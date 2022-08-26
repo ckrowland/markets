@@ -52,20 +52,18 @@ pub fn createBindGroup(gctx: *zgpu.GraphicsContext,
     var consumer_bind_group: zgpu.BindGroupHandle = undefined;
     const num_consumers = sim.consumers.items.len;
     const num_producers = sim.producers.items.len;
-    const consumer_buffer_len = num_consumers * @sizeOf(Consumer);
-    const producer_buffer_len = num_producers * @sizeOf(Producer);
     consumer_bind_group = gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
             .buffer_handle = consumer_buffer,
             .offset = 0,
-            .size = consumer_buffer_len,
+            .size = num_consumers * @sizeOf(Consumer),
         },
         .{
             .binding = 1,
             .buffer_handle = producer_buffer,
             .offset = 0,
-            .size = producer_buffer_len,
+            .size = num_producers * @sizeOf(Producer),
         },
         .{
             .binding = 2,
@@ -273,14 +271,27 @@ pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
-pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
+pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
     const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
         .compute = wgpu.ProgrammableStageDescriptor{
             .module = cs_module,
-            .entry_point = "main",
+            .entry_point = "consumer_main",
+        },
+    };
+
+    return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
+}
+pub fn createProducerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
+    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
+    defer cs_module.release();
+
+    const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
+        .compute = wgpu.ProgrammableStageDescriptor{
+            .module = cs_module,
+            .entry_point = "producer_main",
         },
     };
 

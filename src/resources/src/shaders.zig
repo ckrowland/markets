@@ -57,46 +57,68 @@ pub const cs =
 \\    moving_rate: f32,
 \\    inventory: i32,
 \\    radius: f32,
+\\    producer_id: i32,
 \\  }
 \\  struct Producer {
 \\    position: vec4<f32>,
 \\    production_rate: i32,
 \\    giving_rate: i32,
-\\    inventory: u32,
+\\    inventory: i32,
 \\    width: f32,
 \\  }
 \\  @group(0) @binding(0) var<storage, read_write> consumers_a: array<Consumer>;
-\\  @group(0) @binding(1) var<storage, read> producers: array<Producer>;
+\\  @group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
 \\  @group(0) @binding(2) var<storage, read_write> transactions_this_second: f32;
 \\  @compute @workgroup_size(64)
-\\  fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+\\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
 \\      let c = consumers_a[index];
 \\      consumers_a[index].position = c.position + c.step_size;
 \\      let dist = abs(c.position - c.destination);
-\\      let at_destination = all(dist.xy <= vec2<f32>(c.moving_rate / 2));
+\\      let at_destination = all(dist.xy <= vec2<f32>(0.1));
 \\      
 \\      if (at_destination) {
 \\          var new_destination = vec4<f32>(0);
 \\          let at_home = all(c.destination == c.home);
 \\          if (at_home) {
+\\              consumers_a[index].position = c.home;
+\\              if (c.inventory > c.consumption_rate) {
+\\                  consumers_a[index].inventory -= c.consumption_rate;
+\\                  consumers_a[index].destination = c.home;
+\\                  consumers_a[index].step_size = vec4<f32>(0);
+\\                  return;
+\\              }
 \\              var closest_producer = vec4(10000.0, 10000.0, 0.0, 0.0);
 \\              var shortest_distance = 100000.0;
 \\              var array_len = i32(arrayLength(&producers));
 \\              for(var i = 0; i < array_len; i++){
 \\                  let dist = distance(c.home, producers[i].position);
-\\                  if (dist < shortest_distance) {
+\\                  let inventory = producers[i].inventory;
+\\                  if (dist < shortest_distance && inventory > c.consumption_rate) {
 \\                      shortest_distance = dist;
-\\                      closest_producer = producers[i].position;
+\\                      consumers_a[index].destination = producers[i].position;
+\\                      consumers_a[index].step_size = step_sizes(c.position, producers[i].position, c.moving_rate);
+\\                      consumers_a[index].producer_id = i;
 \\                  }
 \\              }
-\\              new_destination = closest_producer;
+\\              if (shortest_distance == 100000.0) {
+\\                  consumers_a[index].destination = c.home;
+\\                  consumers_a[index].step_size = vec4<f32>(0);
+\\              }
 \\          } else {
-\\              new_destination = c.home;
+\\              let position = c.destination;
+\\              consumers_a[index].position = position;
+\\              let pid = c.producer_id;
+\\              if (producers[pid].inventory < c.consumption_rate) {
+\\                  consumers_a[index].step_size = vec4<f32>(0);
+\\              } else {
+\\                  consumers_a[index].destination = c.home;
+\\                  consumers_a[index].step_size = step_sizes(position, c.home, c.moving_rate);
+\\                  consumers_a[index].inventory += producers[pid].giving_rate;
+\\                  producers[pid].inventory -= c.consumption_rate; 
+\\                  transactions_this_second += 1;
+\\              }
 \\          }
-\\          consumers_a[index].destination = new_destination;
-\\          consumers_a[index].step_size = step_sizes(c.position, new_destination, c.moving_rate);
-\\          transactions_this_second += 1;
 \\      }
 \\  }
 \\  fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
@@ -109,7 +131,12 @@ pub const cs =
 \\  fn num_steps(x: f32, y: f32, rate: f32) -> f32 {
 \\      let distance = abs(x - y);
 \\      if (rate > distance) { return 1.0; }
-\\      return distance / rate;
+\\      return ceil(distance / rate);
 \\  }
+\\  @compute @workgroup_size(64)
+\\  fn producer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+\\      let index : u32 = GlobalInvocationID.x;
+\\      producers[index].inventory += producers[index].production_rate;
+\\}
 ;
 // zig fmt: on

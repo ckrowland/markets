@@ -18,7 +18,7 @@ pub fn update(demo: *DemoState) void {
             }
 
             if (zgui.beginTabItem("Statistics")) {
-                //plots(demo);
+                plots(demo);
                 zgui.endTabItem();
             }
             zgui.endTabBar();
@@ -65,24 +65,24 @@ fn updateStats(demo: *DemoState) void {
     }
 }
 
-//fn plots(demo: *DemoState) void {
-//    const t = @floor(@floatCast(f32, demo.gctx.stats.time));
-//    //const t_idx = @floatToInt(usize, @floatCast(f32, demo.gctx.stats.time));
-//    const stats = demo.sim.stats;
-//    const data = stats.transactions_array.items;
-//    const window_size = zgui.getWindowSize();
-//    const tab_bar_height = 100;
-//    const margin = 50;
-//    const plot_width = window_size[0] - margin;
-//    const plot_height = window_size[1] - tab_bar_height - margin;
-//
-//    if (zgui.beginPlot("My Plot", plot_width, plot_height)) {
-//        zgui.setupXAxisLimits(0, @floatCast(f64, t + 1));
-//        zgui.setupYAxisLimits(0, @floatCast(f64, stats.max_transactions_recorded + (stats.max_transactions_recorded * 0.2) + 1));
-//        zgui.plotLineValues("My Line Plot", data[0..]);
-//        zgui.endPlot();
-//    }
-//}
+fn plots(demo: *DemoState) void {
+    const t = @floor(@floatCast(f32, demo.gctx.stats.time));
+    //const t_idx = @floatToInt(usize, @floatCast(f32, demo.gctx.stats.time));
+    const stats = demo.sim.stats;
+    const data = stats.transactions_array.items;
+    const window_size = zgui.getWindowSize();
+    const tab_bar_height = 100;
+    const margin = 50;
+    const plot_width = window_size[0] - margin;
+    const plot_height = window_size[1] - tab_bar_height - margin;
+
+    if (zgui.beginPlot("My Plot", plot_width, plot_height)) {
+        zgui.setupXAxisLimits(0, @floatCast(f64, t + 1));
+        zgui.setupYAxisLimits(0, @floatCast(f64, stats.max_transactions_recorded + (stats.max_transactions_recorded * 0.2) + 1));
+        zgui.plotLineValues("My Line Plot", data[0..]);
+        zgui.endPlot();
+    }
+}
 
 fn parameters(demo: *DemoState) void {
     zgui.pushItemWidth(zgui.getContentRegionAvailWidth() * 0.4);
@@ -102,7 +102,7 @@ fn parameters(demo: *DemoState) void {
     _ = zgui.sliderInt("Giving Rate",
                         .{ .v = &demo.sim.params.giving_rate,
                            .min = 1,
-                           .max = 100});
+                           .max = 1000});
     _ = zgui.sliderInt("Number of Consumers",
                         .{ .v = &demo.sim.params.num_consumers,
                            .min = 1,
@@ -118,7 +118,7 @@ fn parameters(demo: *DemoState) void {
     if (zgui.button("Start", .{})) {
         const compute_bgl = demo.gctx.createBindGroupLayout(&.{
             zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-            zgpu.bglBuffer(1, .{ .compute = true }, .read_only_storage, true, 0),
+            zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
             zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
         });
         defer demo.gctx.releaseResource(compute_bgl);

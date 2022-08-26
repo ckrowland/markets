@@ -89,6 +89,7 @@ pub fn createConsumers(self: *Self) void {
             .moving_rate = self.params.moving_rate,
             .inventory = 0,
             .radius = self.params.consumer_radius,
+            .producer_id = 1000,
         };
         self.consumers.append(c) catch unreachable;
         i += 1;
@@ -105,7 +106,7 @@ pub fn createProducers(self: *Self) void {
             .position = pos,
             .production_rate = self.params.production_rate,
             .giving_rate = self.params.giving_rate,
-            .inventory = 0,
+            .inventory = 1000,
             .width = self.params.producer_width,
         };
         self.producers.append(p) catch unreachable;
@@ -117,7 +118,7 @@ pub const Producer = struct {
     position: @Vector(4, f32),
     production_rate: i32,
     giving_rate: i32,
-    inventory: u32,
+    inventory: i32,
     width: f32,
 };
 
@@ -130,4 +131,5 @@ pub const Consumer = struct {
     moving_rate: f32,
     inventory: i32,
     radius: f32,
+    producer_id: i32,
 };

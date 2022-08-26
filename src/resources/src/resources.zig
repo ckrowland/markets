@@ -31,7 +31,8 @@ pub const DemoState = struct {
 
     producer_pipeline: zgpu.RenderPipelineHandle,
     consumer_pipeline: zgpu.RenderPipelineHandle,
-    compute_pipeline: zgpu.ComputePipelineHandle,
+    consumer_compute_pipeline: zgpu.ComputePipelineHandle,
+    producer_compute_pipeline: zgpu.ComputePipelineHandle,
     bind_group: zgpu.BindGroupHandle,
 
     producer_vertex_buffer: zgpu.BufferHandle,
@@ -79,13 +80,14 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     // Create Compute Bind Group and Pipeline
     const compute_bgl = gctx.createBindGroupLayout(&.{
         zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .read_only_storage, true, 0),
+        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
         zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
     });
     defer gctx.releaseResource(compute_bgl);
     const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
     defer gctx.releaseResource(compute_pl);
-    const compute_pipeline = Shapes.createComputePipeline(gctx, compute_pl);
+    const consumer_compute_pipeline = Shapes.createConsumerComputePipeline(gctx, compute_pl);
+    const producer_compute_pipeline = Shapes.createProducerComputePipeline(gctx, compute_pl);
 
     // Create Buffers
     const producer_buffer = Shapes.createProducerBuffer(gctx, sim.producers);
@@ -130,7 +132,8 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         .gctx = gctx,
         .producer_pipeline = producer_pipeline,
         .consumer_pipeline = consumer_pipeline,
-        .compute_pipeline = compute_pipeline,
+        .consumer_compute_pipeline = consumer_compute_pipeline,
+        .producer_compute_pipeline = producer_compute_pipeline,
         .bind_group = bind_group,
         .producer_vertex_buffer = producer_vertex_buffer,
         .producer_buffer = producer_buffer,
@@ -186,7 +189,8 @@ fn draw(demo: *DemoState) void {
         defer encoder.release();
 
         pass: {
-            const cp = gctx.lookupResource(demo.compute_pipeline) orelse break :pass;
+            const cp = gctx.lookupResource(demo.producer_compute_pipeline) orelse break :pass;
+            const ccp = gctx.lookupResource(demo.consumer_compute_pipeline) orelse break :pass;
             const bg = gctx.lookupResource(demo.consumer_bind_group) orelse break :pass;
             const bg_info = gctx.lookupResourceInfo(demo.consumer_bind_group) orelse break :pass;
             const first_offset = @intCast(u32, bg_info.entries[0].offset);
@@ -201,8 +205,13 @@ fn draw(demo: *DemoState) void {
             }
             pass.setPipeline(cp);
             pass.setBindGroup(0, bg, dynamic_offsets);
+            const num_producers = @intToFloat(f32, demo.sim.producers.items.len);
+            var workgroup_size = @floatToInt(u32, @ceil(num_producers / 64));
+            pass.dispatchWorkgroups(workgroup_size, 1, 1);
+
+            pass.setPipeline(ccp);
             const num_consumers = @intToFloat(f32, demo.sim.consumers.items.len);
-            const workgroup_size = @floatToInt(u32, @ceil(num_consumers / 64));
+            workgroup_size = @floatToInt(u32, @ceil(num_consumers / 64));
             pass.dispatchWorkgroups(workgroup_size, 1, 1);
         }
 
@@ -251,6 +260,12 @@ fn draw(demo: *DemoState) void {
             mem.slice[0] = zm.transpose(cam_world_to_clip);
             pass.setBindGroup(0, bind_group, &.{mem.offset});
 
+            pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+            pass.setVertexBuffer(1, vpb_info.gpuobj.?, 0, vpb_info.size);
+            const num_producers = @intCast(u32, demo.sim.producers.items.len);
+            pass.setPipeline(producer_pipeline);
+            pass.draw(6, num_producers, 0, 0);
+
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cpb_info.gpuobj.?, 0, cpb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
@@ -258,11 +273,6 @@ fn draw(demo: *DemoState) void {
             pass.setPipeline(consumer_pipeline);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
 
-            pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-            pass.setVertexBuffer(1, vpb_info.gpuobj.?, 0, vpb_info.size);
-            const num_producers = @intCast(u32, demo.sim.producers.items.len);
-            pass.setPipeline(producer_pipeline);
-            pass.draw(6, num_producers, 0, 0);
 
         }
 
