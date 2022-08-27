@@ -24,11 +24,40 @@ coordinate_size: struct {
 producers: array(Producer),
 consumers: array(Consumer),
 stats: struct {
-    transactions_array: array(f32),
-    num_transactions_last_second: f32,
-    previous_second: f32,
-    max_transactions_recorded: f32,
+    num_transactions: array(i32),
+    second: f32,
+    max_stat_recorded: i32,
+    num_empty_consumers: array(i32),
+    num_total_producer_inventory: array(i32),
 },
+
+pub const Producer = struct {
+    position: @Vector(4, f32),
+    production_rate: i32,
+    giving_rate: i32,
+    inventory: i32,
+    width: f32,
+};
+
+pub const Consumer = struct {
+    position: @Vector(4, f32),
+    home: @Vector(4, f32),
+    destination: @Vector(4, f32),
+    step_size: @Vector(4, f32),
+    consumption_rate: i32,
+    moving_rate: f32,
+    inventory: i32,
+    radius: f32,
+    producer_id: i32,
+};
+
+pub const Statistics = struct {
+    num_transactions: array(i32),
+    second: i32,
+    max_stat_recorded: i32,
+    num_empty_consumers: array(i32),
+    num_total_producer_inventory: array(i32),
+};
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
@@ -52,10 +81,11 @@ pub fn init(allocator: std.mem.Allocator) Self {
         .consumers = array(Consumer).init(allocator),
         .producers = array(Producer).init(allocator),
         .stats = .{
-            .transactions_array = array(f32).init(allocator),
-            .num_transactions_last_second = 0,
-            .previous_second = 0,
-            .max_transactions_recorded = 0,
+            .num_transactions = array(i32).init(allocator),
+            .second = 0,
+            .max_stat_recorded = 0,
+            .num_empty_consumers = array(i32).init(allocator),
+            .num_total_producer_inventory = array(i32).init(allocator), 
         },
     };
 }
@@ -63,12 +93,17 @@ pub fn init(allocator: std.mem.Allocator) Self {
 pub fn deinit(self: *Self) void {
     self.producers.deinit();
     self.consumers.deinit();
-    self.stats.transactions_array.deinit();
+    self.stats.num_transactions.deinit();
+    self.stats.num_empty_consumers.deinit();
+    self.stats.num_total_producer_inventory.deinit();
 }
 
 pub fn createAgents(self: *Self) void {
     self.producers.clearAndFree();
     self.consumers.clearAndFree();
+    self.stats.num_transactions.clearAndFree();
+    self.stats.num_empty_consumers.clearAndFree();
+    self.stats.num_total_producer_inventory.clearAndFree();
     createProducers(self);
     createConsumers(self);
 }
@@ -114,22 +149,3 @@ pub fn createProducers(self: *Self) void {
     }
 }
 
-pub const Producer = struct {
-    position: @Vector(4, f32),
-    production_rate: i32,
-    giving_rate: i32,
-    inventory: i32,
-    width: f32,
-};
-
-pub const Consumer = struct {
-    position: @Vector(4, f32),
-    home: @Vector(4, f32),
-    destination: @Vector(4, f32),
-    step_size: @Vector(4, f32),
-    consumption_rate: i32,
-    moving_rate: f32,
-    inventory: i32,
-    radius: f32,
-    producer_id: i32,
-};

@@ -66,9 +66,15 @@ pub const cs =
 \\    inventory: i32,
 \\    width: f32,
 \\  }
+\\  struct Stats {
+\\    num_transactions: i32,
+\\    num_empty_consumers: i32,
+\\    num_total_producer_inventory: i32,
+\\  }
+\\      
 \\  @group(0) @binding(0) var<storage, read_write> consumers_a: array<Consumer>;
 \\  @group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
-\\  @group(0) @binding(2) var<storage, read_write> transactions_this_second: f32;
+\\  @group(0) @binding(2) var<storage, read_write> stats: vec3<i32>;
 \\  @compute @workgroup_size(64)
 \\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
@@ -104,6 +110,7 @@ pub const cs =
 \\              if (shortest_distance == 100000.0) {
 \\                  consumers_a[index].destination = c.home;
 \\                  consumers_a[index].step_size = vec4<f32>(0);
+\\                  stats[1] += 1;
 \\              }
 \\          } else {
 \\              let position = c.destination;
@@ -116,7 +123,7 @@ pub const cs =
 \\                  consumers_a[index].step_size = step_sizes(position, c.home, c.moving_rate);
 \\                  consumers_a[index].inventory += producers[pid].giving_rate;
 \\                  producers[pid].inventory -= c.consumption_rate; 
-\\                  transactions_this_second += 1;
+\\                  stats[0] += 1;
 \\              }
 \\          }
 \\      }
@@ -137,6 +144,13 @@ pub const cs =
 \\  fn producer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
 \\      producers[index].inventory += producers[index].production_rate;
+\\
+\\      var total_producer_inventory = 0;
+\\      let array_len = i32(arrayLength(&producers));
+\\      for(var i = 0; i < array_len; i++){
+\\          total_producer_inventory += producers[i].inventory;
+\\      }
+\\      stats[2] = total_producer_inventory;
 \\}
 ;
 // zig fmt: on

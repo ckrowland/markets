@@ -1,4 +1,6 @@
-const Vertex = @import("resources.zig").Vertex;
+const main = @import("resources.zig");
+const Vertex = main.Vertex;
+const GPUStats = main.GPUStats;
 const std = @import("std");
 const math = std.math;
 const zgpu = @import("zgpu");
@@ -9,7 +11,7 @@ const Producer = Simulation.Producer;
 const wgsl = @import("shaders.zig");
 const array = std.ArrayList;
 
-pub fn createConsumerIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32) zgpu.BufferHandle{
+pub fn createConsumerIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32) zgpu.BufferHandle {
     const num_triangles = num_vertices - 1;
     const consumer_index_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .index = true },
@@ -20,7 +22,7 @@ pub fn createConsumerIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_verti
     return consumer_index_buffer;
 }
 
-pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comptime num_vertices: u32) zgpu.BufferHandle{
+pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comptime num_vertices: u32) zgpu.BufferHandle {
     const consumer_vertex_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = num_vertices * @sizeOf(Vertex),
@@ -30,8 +32,8 @@ pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comp
     const angle = 2 * math.pi / num_sides;
 
     consumer_vertex_data[0] = createVertex(0, 0);
-    var i:u32 = 1;
-    while (i < num_vertices){
+    var i: u32 = 1;
+    while (i < num_vertices) {
         const current_angle = angle * @intToFloat(f32, i);
         const x = @cos(current_angle) * radius;
         const y = @sin(current_angle) * radius;
@@ -42,13 +44,7 @@ pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comp
     return consumer_vertex_buffer;
 }
 
-pub fn createBindGroup(gctx: *zgpu.GraphicsContext,
-                        sim: Simulation,
-                        compute_bgl: zgpu.BindGroupLayoutHandle,
-                        consumer_buffer: zgpu.BufferHandle,
-                        producer_buffer: zgpu.BufferHandle,
-                        num_transactions_buffer: zgpu.BufferHandle)
-                            zgpu.BindGroupHandle{
+pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, producer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
     var consumer_bind_group: zgpu.BindGroupHandle = undefined;
     const num_consumers = sim.consumers.items.len;
     const num_producers = sim.producers.items.len;
@@ -67,9 +63,9 @@ pub fn createBindGroup(gctx: *zgpu.GraphicsContext,
         },
         .{
             .binding = 2,
-            .buffer_handle = num_transactions_buffer,
+            .buffer_handle = stats_buffer,
             .offset = 0,
-            .size = @sizeOf(f32),
+            .size = @sizeOf(GPUStats),
         },
     });
     return consumer_bind_group;
@@ -102,7 +98,7 @@ pub fn createConsumerIndexData(comptime num_triangles: u32) [num_triangles * 3]i
 }
 
 fn createVertex(x: f32, y: f32) Vertex {
-    return Vertex {
+    return Vertex{
         .position = [3]f32{ x, y, 0.0 },
         .color = [3]f32{ 0.0, 0.0, 1.0 },
     };
@@ -114,12 +110,12 @@ pub fn createProducerVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.
         .size = 6 * @sizeOf(Vertex),
     });
 
-    const upper_left = [3]f32{ -width, width, 0.0};
-    const lower_left = [3]f32{ -width, -width, 0.0};
-    const upper_right = [3]f32{ width, width, 0.0};
-    const lower_right = [3]f32{ width, -width, 0.0};
+    const upper_left = [3]f32{ -width, width, 0.0 };
+    const lower_left = [3]f32{ -width, -width, 0.0 };
+    const upper_right = [3]f32{ width, width, 0.0 };
+    const lower_right = [3]f32{ width, -width, 0.0 };
     const color = [3]f32{ 1.0, 0.0, 0.0 };
-    const producer_vertex_data = [6]Vertex {
+    const producer_vertex_data = [6]Vertex{
         .{ .position = upper_left, .color = color },
         .{ .position = lower_left, .color = color },
         .{ .position = lower_right, .color = color },
@@ -143,7 +139,6 @@ pub fn createProducerBuffer(gctx: *zgpu.GraphicsContext, producers: array(Produc
 }
 
 pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-
     const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
     defer vs_module.release();
 
@@ -208,7 +203,6 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 }
 
 pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-
     const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.consumer_vs, "consumer_vs");
     defer vs_module.release();
 

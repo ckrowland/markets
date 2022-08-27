@@ -9,6 +9,7 @@ const array = std.ArrayList;
 const random = std.crypto.random;
 const F32x4 = @Vector(4, f32);
 const Simulation = @import("simulation.zig");
+const Statistics = Simulation.stats;
 const Shapes = @import("shapes.zig");
 const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
@@ -17,13 +18,19 @@ const content_dir = @import("build_options").content_dir;
 const window_title = "Resource Simulation";
 
 pub const StagingBuffer = struct {
-    slice: ?[]const f32 = null,
+    slice: ?[]const [3]i32 = null,
     buffer: wgpu.Buffer = undefined,
 };
 
 pub const Vertex = struct {
     position: [3]f32,
     color: [3]f32,
+};
+
+pub const GPUStats = struct {
+    num_transactions: i32,
+    num_empty_consumers: i32,
+    num_total_producer_inventory: i32,
 };
 
 pub const DemoState = struct {
@@ -41,9 +48,9 @@ pub const DemoState = struct {
     consumer_index_buffer: zgpu.BufferHandle,
     consumer_buffer: zgpu.BufferHandle,
     consumer_bind_group: zgpu.BindGroupHandle,
-    num_transactions_buffer: zgpu.BufferHandle,
-    num_transactions_buffer_copy: zgpu.BufferHandle,
-    num_transactions: StagingBuffer,
+    stats_buffer: zgpu.BufferHandle,
+    stats_mapped_buffer: zgpu.BufferHandle,
+    stats: StagingBuffer,
 
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
@@ -60,18 +67,13 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         zgpu.bglBuffer(0, .{ .vertex = true }, .uniform, true, 0),
     });
     defer gctx.releaseResource(bind_group_layout);
-    const bind_group = gctx.createBindGroup(bind_group_layout,
-                                            &[_]zgpu.BindGroupEntryInfo{
-        .{ .binding = 0,
-           .buffer_handle = gctx.uniforms.buffer,
-           .offset = 0,
-           .size = @sizeOf(zm.Mat) },
+    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
+        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
     const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
     defer gctx.releaseResource(pipeline_layout);
     const producer_pipeline = Shapes.createProducerPipeline(gctx, pipeline_layout);
     const consumer_pipeline = Shapes.createConsumerPipeline(gctx, pipeline_layout);
-
 
     // Simulation struct
     var sim = Simulation.init(allocator);
@@ -94,36 +96,28 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     const producer_vertex_buffer = Shapes.createProducerVertexBuffer(gctx, sim.params.producer_width);
 
     const num_vertices = 20;
-    const consumer_vertex_buffer = Shapes.createConsumerVertexBuffer(gctx,
-                                    sim.params.consumer_radius,
-                                    num_vertices);
+    const consumer_vertex_buffer = Shapes.createConsumerVertexBuffer(gctx, sim.params.consumer_radius, num_vertices);
     const consumer_index_buffer = Shapes.createConsumerIndexBuffer(gctx, num_vertices);
     var consumer_buffer = Shapes.createConsumerBuffer(gctx, sim.consumers);
 
-    const num_transactions_buffer = gctx.createBuffer(.{
+    const stats_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .storage = true },
-        .size = @sizeOf(f32),
+        .size = @sizeOf(f32) * 3,
     });
-    const num_transactions_buffer_copy = gctx.createBuffer(.{
+    const stats_mapped_buffer  = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .map_read = true },
-        .size = @sizeOf(f32),
+        .size = @sizeOf(f32) * 3,
     });
 
-    const num_transactions_data = [_]f32{ 0.0 };
-    gctx.queue.writeBuffer(gctx.lookupResource(num_transactions_buffer).?, 0, f32, num_transactions_data[0..]);
+    const stats_data = [_][3]f32{ [3]f32{0.0, 0.0, 0.0 }, };
+    gctx.queue.writeBuffer(gctx.lookupResource(stats_buffer).?, 0, [3]f32, stats_data[0..]);
 
-    var num_transactions: StagingBuffer = .{
+    var stats: StagingBuffer = .{
         .slice = null,
-        .buffer = gctx.lookupResource(num_transactions_buffer_copy).?,
+        .buffer = gctx.lookupResource(stats_mapped_buffer).?,
     };
 
-    var consumer_bind_group = Shapes.createBindGroup(gctx,
-                                                     sim,
-                                                     compute_bgl,
-                                                     consumer_buffer,
-                                                     producer_buffer,
-                                                     num_transactions_buffer);
- 
+    var consumer_bind_group = Shapes.createBindGroup(gctx, sim, compute_bgl, consumer_buffer, producer_buffer, stats_buffer);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -141,9 +135,9 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         .consumer_index_buffer = consumer_index_buffer,
         .consumer_buffer = consumer_buffer,
         .consumer_bind_group = consumer_bind_group,
-        .num_transactions_buffer = num_transactions_buffer,
-        .num_transactions_buffer_copy = num_transactions_buffer_copy,
-        .num_transactions = num_transactions,
+        .stats_buffer = stats_buffer,
+        .stats_mapped_buffer = stats_mapped_buffer,
+        .stats = stats,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
@@ -196,7 +190,7 @@ fn draw(demo: *DemoState) void {
             const first_offset = @intCast(u32, bg_info.entries[0].offset);
             const second_offset = @intCast(u32, bg_info.entries[1].offset);
             const third_offset = @intCast(u32, bg_info.entries[2].offset);
-            const dynamic_offsets = &.{ first_offset, second_offset, third_offset};
+            const dynamic_offsets = &.{ first_offset, second_offset, third_offset };
 
             const pass = encoder.beginComputePass(null);
             defer {
@@ -217,9 +211,9 @@ fn draw(demo: *DemoState) void {
 
         // Copy transactions number to mapped buffer
         pass: {
-            const buf = gctx.lookupResource(demo.num_transactions_buffer) orelse break :pass;
-            const cp = gctx.lookupResource(demo.num_transactions_buffer_copy) orelse break :pass;
-            encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(f32));
+            const buf = gctx.lookupResource(demo.stats_buffer) orelse break :pass;
+            const cp = gctx.lookupResource(demo.stats_mapped_buffer) orelse break :pass;
+            encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(f32) * 3);
         }
 
         pass: {
@@ -255,7 +249,6 @@ fn draw(demo: *DemoState) void {
                 pass.release();
             }
 
-
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
             mem.slice[0] = zm.transpose(cam_world_to_clip);
             pass.setBindGroup(0, bind_group, &.{mem.offset});
@@ -272,8 +265,6 @@ fn draw(demo: *DemoState) void {
             const num_consumers = @intCast(u32, demo.sim.consumers.items.len);
             pass.setPipeline(consumer_pipeline);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
-
-
         }
 
         {
@@ -317,7 +308,7 @@ pub fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyo
     const usb = @ptrCast(*StagingBuffer, @alignCast(@sizeOf(usize), userdata));
     std.debug.assert(usb.slice == null);
     if (status == .success) {
-        usb.slice = usb.buffer.getConstMappedRange(f32, 0, 1).?;
+        usb.slice = usb.buffer.getConstMappedRange([3]i32, 0, 1).?;
     } else {
         std.debug.print("[zgpu] Failed to map buffer (code: {d})\n", .{@enumToInt(status)});
     }

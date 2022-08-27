@@ -7,8 +7,7 @@ Using agent-based modeling to visualize and simulate complex systems.
 
 ## Run
 ```
-git clone https://github.com/ckrowland/simulations.git
+git clone --recurse-submodules https://github.com/ckrowland/simulations.git
 cd simulations
-git submodule update --init --recursive
 zig build resources-run
 ```
