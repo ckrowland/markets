@@ -100,7 +100,6 @@ pub fn createConsumerIndexData(comptime num_triangles: u32) [num_triangles * 3]i
 fn createVertex(x: f32, y: f32) Vertex {
     return Vertex{
         .position = [3]f32{ x, y, 0.0 },
-        .color = [3]f32{ 0.0, 0.0, 1.0 },
     };
 }
 
@@ -114,14 +113,13 @@ pub fn createProducerVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.
     const lower_left = [3]f32{ -width, -width, 0.0 };
     const upper_right = [3]f32{ width, width, 0.0 };
     const lower_right = [3]f32{ width, -width, 0.0 };
-    const color = [3]f32{ 1.0, 0.0, 0.0 };
     const producer_vertex_data = [6]Vertex{
-        .{ .position = upper_left, .color = color },
-        .{ .position = lower_left, .color = color },
-        .{ .position = lower_right, .color = color },
-        .{ .position = lower_right, .color = color },
-        .{ .position = upper_right, .color = color },
-        .{ .position = upper_left, .color = color },
+        .{ .position = upper_left, },
+        .{ .position = lower_left, },
+        .{ .position = lower_right, },
+        .{ .position = lower_right, },
+        .{ .position = upper_right, },
+        .{ .position = upper_left, },
     };
 
     gctx.queue.writeBuffer(gctx.lookupResource(producer_vertex_buffer).?, 0, Vertex, producer_vertex_data[0..]);
@@ -151,12 +149,12 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
     }};
 
     const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "color"), .shader_location = 1 },
+        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
     };
 
     const instance_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x2, .offset = 0, .shader_location = 2 },
+        .{ .format = .float32x4, .offset = @offsetOf(Producer, "position"), .shader_location = 1 },
+        .{ .format = .float32x4, .offset = @offsetOf(Producer, "color"), .shader_location = 2 },
     };
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{
@@ -215,12 +213,12 @@ pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
     }};
 
     const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "color"), .shader_location = 1 },
+        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
     };
 
     const instance_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x2, .offset = 0, .shader_location = 2 },
+        .{ .format = .float32x4, .offset = @offsetOf(Consumer, "position"), .shader_location = 1 },
+        .{ .format = .float32x4, .offset = @offsetOf(Consumer, "color"), .shader_location = 2 },
     };
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{

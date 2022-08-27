@@ -8,6 +8,7 @@ params: struct {
     num_producers: i32,
     production_rate: i32,
     giving_rate: i32,
+    max_inventory: i32,
     num_consumers: i32,
     consumption_rate: i32,
     moving_rate: f32,
@@ -33,9 +34,11 @@ stats: struct {
 
 pub const Producer = struct {
     position: @Vector(4, f32),
+    color: @Vector(4, f32),
     production_rate: i32,
     giving_rate: i32,
     inventory: i32,
+    max_inventory: i32,
     width: f32,
 };
 
@@ -44,6 +47,7 @@ pub const Consumer = struct {
     home: @Vector(4, f32),
     destination: @Vector(4, f32),
     step_size: @Vector(4, f32),
+    color: @Vector(4, f32),
     consumption_rate: i32,
     moving_rate: f32,
     inventory: i32,
@@ -65,6 +69,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .num_producers = 10,
             .production_rate = 10,
             .giving_rate = 10,
+            .max_inventory = 10000,
             .num_consumers = 10000,
             .consumption_rate = 10,
             .moving_rate = 5.0,
@@ -104,6 +109,11 @@ pub fn createAgents(self: *Self) void {
     self.stats.num_transactions.clearAndFree();
     self.stats.num_empty_consumers.clearAndFree();
     self.stats.num_total_producer_inventory.clearAndFree();
+    self.stats.num_transactions.append(0) catch unreachable;
+    self.stats.num_empty_consumers.append(0) catch unreachable;
+    self.stats.num_total_producer_inventory.append(0) catch unreachable;
+    self.stats.second = 0;
+    self.stats.max_stat_recorded = 0;
     createProducers(self);
     createConsumers(self);
 }
@@ -115,11 +125,13 @@ pub fn createConsumers(self: *Self) void {
         const y = @intToFloat(f32, random.intRangeAtMost(i32, self.coordinate_size.min_y, self.coordinate_size.max_y));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
         const step_size = @Vector(4, f32){ 0.0, 0.0, 0.0, 0.0 };
+        const init_color = @Vector(4, f32){ 0.0, 1.0, 0.0, 0.0 };
         const c = Consumer{
             .position = pos,
             .home = pos,
             .destination = pos,
             .step_size = step_size,
+            .color = init_color,
             .consumption_rate = self.params.consumption_rate,
             .moving_rate = self.params.moving_rate,
             .inventory = 0,
@@ -137,15 +149,17 @@ pub fn createProducers(self: *Self) void {
         const x = @intToFloat(f32, random.intRangeAtMost(i32, self.coordinate_size.min_x, self.coordinate_size.max_x));
         const y = @intToFloat(f32, random.intRangeAtMost(i32, self.coordinate_size.min_y, self.coordinate_size.max_y));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
+        const init_color = @Vector(4, f32){ 1.0, 1.0, 1.0, 0.0 };
         const p = Producer{
             .position = pos,
+            .color = init_color,
             .production_rate = self.params.production_rate,
             .giving_rate = self.params.giving_rate,
             .inventory = 1000,
+            .max_inventory = self.params.max_inventory,
             .width = self.params.producer_width,
         };
         self.producers.append(p) catch unreachable;
         i += 1;
     }
 }
-

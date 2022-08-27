@@ -101,19 +101,13 @@ fn parameters(demo: *DemoState) void {
     _ = zgui.sliderInt("Number of Producers", .{ .v = &demo.sim.params.num_producers, .min = 1, .max = 100 });
     _ = zgui.sliderInt("Production Rate", .{ .v = &demo.sim.params.production_rate, .min = 1, .max = 100 });
     _ = zgui.sliderInt("Giving Rate", .{ .v = &demo.sim.params.giving_rate, .min = 1, .max = 1000 });
+    _ = zgui.sliderInt("Max Inventory", .{ .v = &demo.sim.params.max_inventory, .min = 1, .max = 1000 });
+    zgui.dummy(.{.w = 1.0, .h = 40.0});
     _ = zgui.sliderInt("Number of Consumers", .{ .v = &demo.sim.params.num_consumers, .min = 1, .max = 10000 });
     _ = zgui.sliderInt("Consumption Rate", .{ .v = &demo.sim.params.consumption_rate, .min = 1, .max = 100 });
     _ = zgui.sliderFloat("Moving Rate", .{ .v = &demo.sim.params.moving_rate, .min = 1.0, .max = 20 });
+    _ = zgui.sliderFloat("Consumer Size", .{ .v = &demo.sim.params.consumer_radius, .min = 1, .max = 20 });
     if (zgui.button("Start", .{})) {
-        const compute_bgl = demo.gctx.createBindGroupLayout(&.{
-            zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-            zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-            zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
-        });
-        defer demo.gctx.releaseResource(compute_bgl);
-        demo.sim.createAgents();
-        demo.producer_buffer = Shapes.createProducerBuffer(demo.gctx, demo.sim.producers);
-        demo.consumer_buffer = Shapes.createConsumerBuffer(demo.gctx, demo.sim.consumers);
-        demo.consumer_bind_group = Shapes.createBindGroup(demo.gctx, demo.sim, compute_bgl, demo.consumer_buffer, demo.producer_buffer, demo.stats_buffer);
+        main.startSimulation(demo);
     }
 }

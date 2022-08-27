@@ -7,8 +7,8 @@ pub const producer_vs =
 \\  }
 \\  @stage(vertex) fn main(
 \\      @location(0) vertex_position: vec3<f32>,
-\\      @location(1) color: vec3<f32>,
-\\      @location(2) position: vec2<f32>,
+\\      @location(1) position: vec4<f32>,
+\\      @location(2) color: vec3<f32>,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
 \\      var x = position[0] + vertex_position[0];
@@ -26,14 +26,14 @@ pub const consumer_vs =
 \\  }
 \\  @stage(vertex) fn main(
 \\      @location(0) vertex_position: vec3<f32>,
-\\      @location(1) color: vec3<f32>,
-\\      @location(2) position: vec2<f32>,
+\\      @location(1) position: vec4<f32>,
+\\      @location(2) color: vec4<f32>,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
 \\      var x = position[0] + vertex_position[0];
 \\      var y = position[1] + vertex_position[1];
 \\      output.position_clip = vec4(x, y, 0.0, 1.0) * object_to_clip;
-\\      output.color = color;
+\\      output.color = color.xyz;
 \\      return output;
 \\  }
 ;
@@ -45,14 +45,12 @@ pub const fs =
 \\  }
 ;
 pub const cs =
-\\  struct Position {
-\\    position: vec2<f32>,
-\\  }
 \\  struct Consumer {
 \\    position: vec4<f32>,
 \\    home: vec4<f32>,
 \\    destination: vec4<f32>,
 \\    step_size: vec4<f32>,
+\\    color: vec4<f32>,
 \\    consumption_rate: i32,
 \\    moving_rate: f32,
 \\    inventory: i32,
@@ -61,9 +59,11 @@ pub const cs =
 \\  }
 \\  struct Producer {
 \\    position: vec4<f32>,
+\\    color: vec4<f32>,
 \\    production_rate: i32,
 \\    giving_rate: i32,
 \\    inventory: i32,
+\\    max_inventory: i32,
 \\    width: f32,
 \\  }
 \\  struct Stats {
@@ -79,7 +79,7 @@ pub const cs =
 \\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
 \\      let c = consumers_a[index];
-\\      consumers_a[index].position = c.position + c.step_size;
+\\      consumers_a[index].position += c.step_size;
 \\      let dist = abs(c.position - c.destination);
 \\      let at_destination = all(dist.xy <= vec2<f32>(0.1));
 \\      
@@ -94,6 +94,8 @@ pub const cs =
 \\                  consumers_a[index].step_size = vec4<f32>(0);
 \\                  return;
 \\              }
+\\              consumers_a[index].color = vec4(1.0, 0.0, 0.0, 0.0);
+\\              stats[1] += 1;
 \\              var closest_producer = vec4(10000.0, 10000.0, 0.0, 0.0);
 \\              var shortest_distance = 100000.0;
 \\              var array_len = i32(arrayLength(&producers));
@@ -110,7 +112,6 @@ pub const cs =
 \\              if (shortest_distance == 100000.0) {
 \\                  consumers_a[index].destination = c.home;
 \\                  consumers_a[index].step_size = vec4<f32>(0);
-\\                  stats[1] += 1;
 \\              }
 \\          } else {
 \\              let position = c.destination;
@@ -124,6 +125,7 @@ pub const cs =
 \\                  consumers_a[index].inventory += producers[pid].giving_rate;
 \\                  producers[pid].inventory -= c.consumption_rate; 
 \\                  stats[0] += 1;
+\\                  consumers_a[index].color = vec4(0.0, 1.0, 0.0, 0.0);
 \\              }
 \\          }
 \\      }
@@ -143,7 +145,10 @@ pub const cs =
 \\  @compute @workgroup_size(64)
 \\  fn producer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
-\\      producers[index].inventory += producers[index].production_rate;
+\\      let p = producers[index];
+\\      if (p.max_inventory - p.inventory > p.production_rate) {
+\\          producers[index].inventory += p.production_rate;
+\\      }
 \\
 \\      var total_producer_inventory = 0;
 \\      let array_len = i32(arrayLength(&producers));

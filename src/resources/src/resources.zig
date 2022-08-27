@@ -24,7 +24,6 @@ pub const StagingBuffer = struct {
 
 pub const Vertex = struct {
     position: [3]f32,
-    color: [3]f32,
 };
 
 pub const GPUStats = struct {
@@ -109,8 +108,8 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         .size = @sizeOf(f32) * 3,
     });
 
-    const stats_data = [_][3]f32{ [3]f32{0.0, 0.0, 0.0 }, };
-    gctx.queue.writeBuffer(gctx.lookupResource(stats_buffer).?, 0, [3]f32, stats_data[0..]);
+    const stats_data = [_][3]i32{ [3]i32{0.0, 0.0, 0.0 }, };
+    gctx.queue.writeBuffer(gctx.lookupResource(stats_buffer).?, 0, [3]i32, stats_data[0..]);
 
     var stats: StagingBuffer = .{
         .slice = null,
@@ -302,6 +301,22 @@ fn draw(demo: *DemoState) void {
         demo.depth_texture = depth.texture;
         demo.depth_texture_view = depth.view;
     }
+}
+
+pub fn startSimulation(demo: *DemoState) void {
+    const compute_bgl = demo.gctx.createBindGroupLayout(&.{
+        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
+    });
+    defer demo.gctx.releaseResource(compute_bgl);
+    demo.sim.createAgents();
+    demo.producer_buffer = Shapes.createProducerBuffer(demo.gctx, demo.sim.producers);
+    demo.consumer_buffer = Shapes.createConsumerBuffer(demo.gctx, demo.sim.consumers);
+    const stats_data = [_][3]i32{ [3]i32{ 0, 0, 0 }, };
+    demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, [3]i32, stats_data[0..]);
+    demo.consumer_bind_group = Shapes.createBindGroup(demo.gctx, demo.sim, compute_bgl, demo.consumer_buffer, demo.producer_buffer, demo.stats_buffer);
+    demo.consumer_vertex_buffer = Shapes.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
 }
 
 pub fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
