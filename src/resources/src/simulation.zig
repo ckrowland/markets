@@ -79,9 +79,9 @@ pub fn init(allocator: std.mem.Allocator) Self {
         },
         .coordinate_size = .{
             .min_x = -1000,
-            .min_y = -1000,
-            .max_x = 1000,
-            .max_y = 1000,
+            .min_y = -500,
+            .max_x = 1800,
+            .max_y = 1200,
         },
         .consumers = array(Consumer).init(allocator),
         .producers = array(Producer).init(allocator),
@@ -155,7 +155,7 @@ pub fn createProducers(self: *Self) void {
             .color = init_color,
             .production_rate = self.params.production_rate,
             .giving_rate = self.params.giving_rate,
-            .inventory = 1000,
+            .inventory = 0,
             .max_inventory = self.params.max_inventory,
             .width = self.params.producer_width,
         };

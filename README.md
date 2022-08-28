@@ -1,9 +1,9 @@
 # Simulations
-Use GPU Accelerated agent-based modeling to visualize and simulate complex systems.
+GPU Accelerated agent-based modeling to visualize and simulate complex systems.
 
 ## Current Simulations
 - Resource Distribution
-  - Simulate market dynamics of consumers and producers with certain parameters
+  - Simulate market dynamics of consumers and producers.
   - Consumers move to Producers, get resources, travel home and consume the resources.
   - Parameters:
     - Number of Consumers
@@ -12,6 +12,13 @@ Use GPU Accelerated agent-based modeling to visualize and simulate complex syste
     - Consumers consumption rate
     - Producers production rate
     - Producers giving rate
+    - Producers maximum inventory
+  - Data Gathered:
+    - Transactions per second
+    - Empty Consumers
+    - Total Producer Inventory
+  - To remove a line from the graph, click it's title in the legend.
+
 ## Install
 - `git` with [Git LFS](https://git-lfs.github.com/)
 - [Zig 0.10.0-dev.3027 (master)](https://ziglang.org/download/) or newer

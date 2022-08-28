@@ -7,7 +7,7 @@ const Options = @import("../../build.zig").Options;
 const content_dir = "content/";
 
 pub fn build(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
-    const exe = b.addExecutable("resources", thisDir() ++ "/src/resources.zig");
+    const exe = b.addExecutable("Resource Simulation", thisDir() ++ "/src/resources.zig");
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
