@@ -2,6 +2,8 @@
 GPU Accelerated agent-based modeling to visualize and simulate complex systems.
 
 ## Current Simulations
+![demo](gh_demo.gif)
+
 - Resource Distribution
   - Simulate market dynamics of consumers and producers.
   - Consumers move to Producers, get resources, travel home and consume the resources.
@@ -18,6 +20,8 @@ GPU Accelerated agent-based modeling to visualize and simulate complex systems.
     - Empty Consumers
     - Total Producer Inventory
   - To remove a line from the graph, click it's title in the legend.
+
+
 
 ## Install
 - `git` with [Git LFS](https://git-lfs.github.com/)
