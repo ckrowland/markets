@@ -7,6 +7,8 @@ GPU Accelerated agent-based modeling to visualize and simulate complex systems.
 - Resource Distribution
   - Simulate market dynamics of consumers and producers.
   - Consumers move to Producers, get resources, travel home and consume the resources.
+  - Red means consumer is empty and looking for resources.
+  - Green means consumer has enough resources to consume.
   - Parameters:
     - Number of Consumers
     - Number of Producers
