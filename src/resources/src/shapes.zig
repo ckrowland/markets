@@ -137,7 +137,7 @@ pub fn createProducerBuffer(gctx: *zgpu.GraphicsContext, producers: array(Produc
 }
 
 pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
     defer vs_module.release();
 
     const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
@@ -201,7 +201,7 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 }
 
 pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.consumer_vs, "consumer_vs");
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
     defer vs_module.release();
 
     const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
