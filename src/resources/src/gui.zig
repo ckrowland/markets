@@ -12,21 +12,19 @@ const Statistics = @import("simulation.zig").Statistics;
 pub fn update(demo: *DemoState) void {
     updateStats(demo);
     zgpu.gui.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
-    if (zgui.begin("Settings", .{})) {
-        if (zgui.beginTabBar("My Tab Bar")) {
-            if (zgui.beginTabItem("Parameters")) {
-                parameters(demo);
-                zgui.endTabItem();
-            }
-
-            if (zgui.beginTabItem("Statistics")) {
-                plots(demo);
-                zgui.endTabItem();
-            }
-            zgui.endTabBar();
-        }
-        zgui.end();
+    if (zgui.begin("Parameters", .{})) {
+        zgui.pushIntId(1);
+        parameters(demo);
+        zgui.popId();
     }
+    zgui.end();
+
+    if (zgui.begin("Data", .{})) {
+        zgui.pushIntId(2);
+        plots(demo);
+        zgui.popId();
+    }
+    zgui.end();
 }
 
 fn getGPUStatistics(demo: *DemoState) [3]i32 {
@@ -76,14 +74,14 @@ fn plots(demo: *DemoState) void {
     const num_empty_consumers = stats.num_empty_consumers.items;
     const tpi = stats.num_total_producer_inventory.items;
     const window_size = zgui.getWindowSize();
-    const tab_bar_height = 100;
-    const margin = 50;
+    const tab_bar_height = 50;
+    const margin = 30;
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - tab_bar_height - margin;
 
-    if (zgui.beginPlot("Statistics", plot_width, plot_height)) {
-        zgui.setupXAxisLimits(0, @floatCast(f64, stats.second - 1));
-        zgui.setupYAxisLimits(0, @intToFloat(f64, stats.max_stat_recorded + @divFloor(stats.max_stat_recorded, 2) + 1));
+    if (zgui.beginPlot("", plot_width, plot_height)) {
+        zgui.setupAxes("", "");
+        zgui.setupLegend();
         zgui.plotLineValues("Transactions", num_transactions[0..]);
         zgui.plotLineValues("Empty Consumers", num_empty_consumers[0..]);
         zgui.plotLineValues("Total Producer Inventory", tpi[0..]);
@@ -92,21 +90,51 @@ fn plots(demo: *DemoState) void {
 }
 
 fn parameters(demo: *DemoState) void {
-    zgui.pushItemWidth(zgui.getContentRegionAvailWidth() * 0.4);
-    zgui.bulletText(
-        "Average :  {d:.3} ms/frame ({d:.1} fps)",
-        .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
-    );
+    zgui.pushItemWidth(zgui.getContentRegionAvailWidth());
+    zgui.bulletText("{d:.1} fps", .{ demo.gctx.stats.fps });
     zgui.spacing();
-    _ = zgui.sliderInt("Number of Producers", .{ .v = &demo.sim.params.num_producers, .min = 1, .max = 100 });
-    _ = zgui.sliderInt("Production Rate", .{ .v = &demo.sim.params.production_rate, .min = 1, .max = 100 });
-    _ = zgui.sliderInt("Giving Rate", .{ .v = &demo.sim.params.giving_rate, .min = 1, .max = 1000 });
-    _ = zgui.sliderInt("Max Inventory", .{ .v = &demo.sim.params.max_inventory, .min = 1, .max = 1000 });
+    zgui.text("Number Of Producers", .{});
+    _ = zgui.sliderInt("##np", .{ .v = &demo.sim.params.num_producers,
+                              .min = 1,
+                              .max = 100 });
+
+    zgui.text("Production Rate", .{});
+    _ = zgui.sliderInt("##pr", .{ .v = &demo.sim.params.production_rate,
+                              .min = 1,
+                              .max = 100 });
+
+    zgui.text("Giving Rate", .{});
+    _ = zgui.sliderInt("##gr", .{ .v = &demo.sim.params.giving_rate,
+                              .min = 1,
+                              .max = 1000 });
+
+    zgui.text("Max Inventory", .{});
+    _ = zgui.sliderInt("##mi", .{ .v = &demo.sim.params.max_inventory,
+                              .min = 1,
+                              .max = 1000 });
+
     zgui.dummy(.{.w = 1.0, .h = 40.0});
-    _ = zgui.sliderInt("Number of Consumers", .{ .v = &demo.sim.params.num_consumers, .min = 1, .max = 10000 });
-    _ = zgui.sliderInt("Consumption Rate", .{ .v = &demo.sim.params.consumption_rate, .min = 1, .max = 100 });
-    _ = zgui.sliderFloat("Moving Rate", .{ .v = &demo.sim.params.moving_rate, .min = 1.0, .max = 20 });
-    _ = zgui.sliderFloat("Consumer Size", .{ .v = &demo.sim.params.consumer_radius, .min = 1, .max = 20 });
+
+    zgui.text("Number of Consumers", .{});
+    _ = zgui.sliderInt("##nc", .{ .v = &demo.sim.params.num_consumers,
+                              .min = 1,
+                              .max = 10000 });
+
+    zgui.text("Consumption Rate", .{});
+    _ = zgui.sliderInt("##cr", .{ .v = &demo.sim.params.consumption_rate,
+                              .min = 1,
+                              .max = 100 });
+
+    zgui.text("Moving Rate", .{});
+    _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.moving_rate,
+                                .min = 1.0,
+                                .max = 20 });
+
+    zgui.text("Consumer Size", .{});
+    _ = zgui.sliderFloat("##cs", .{ .v = &demo.sim.params.consumer_radius,
+                                .min = 1,
+                                .max = 20 });
+
     if (zgui.button("Start", .{})) {
         main.startSimulation(demo);
     }

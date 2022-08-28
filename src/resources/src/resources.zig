@@ -267,21 +267,8 @@ fn draw(demo: *DemoState) void {
         }
 
         {
-            const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
-                .view = back_buffer_view,
-                .load_op = .load,
-                .store_op = .store,
-            }};
-            const render_pass_info = wgpu.RenderPassDescriptor{
-                .color_attachment_count = color_attachments.len,
-                .color_attachments = &color_attachments,
-            };
-            const pass = encoder.beginRenderPass(render_pass_info);
-            defer {
-                pass.end();
-                pass.release();
-            }
-
+            const pass = zgpu.util.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
+            defer zgpu.util.endRelease(pass);
             zgpu.gui.draw(pass);
         }
 
