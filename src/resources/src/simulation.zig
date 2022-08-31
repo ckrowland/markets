@@ -39,7 +39,6 @@ pub const Producer = struct {
     giving_rate: i32,
     inventory: i32,
     max_inventory: i32,
-    width: f32,
 };
 
 pub const Consumer = struct {
@@ -155,9 +154,8 @@ pub fn createProducers(self: *Self) void {
             .color = init_color,
             .production_rate = self.params.production_rate,
             .giving_rate = self.params.giving_rate,
-            .inventory = 0,
+            .inventory = self.params.max_inventory,
             .max_inventory = self.params.max_inventory,
-            .width = self.params.producer_width,
         };
         self.producers.append(p) catch unreachable;
         i += 1;

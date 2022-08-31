@@ -18,6 +18,29 @@ pub const vs =
 \\      return output;
 \\  }
 ;
+pub const producer_vs =
+\\  @group(0) @binding(0) var<uniform> object_to_clip: mat4x4<f32>;
+\\  struct VertexOut {
+\\      @builtin(position) position_clip: vec4<f32>,
+\\      @location(0) color: vec3<f32>,
+\\  }
+\\  @vertex fn main(
+\\      @location(0) vertex_position: vec3<f32>,
+\\      @location(1) position: vec4<f32>,
+\\      @location(2) color: vec4<f32>,
+\\      @location(3) inventory: i32,
+\\      @location(4) max_inventory: i32,
+\\  ) -> VertexOut {
+\\      var output: VertexOut;
+\\      let num = f32(inventory) / f32(max_inventory);
+\\      let scale = num + 0.5;
+\\      var x = position[0] + (scale * vertex_position[0]);
+\\      var y = position[1] + (scale * vertex_position[1]);
+\\      output.position_clip = vec4(x, y, 0.0, 1.0) * object_to_clip;
+\\      output.color = color.xyz;
+\\      return output;
+\\  }
+;
 pub const fs =
 \\  @stage(fragment) fn main(
 \\      @location(0) color: vec3<f32>,
@@ -45,7 +68,6 @@ pub const cs =
 \\    giving_rate: i32,
 \\    inventory: i32,
 \\    max_inventory: i32,
-\\    width: f32,
 \\  }
 \\  struct Stats {
 \\    num_transactions: i32,
@@ -98,18 +120,20 @@ pub const cs =
 \\              let position = c.destination;
 \\              consumers_a[index].position = position;
 \\              let pid = c.producer_id;
-\\              if (producers[pid].inventory < c.consumption_rate) {
+\\              let p = producers[pid];
+\\              if (p.inventory < c.consumption_rate) {
 \\                  consumers_a[index].step_size = vec4<f32>(0);
 \\              } else {
 \\                  consumers_a[index].destination = c.home;
 \\                  consumers_a[index].step_size = step_sizes(position, c.home, c.moving_rate);
 \\                  consumers_a[index].inventory += producers[pid].giving_rate;
-\\                  producers[pid].inventory -= c.consumption_rate; 
+\\                  producers[pid].inventory -= producers[pid].giving_rate; 
 \\                  stats[0] += 1;
 \\                  consumers_a[index].color = vec4(0.0, 1.0, 0.0, 0.0);
 \\              }
 \\          }
 \\      }
+\\      storageBarrier();
 \\  }
 \\  fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
 \\      let x_num_steps = num_steps(pos.x, dest.x, mr);
@@ -137,6 +161,7 @@ pub const cs =
 \\          total_producer_inventory += producers[i].inventory;
 \\      }
 \\      stats[2] = total_producer_inventory;
+\\      storageBarrier();
 \\}
 ;
 // zig fmt: on

@@ -109,20 +109,20 @@ pub fn createProducerVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.
         .size = 6 * @sizeOf(Vertex),
     });
 
+    var producer_vertex_array:[6]Vertex = undefined;
     const upper_left = [3]f32{ -width, width, 0.0 };
     const lower_left = [3]f32{ -width, -width, 0.0 };
     const upper_right = [3]f32{ width, width, 0.0 };
     const lower_right = [3]f32{ width, -width, 0.0 };
-    const producer_vertex_data = [6]Vertex{
-        .{ .position = upper_left, },
-        .{ .position = lower_left, },
-        .{ .position = lower_right, },
-        .{ .position = lower_right, },
-        .{ .position = upper_right, },
-        .{ .position = upper_left, },
-    };
 
-    gctx.queue.writeBuffer(gctx.lookupResource(producer_vertex_buffer).?, 0, Vertex, producer_vertex_data[0..]);
+    producer_vertex_array[0] = .{ .position = upper_left, };
+    producer_vertex_array[1] = .{ .position = lower_left, };
+    producer_vertex_array[2] = .{ .position = lower_right, };
+    producer_vertex_array[3] = .{ .position = lower_right, };
+    producer_vertex_array[4] = .{ .position = upper_right, };
+    producer_vertex_array[5] = .{ .position = upper_left, };
+
+    gctx.queue.writeBuffer(gctx.lookupResource(producer_vertex_buffer).?, 0, Vertex, producer_vertex_array[0..]);
     return producer_vertex_buffer;
 }
 
@@ -137,7 +137,7 @@ pub fn createProducerBuffer(gctx: *zgpu.GraphicsContext, producers: array(Produc
 }
 
 pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
     defer vs_module.release();
 
     const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
@@ -155,6 +155,8 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
     const instance_attributes = [_]wgpu.VertexAttribute{
         .{ .format = .float32x4, .offset = @offsetOf(Producer, "position"), .shader_location = 1 },
         .{ .format = .float32x4, .offset = @offsetOf(Producer, "color"), .shader_location = 2 },
+        .{ .format = .sint32, .offset = @offsetOf(Producer, "inventory"), .shader_location = 3 },
+        .{ .format = .sint32, .offset = @offsetOf(Producer, "max_inventory"), .shader_location = 4 },
     };
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{
