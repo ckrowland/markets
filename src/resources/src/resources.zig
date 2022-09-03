@@ -306,6 +306,18 @@ pub fn startSimulation(demo: *DemoState) void {
     demo.consumer_vertex_buffer = Shapes.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
 }
 
+pub fn supplyShock(demo: *DemoState) void {
+    const compute_bgl = demo.gctx.createBindGroupLayout(&.{
+        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
+    });
+    defer demo.gctx.releaseResource(compute_bgl);
+    demo.sim.supplyShock();
+    demo.producer_buffer = Shapes.createProducerBuffer(demo.gctx, demo.sim.producers);
+    demo.consumer_bind_group = Shapes.createBindGroup(demo.gctx, demo.sim, compute_bgl, demo.consumer_buffer, demo.producer_buffer, demo.stats_buffer);
+}
+
 pub fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
     const usb = @ptrCast(*StagingBuffer, @alignCast(@sizeOf(usize), userdata));
     std.debug.assert(usb.slice == null);

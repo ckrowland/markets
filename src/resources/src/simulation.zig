@@ -117,6 +117,12 @@ pub fn createAgents(self: *Self) void {
     createConsumers(self);
 }
 
+pub fn supplyShock(self: *Self) void {
+    for (self.producers.items) |_, i| {
+        self.producers.items[i].inventory = 0;
+    }
+}
+
 pub fn createConsumers(self: *Self) void {
     var i: usize = 0;
     while (i < self.params.num_consumers) {

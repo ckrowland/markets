@@ -53,15 +53,15 @@ fn getGPUStatistics(demo: *DemoState) [3]i32 {
 
 fn updateStats(demo: *DemoState) void {
     const current_time = @floatCast(f32, demo.gctx.stats.time);
-    const current_second = @floor(current_time);
     const stats = demo.sim.stats;
     const previous_second = stats.second;
-    if (previous_second < current_second) {
+    const diff = current_time - previous_second;
+    if (diff > 0.5) {
         const gpu_stats = getGPUStatistics(demo);
         const vec_stats: @Vector(4, i32) = [_]i32{ gpu_stats[0], gpu_stats[1], gpu_stats[2], stats.max_stat_recorded};
         const max_stat = @reduce(.Max, vec_stats);
         demo.sim.stats.num_transactions.append(gpu_stats[0]) catch unreachable;
-        demo.sim.stats.second = current_second;
+        demo.sim.stats.second = current_time;
         demo.sim.stats.max_stat_recorded = max_stat;
         demo.sim.stats.num_empty_consumers.append(gpu_stats[1]) catch unreachable;
         demo.sim.stats.num_total_producer_inventory.append(gpu_stats[2]) catch unreachable;
@@ -137,5 +137,11 @@ fn parameters(demo: *DemoState) void {
 
     if (zgui.button("Start", .{})) {
         main.startSimulation(demo);
+    }
+
+    zgui.dummy(.{.w = 1.0, .h = 40.0});
+
+    if (zgui.button("Supply Shock", .{})) {
+        main.supplyShock(demo);
     }
 }

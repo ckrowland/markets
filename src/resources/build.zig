@@ -24,7 +24,7 @@ pub fn build(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     exe.setTarget(options.target);
 
     const zgpu_options = zgpu.BuildOptionsStep.init(b, .{
-        .dawn = .{ .from_source = options.zgpu_dawn_from_source },
+        .dawn = .{},
     });
     const zgpu_pkg = zgpu.getPkg(&.{ zgpu_options.getPkg(), zpool.pkg });
 
