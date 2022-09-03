@@ -39,6 +39,8 @@ pub const Producer = struct {
     giving_rate: i32,
     inventory: i32,
     max_inventory: i32,
+    len: i32,
+    queue: [450]i32,
 };
 
 pub const Consumer = struct {
@@ -66,7 +68,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .params = .{
             .num_producers = 10,
-            .production_rate = 10,
+            .production_rate = 100,
             .giving_rate = 10,
             .max_inventory = 10000,
             .num_consumers = 10000,
@@ -155,6 +157,7 @@ pub fn createProducers(self: *Self) void {
         const y = @intToFloat(f32, random.intRangeAtMost(i32, self.coordinate_size.min_y, self.coordinate_size.max_y));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
         const init_color = @Vector(4, f32){ 1.0, 1.0, 1.0, 0.0 };
+        const q = [_]i32{0} ** 450;
         const p = Producer{
             .position = pos,
             .color = init_color,
@@ -162,6 +165,8 @@ pub fn createProducers(self: *Self) void {
             .giving_rate = self.params.giving_rate,
             .inventory = self.params.max_inventory,
             .max_inventory = self.params.max_inventory,
+            .len = 0,
+            .queue = q,
         };
         self.producers.append(p) catch unreachable;
         i += 1;

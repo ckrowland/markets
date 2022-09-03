@@ -101,7 +101,7 @@ fn parameters(demo: *DemoState) void {
     zgui.text("Production Rate", .{});
     _ = zgui.sliderInt("##pr", .{ .v = &demo.sim.params.production_rate,
                               .min = 1,
-                              .max = 100 });
+                              .max = 1000 });
 
     zgui.text("Giving Rate", .{});
     _ = zgui.sliderInt("##gr", .{ .v = &demo.sim.params.giving_rate,
@@ -111,7 +111,7 @@ fn parameters(demo: *DemoState) void {
     zgui.text("Max Inventory", .{});
     _ = zgui.sliderInt("##mi", .{ .v = &demo.sim.params.max_inventory,
                               .min = 1,
-                              .max = 1000 });
+                              .max = 10000 });
 
     zgui.dummy(.{.w = 1.0, .h = 40.0});
 

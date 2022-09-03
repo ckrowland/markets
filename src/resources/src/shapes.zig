@@ -72,7 +72,7 @@ pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl
 }
 
 pub fn createConsumerBuffer(gctx: *zgpu.GraphicsContext, consumers: array(Consumer)) zgpu.BufferHandle {
-    const max_num_consumer = 100000;
+    const max_num_consumer = 10000;
     const consumer_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
         .size = max_num_consumer * @sizeOf(Consumer),
