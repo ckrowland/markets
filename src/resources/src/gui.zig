@@ -70,8 +70,8 @@ fn updateStats(demo: *DemoState) void {
 
 fn plots(demo: *DemoState) void {
     const stats = demo.sim.stats;
-    const num_transactions = stats.num_transactions.items;
-    const num_empty_consumers = stats.num_empty_consumers.items;
+    const nt = stats.num_transactions.items;
+    const nec = stats.num_empty_consumers.items;
     const tpi = stats.num_total_producer_inventory.items;
     const window_size = zgui.getWindowSize();
     const tab_bar_height = 50;
@@ -79,18 +79,21 @@ fn plots(demo: *DemoState) void {
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - tab_bar_height - margin;
 
-    if (zgui.beginPlot("", plot_width, plot_height)) {
-        zgui.setupAxes("", "");
-        zgui.setupLegend();
-        zgui.plotLineValues("Transactions", num_transactions[0..]);
-        zgui.plotLineValues("Empty Consumers", num_empty_consumers[0..]);
-        zgui.plotLineValues("Total Producer Inventory", tpi[0..]);
+    if (zgui.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{}})) {
+        zgui.setupXAxis("", .{ .auto_fit = true, });
+        zgui.setupYAxis("", .{ .auto_fit = true });
+        zgui.setupLegend(zgui.PlotLocation.north_west, .{});
+        zgui.plotLineValues("Transactions", .{ .slice = nt[0..], .flags = .{}});
+        zgui.plotLineValues("Empty Consumers", .{ .slice = nec[0..],
+                                                  .flags = .{.no_clip = true} });
+        zgui.plotLineValues("Total Producer Inventory", .{ .slice = tpi[0..],
+                                                           .flags = .{}});
         zgui.endPlot();
     }
 }
 
 fn parameters(demo: *DemoState) void {
-    zgui.pushItemWidth(zgui.getContentRegionAvailWidth());
+    zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
     zgui.bulletText("{d:.1} fps", .{ demo.gctx.stats.fps });
     zgui.spacing();
     zgui.text("Number Of Producers", .{});
