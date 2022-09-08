@@ -51,15 +51,14 @@ pub const fs =
 pub const cs =
 \\  struct Consumer {
 \\    position: vec4<f32>,
-\\    center: vec4<f32>,
 \\    color: vec4<f32>,
+\\    velocity: vec4<f32>,
+\\    acceleration: vec4<f32>,
 \\    consumption_rate: i32,
-\\    moving_rate: f32,
+\\    jerk: f32,
 \\    inventory: i32,
 \\    radius: f32,
 \\    producer_id: i32,
-\\    angle: f32,
-\\    center_radius: f32,
 \\  }
 \\  struct Stats {
 \\    second: i32,
@@ -74,29 +73,31 @@ pub const cs =
 \\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
 \\      let c = consumers[index];
-\\      let rad = radians(c.angle);
-\\      var new_pos = vec4(cos(rad), sin(rad), 0.0, 0.0);
-\\      new_pos *= c.center_radius;
-\\      new_pos += c.center;
-\\      consumers[index].position = new_pos;
-\\      consumers[index].angle += c.moving_rate;
-\\      consumers[index].moving_rate = max(c.moving_rate - 0.5, 0);
-\\
-\\      if (stats[0] % 3 == 1) {
-\\          consumers[index].moving_rate = 28.0;
+\\      let nc = arrayLength(&consumers);
+\\      if(GlobalInvocationID.x >= nc) {
+\\        return;
 \\      }
-\\  }
-\\  fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
-\\      let x_num_steps = num_steps(pos.x, dest.x, mr);
-\\      let y_num_steps = num_steps(pos.y, dest.y, mr);
-\\      let num_steps = max(x_num_steps, y_num_steps);
-\\      let distance = dest - pos;
-\\      return distance / num_steps;
-\\  }
-\\  fn num_steps(x: f32, y: f32, rate: f32) -> f32 {
-\\      let distance = abs(x - y);
-\\      if (rate > distance) { return 1.0; }
-\\      return ceil(distance / rate);
+\\      var velocity = c.velocity;
+//\\      var velocity = c.velocity + c.acceleration;
+\\      let new_pos = c.position + velocity;
+\\
+        //Wall[0] (or Wall.x) is the slope
+        //Wall[1] (or Wall.y) is the y-intercept.
+//\\      let wall = vec4<f32>(-1.0, -100.0, 0.0, 0.0);
+//\\
+//\\      let wall_pos_y = (wall.x * c.position.x) + wall.y;
+//\\      let wall_pos_x = (wall_pos_y - wall.y) / wall.x;
+//\\      let collision_x = abs(c.position.x - wall_pos_x) <= abs(velocity.x);
+//\\      let collision_y = abs(c.position.y - wall_pos_y) <= abs(velocity.y);
+//\\      if (collision_x && collision_y) {
+//\\          let dist = c.radius;
+//\\          velocity.x = -c.velocity.y;
+//\\          velocity.y = 0;
+//\\          consumers[index].position += velocity;
+//\\      } else {
+//\\          consumers[index].position += velocity;
+//\\      }
+\\      consumers[index].velocity = velocity;
 \\  }
 ;
 // zig fmt: on

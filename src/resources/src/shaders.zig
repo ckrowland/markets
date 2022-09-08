@@ -83,6 +83,10 @@ pub const cs =
 \\  @compute @workgroup_size(64)
 \\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
+\\      let nc = arrayLength(&consumers);
+\\      if(GlobalInvocationID.x >= nc) {
+\\        return;
+\\      }
 \\      let c = consumers[index];
 \\      consumers[index].position += c.step_size;
 \\      let dist = abs(c.position - c.destination);
@@ -143,6 +147,10 @@ pub const cs =
 \\  @compute @workgroup_size(64)
 \\  fn producer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
+\\      let np = arrayLength(&producers);
+\\      if(GlobalInvocationID.x >= np) {
+\\        return;
+\\      }
 \\      let max_inventory = producers[index].max_inventory;
 \\      let inventory = producers[index].inventory;
 \\      var production_rate = producers[index].production_rate;

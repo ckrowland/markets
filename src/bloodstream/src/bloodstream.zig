@@ -85,7 +85,6 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     const consumer_compute_pipeline = Shapes.createConsumerComputePipeline(gctx, compute_pl);
 
     // Create Buffers
-
     const num_vertices = 20;
     const consumer_vertex_buffer = Shapes.createConsumerVertexBuffer(gctx, sim.params.consumer_radius, num_vertices);
     const consumer_index_buffer = Shapes.createConsumerIndexBuffer(gctx, num_vertices);

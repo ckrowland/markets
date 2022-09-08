@@ -130,10 +130,20 @@ fn parameters(demo: *DemoState) void {
                               .min = 1,
                               .max = 100 });
 
-    zgui.text("Moving Rate", .{});
-    _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.moving_rate,
+    zgui.text("Starting Velocity", .{});
+    _ = zgui.sliderFloat("##sv", .{ .v = &demo.sim.params.velocity,
                                 .min = 0.0,
-                                .max = 3.0 });
+                                .max = 200.0 });
+
+    zgui.text("Acceleration", .{});
+    _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.acceleration,
+                                .min = 0.0,
+                                .max = 8.0 });
+
+    zgui.text("Jerk", .{});
+    _ = zgui.sliderFloat("##a", .{ .v = &demo.sim.params.jerk,
+                                .min = 0.0,
+                                .max = 2.0 });
 
     zgui.text("Consumer Size", .{});
     _ = zgui.sliderFloat("##cs", .{ .v = &demo.sim.params.consumer_radius,
