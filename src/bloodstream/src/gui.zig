@@ -135,16 +135,6 @@ fn parameters(demo: *DemoState) void {
                                 .min = 0.0,
                                 .max = 200.0 });
 
-    zgui.text("Acceleration", .{});
-    _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.acceleration,
-                                .min = 0.0,
-                                .max = 8.0 });
-
-    zgui.text("Jerk", .{});
-    _ = zgui.sliderFloat("##a", .{ .v = &demo.sim.params.jerk,
-                                .min = 0.0,
-                                .max = 2.0 });
-
     zgui.text("Consumer Size", .{});
     _ = zgui.sliderFloat("##cs", .{ .v = &demo.sim.params.consumer_radius,
                                 .min = 1,
@@ -155,8 +145,4 @@ fn parameters(demo: *DemoState) void {
     }
 
     zgui.dummy(.{.w = 1.0, .h = 40.0});
-
-    if (zgui.button("Supply Shock", .{})) {
-        main.supplyShock(demo);
-    }
 }
