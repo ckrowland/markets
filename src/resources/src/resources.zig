@@ -1,9 +1,9 @@
 const std = @import("std");
 const math = std.math;
-const glfw = @import("glfw");
+const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const zgui = zgpu.zgui;
+const zgui = @import("zgui");
 const zm = @import("zmath");
 const array = std.ArrayList;
 const random = std.crypto.random;
@@ -58,7 +58,7 @@ pub const DemoState = struct {
     allocator: std.mem.Allocator,
 };
 
-fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
+fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.init(allocator, window);
 
     // Render Pipeline and Bind Group
@@ -269,7 +269,7 @@ fn draw(demo: *DemoState) void {
         {
             const pass = zgpu.util.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
             defer zgpu.util.endRelease(pass);
-            zgpu.gui.draw(pass);
+            zgui.backend.draw(pass);
         }
 
         break :commands encoder.finish(null);
@@ -349,20 +349,20 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
 }
 
 pub fn main() !void {
-    try glfw.init(.{});
-    defer glfw.terminate();
+    try zglfw.init();
+    defer zglfw.terminate();
 
     //zgpu.checkSystem(content_dir) catch {
     //    // In case of error zgpu.checkSystem() will print error message.
     //    return;
     //};
 
-    const window = try glfw.Window.create(1280, 960, window_title, null, null, .{
-        .client_api = .no_api,
-        .cocoa_retina_framebuffer = true,
-    });
+    zglfw.defaultWindowHints();
+    zglfw.windowHint(.cocoa_retina_framebuffer, 1);
+    zglfw.windowHint(.client_api, 0);
+    const window = try zglfw.createWindow(1600, 1000, window_title, null, null);
     defer window.destroy();
-    try window.setSizeLimits(.{ .width = 400, .height = 400 }, .{ .width = null, .height = null });
+    window.setSizeLimits(400, 400, -1, -1);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -372,11 +372,27 @@ pub fn main() !void {
     var demo = try init(allocator, window);
     defer deinit(allocator, &demo);
 
-    zgpu.gui.init(window, demo.gctx.device, content_dir, "Roboto-Medium.ttf", 45.0);
-    defer zgpu.gui.deinit();
+    const scale_factor = scale_factor: {
+        const scale = window.getContentScale();
+        break :scale_factor math.max(scale.x, scale.y);
+    };
+
+    zgui.init();
+    defer zgui.deinit();
+
+    _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", 19.0 * scale_factor);
+
+    zgui.backend.init(
+        window,
+        demo.gctx.device,
+        @enumToInt(zgpu.GraphicsContext.swapchain_format),
+    );
+    defer zgui.backend.deinit();
+
+    zgui.getStyle().scaleAllSizes(scale_factor);
 
     while (!window.shouldClose()) {
-        try glfw.pollEvents();
+        zglfw.pollEvents();
         update(&demo);
         draw(&demo);
     }

@@ -51,6 +51,7 @@ pub const DemoState = struct {
     lines_buffer: zgpu.BufferHandle,
     square_vertex_buffer: zgpu.BufferHandle,
     square_position_buffer: zgpu.BufferHandle,
+    splines_point_buffer: zgpu.BufferHandle,
     stats_mapped_buffer: zgpu.BufferHandle,
     stats: StagingBuffer,
 
@@ -64,7 +65,7 @@ pub const DemoState = struct {
 fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.init(allocator, window);
 
-    // Render Pipeline and Bind Group
+    // Uniform Bind Group
     const bind_group_layout = gctx.createBindGroupLayout(&.{
         zgpu.bglBuffer(0, .{ .vertex = true }, .uniform, true, 0),
     });
@@ -72,10 +73,14 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
+
+    // Render Pipelines
     const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
     defer gctx.releaseResource(pipeline_layout);
+
     const consumer_pipeline = Consumers.createConsumerPipeline(gctx, pipeline_layout);
     const line_pipeline = Lines.createLinePipeline(gctx, pipeline_layout);
+    const spline_pipeline = Splines.createSplinePipeline(gctx, pipeline_layout);
 
     // Simulation struct
     var sim = Simulation.init(allocator);
@@ -100,6 +105,7 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
     var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
     const lines_buffer = Lines.createLinesBuffer(gctx, sim.lines);
+    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
     const square_position_buffer = Lines.createSquarePositionBuffer(gctx, sim.lines);
 
@@ -130,6 +136,7 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         .gctx = gctx,
         .consumer_pipeline = consumer_pipeline,
         .line_pipeline = line_pipeline,
+        .spline_pipeline = spline_pipeline,
         .consumer_compute_pipeline = consumer_compute_pipeline,
         .bind_group = bind_group,
         .consumer_vertex_buffer = consumer_vertex_buffer,
@@ -141,6 +148,7 @@ fn init(allocator: std.mem.Allocator, window: glfw.Window) !DemoState {
         .lines_buffer = lines_buffer,
         .square_vertex_buffer = square_vertex_buffer,
         .square_position_buffer = square_position_buffer,
+        .splines_point_buffer = splines_point_buffer,
         .stats_mapped_buffer = stats_mapped_buffer,
         .stats = stats,
         .depth_texture = depth.texture,

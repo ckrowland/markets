@@ -3,6 +3,8 @@ const Consumers = @import("consumers.zig");
 const Consumer = Consumers.Consumer;
 const Lines = @import("lines.zig");
 const Line = Lines.Line;
+const Splines = @import("lines.zig");
+const Spline = Splines.Spline;
 const array = std.ArrayList;
 const random = std.crypto.random;
 
@@ -24,6 +26,7 @@ coordinate_size: CoordinateSize,
 consumers: array(Consumer),
 stats: Statistics,
 lines: array(Line),
+splines: array(Spline),
 
 pub const Statistics = struct {
     num_transactions: array(i32),

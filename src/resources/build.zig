@@ -2,6 +2,8 @@ const std = @import("std");
 const zgpu = @import("../../zig-gamedev/libs/zgpu/build.zig");
 const zmath = @import("../../zig-gamedev/libs/zmath/build.zig");
 const zpool = @import("../../zig-gamedev/libs/zpool/build.zig");
+const zglfw = @import("../../zig-gamedev/libs/zglfw/build.zig");
+const zgui = @import("../../zig-gamedev/libs/zgui/build.zig");
 
 const Options = @import("../../build.zig").Options;
 const content_dir = "content/";
@@ -23,15 +25,17 @@ pub fn build(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     exe.setBuildMode(options.build_mode);
     exe.setTarget(options.target);
 
-    const zgpu_options = zgpu.BuildOptionsStep.init(b, .{
-        .dawn = .{},
-    });
-    const zgpu_pkg = zgpu.getPkg(&.{ zgpu_options.getPkg(), zpool.pkg });
+    const zgpu_pkg = zgpu.getPkg(&.{ zpool.pkg, zglfw.pkg });
+    const zgui_pkg = zgui.getPkg(&.{ zglfw.pkg });
 
     exe.addPackage(zgpu_pkg);
     exe.addPackage(zmath.pkg);
+    exe.addPackage(zglfw.pkg);
+    exe.addPackage(zgui_pkg);
 
-    zgpu.link(exe, zgpu_options);
+    zgpu.link(exe);
+    zglfw.link(exe);
+    zgui.link(exe);
 
     return exe;
 }
