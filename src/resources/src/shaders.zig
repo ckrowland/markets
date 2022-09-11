@@ -131,6 +131,7 @@ pub const cs =
 \\              producers[pid].queue[idx] = i32(index) + 1;
 \\          }
 \\      }
+\\      storageBarrier();
 \\  }
 \\  fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
 \\      let x_num_steps = num_steps(pos.x, dest.x, mr);
@@ -183,6 +184,7 @@ pub const cs =
 \\          total_producer_inventory += producers[i].inventory;
 \\      }
 \\      stats[2] = total_producer_inventory;
+\\      storageBarrier();
 \\}
 ;
 // zig fmt: on
