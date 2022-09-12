@@ -3,7 +3,7 @@ const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
 const std = @import("std");
 const zgpu = @import("zgpu");
-const zgui = zgpu.zgui;
+const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
 const Shapes = @import("shapes.zig");
 const StagingBuffer = main.StagingBuffer;
@@ -11,7 +11,19 @@ const Statistics = @import("simulation.zig").Statistics;
 
 pub fn update(demo: *DemoState) void {
     updateStats(demo);
-    zgpu.gui.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
+    zgui.backend.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
+
+    const window_width = @intToFloat(f32, demo.gctx.swapchain_descriptor.width);
+    const window_height = @intToFloat(f32, demo.gctx.swapchain_descriptor.height);
+    const margin: f32 = 40;
+    const stats_height: f32 = 400;
+    const params_width: f32 = 600;
+    zgui.setNextWindowPos(.{ .x = margin,
+                            .y = margin,
+                            .cond = zgui.Condition.once });
+    zgui.setNextWindowSize(.{ .w = params_width,
+                            .h = window_height - stats_height - (margin * 3),
+                            .cond = zgui.Condition.once });
     if (zgui.begin("Parameters", .{})) {
         zgui.pushIntId(1);
         parameters(demo);
@@ -19,6 +31,12 @@ pub fn update(demo: *DemoState) void {
     }
     zgui.end();
 
+    zgui.setNextWindowPos(.{ .x = margin,
+                            .y = window_height - stats_height - margin,
+                            .cond = zgui.Condition.once });
+    zgui.setNextWindowSize(.{ .w = window_width - (2 * margin),
+                            .h = stats_height,
+                            .cond = zgui.Condition.once });
     if (zgui.begin("Data", .{})) {
         zgui.pushIntId(2);
         plots(demo);

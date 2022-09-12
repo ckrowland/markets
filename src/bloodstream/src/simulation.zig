@@ -3,7 +3,7 @@ const Consumers = @import("consumers.zig");
 const Consumer = Consumers.Consumer;
 const Lines = @import("lines.zig");
 const Line = Lines.Line;
-const Splines = @import("lines.zig");
+const Splines = @import("splines.zig");
 const Spline = Splines.Spline;
 const array = std.ArrayList;
 const random = std.crypto.random;
@@ -72,18 +72,23 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .num_total_producer_inventory = array(i32).init(allocator), 
         },
         .lines = array(Line).init(allocator),
+        .splines = array(Spline).init(allocator),
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.consumers.deinit();
     self.lines.deinit();
+    for (self.splines.items) |s| {
+        s.points.deinit();
+    }
+    self.splines.deinit();
     self.stats.num_transactions.deinit();
     self.stats.num_empty_consumers.deinit();
     self.stats.num_total_producer_inventory.deinit();
 }
 
-pub fn createAgents(self: *Self) void {
+pub fn createAgents(self: *Self, allocator: std.mem.Allocator) void {
     self.consumers.clearAndFree();
     self.stats.num_transactions.clearAndFree();
     self.stats.num_empty_consumers.clearAndFree();
@@ -95,6 +100,7 @@ pub fn createAgents(self: *Self) void {
     self.stats.max_stat_recorded = 0;
     Consumers.createConsumers(self);
     Lines.createLines(self);
+    Splines.createSplines(self, allocator);
 }
 
 pub fn supplyShock(self: *Self) void {

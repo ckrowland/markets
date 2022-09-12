@@ -9,7 +9,7 @@ const Vertex = @import("bloodstream.zig").Vertex;
 const wgsl = @import("shaders.zig");
 
 pub const Spline = struct {
-    points: []@Vector(2, f32),
+    points: array([2]f32),
     radius: f32,
 };
 
@@ -20,18 +20,54 @@ pub const VertexColor = struct {
     radians: f32,
 };
 
-pub fn createSplines(self: *Simulation) void {
-    const p1 = @Vector(2, f32){ 0, 0 };
-    const p2 = @Vector(2, f32){ 200, 200 };
-    const p3 = @Vector(2, f32){ 400, 200};
-    const p4 = @Vector(2, f32){ 600, 0};
-    const points = { p1, p2, p3, p4 };
+pub fn createSplines(self: *Simulation, allocator: std.mem.Allocator) void {
+    const c = self.coordinate_size;
+    const len_x = @fabs(c.min_x) + @fabs(c.max_x);
+    const len_y = @fabs(c.min_y) + @fabs(c.max_y);
+    const cx = c.min_x + (len_x / 2);
+    const cy = c.min_y + (len_y / 2);
+    const offset = 100;
+    const width = 700 + offset;
+    const height = 700;
+    var points = array([2]f32).init(allocator);
+    points.append([2]f32{cx, cy}) catch unreachable;
+    points.append([2]f32{cx+offset, cy+height}) catch unreachable;
+    points.append([2]f32{cx+width, cy+height}) catch unreachable;
+    points.append([2]f32{cx+width, cy}) catch unreachable;
+    points.append([2]f32{cx, cy-height}) catch unreachable;
+    points.append([2]f32{cx-width, cy}) catch unreachable;
+    points.append([2]f32{cx-width, cy+height}) catch unreachable;
+    points.append([2]f32{cx-offset, cy+height}) catch unreachable;
+    points.append([2]f32{cx, cy}) catch unreachable;
     const radius = 5;
     const s = Spline{
-        .points = points[0..],
+        .points = points,
         .radius = radius,
     };
     self.splines.append(s) catch unreachable;
+}
+
+pub fn getSplinePoint(i: f32, points: array([2]f32)) [2]f32 {
+    const p0: u32 = @floatToInt(u32, i);
+    const p1 = p0 + 1;
+    const p2 = p1 + 1;
+    const p3 = p2 + 1;
+
+    const t = i - @floor(i);
+    const tt = t * t;
+    const ttt = tt * t;
+
+    const q1 = -ttt + (2 * tt) - t;
+    const q2 = (3 * ttt) - (5 * tt) + 2;
+    const q3 = (-3 * ttt) + (4 * tt) + t;
+    const q4 = ttt - tt;
+
+    const p = points.items;
+
+    const tx = 0.5 * (p[p0][0] * q1 + p[p1][0] * q2 + p[p2][0] * q3 + p[p3][0] * q4);
+    const ty = 0.5 * (p[p0][1] * q1 + p[p1][1] * q2 + p[p2][1] * q3 + p[p3][1] * q4);
+
+    return [2]f32{ tx, ty };
 }
 
 pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spline)) zgpu.BufferHandle {
@@ -50,24 +86,44 @@ pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spli
         .size = max_num_squares * @sizeOf(VertexColor),
     });
     var spline_vertex_data: [max_num_squares]VertexColor = undefined;
-    for (spline.items[0].points) |p, i| {
-        spline_vertex_data[i] = createVertexColor(p[0], p[1], 0, 0);
+    for (splines.items[0].points.items) |p, i| {
+        spline_vertex_data[i] = createVertexColor(p[0], p[1], 20, 0);
     }
     gctx.queue.writeBuffer(gctx.lookupResource(spline_points_buffer).?, 0, VertexColor, spline_vertex_data[0..]);
     return spline_points_buffer;
 }
 
+pub fn createSplinesSquaresBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spline)) zgpu.BufferHandle {
+    const max_num_squares = 10000;
+    const splines_square_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
+        .size = max_num_squares * @sizeOf(VertexColor),
+    });
+    var spline_vertex_data: [max_num_squares]VertexColor = undefined;
+    var t: f32 = 0;
+    var i: u32 = 0;
+    const radius = splines.items[0].radius;
+    const num_splines = @intToFloat(f32, splines.items[0].points.items.len - 3);
+    while (t < num_splines) {
+        const pos = getSplinePoint(t, splines.items[0].points);
+        spline_vertex_data[i] = createVertexColor(pos[0], pos[1], radius, 0);
+        i += 1;
+        t += 0.01;
+    }
+    gctx.queue.writeBuffer(gctx.lookupResource(splines_square_buffer).?, 0, VertexColor, spline_vertex_data[0..]);
+    return splines_square_buffer;
+}
 fn createVertexColor(x: f32, y: f32, radius: f32, radians: f32) VertexColor {
     return .{
         .position = [3]f32 {x, y, 0},
-        .color = [4]f32{ 0, 1, 0, 0},
+        .color = [4]f32{ 0, 1, 1, 0},
         .radius = radius,
         .radians = radians,
     };
 }
 
 pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.line_vs, "vs");
     defer vs_module.release();
 
     const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
@@ -85,6 +141,8 @@ pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.P
     const instance_attributes = [_]wgpu.VertexAttribute{
         .{ .format = .float32x3, .offset = @offsetOf(VertexColor, "position"), .shader_location = 1 },
         .{ .format = .float32x4, .offset = @offsetOf(VertexColor, "color"), .shader_location = 2 },
+        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radius"), .shader_location = 3 },
+        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radians"), .shader_location = 4 },
     };
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{
