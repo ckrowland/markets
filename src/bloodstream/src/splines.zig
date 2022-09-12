@@ -26,11 +26,11 @@ pub fn createSplines(self: *Simulation, allocator: std.mem.Allocator) void {
     const len_y = @fabs(c.min_y) + @fabs(c.max_y);
     const cx = c.min_x + (len_x / 2);
     const cy = c.min_y + (len_y / 2);
-    const offset = 100;
-    const width = 700 + offset;
-    const height = 700;
+    var offset: f32 = 100;
+    var width: f32 = 700 + offset;
+    var height: f32 = 700;
     var points = array([2]f32).init(allocator);
-    points.append([2]f32{cx, cy}) catch unreachable;
+    points.append([2]f32{cx+offset, cy}) catch unreachable;
     points.append([2]f32{cx+offset, cy+height}) catch unreachable;
     points.append([2]f32{cx+width, cy+height}) catch unreachable;
     points.append([2]f32{cx+width, cy}) catch unreachable;
@@ -38,13 +38,33 @@ pub fn createSplines(self: *Simulation, allocator: std.mem.Allocator) void {
     points.append([2]f32{cx-width, cy}) catch unreachable;
     points.append([2]f32{cx-width, cy+height}) catch unreachable;
     points.append([2]f32{cx-offset, cy+height}) catch unreachable;
-    points.append([2]f32{cx, cy}) catch unreachable;
-    const radius = 5;
+    points.append([2]f32{cx-offset, cy}) catch unreachable;
+    const radius = 2;
     const s = Spline{
         .points = points,
         .radius = radius,
     };
     self.splines.append(s) catch unreachable;
+
+    offset = 200;
+    width = 600;
+    height = 600;
+    var points2 = array([2]f32).init(allocator);
+    points2.append([2]f32{cx+offset, cy}) catch unreachable;
+    points2.append([2]f32{cx+offset, cy+height}) catch unreachable;
+    points2.append([2]f32{cx+width, cy+height}) catch unreachable;
+    points2.append([2]f32{cx+width, cy}) catch unreachable;
+    points2.append([2]f32{cx, cy-height}) catch unreachable;
+    points2.append([2]f32{cx-width, cy}) catch unreachable;
+    points2.append([2]f32{cx-width, cy+height}) catch unreachable;
+    points2.append([2]f32{cx-offset, cy+height}) catch unreachable;
+    points2.append([2]f32{cx-offset, cy}) catch unreachable;
+
+    const s2 = Spline{
+        .points = points2,
+        .radius = radius,
+    };
+    self.splines.append(s2) catch unreachable;
 }
 
 pub fn getSplinePoint(i: f32, points: array([2]f32)) [2]f32 {
@@ -86,15 +106,19 @@ pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spli
         .size = max_num_squares * @sizeOf(VertexColor),
     });
     var spline_vertex_data: [max_num_squares]VertexColor = undefined;
-    for (splines.items[0].points.items) |p, i| {
-        spline_vertex_data[i] = createVertexColor(p[0], p[1], 20, 0);
+    var i: u32 = 0;
+    for (splines.items) |s| {
+        for (s.points.items) |p| {
+            spline_vertex_data[i] = createVertexColor(p[0], p[1], 20, 0);
+            i += 1;
+        }
     }
     gctx.queue.writeBuffer(gctx.lookupResource(spline_points_buffer).?, 0, VertexColor, spline_vertex_data[0..]);
     return spline_points_buffer;
 }
 
 pub fn createSplinesSquaresBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spline)) zgpu.BufferHandle {
-    const max_num_squares = 10000;
+    const max_num_squares = 100000;
     const splines_square_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
         .size = max_num_squares * @sizeOf(VertexColor),
@@ -102,13 +126,15 @@ pub fn createSplinesSquaresBuffer(gctx: *zgpu.GraphicsContext, splines: array(Sp
     var spline_vertex_data: [max_num_squares]VertexColor = undefined;
     var t: f32 = 0;
     var i: u32 = 0;
-    const radius = splines.items[0].radius;
-    const num_splines = @intToFloat(f32, splines.items[0].points.items.len - 3);
-    while (t < num_splines) {
-        const pos = getSplinePoint(t, splines.items[0].points);
-        spline_vertex_data[i] = createVertexColor(pos[0], pos[1], radius, 0);
-        i += 1;
-        t += 0.01;
+    for (splines.items) |s| {
+        const num_splines = @intToFloat(f32, s.points.items.len - 3);
+        while (t < num_splines) {
+            const p = getSplinePoint(t, s.points);
+            spline_vertex_data[i] = createVertexColor(p[0], p[1], s.radius, 0);
+            i += 1;
+            t += 0.001;
+        }
+        t = 0;
     }
     gctx.queue.writeBuffer(gctx.lookupResource(splines_square_buffer).?, 0, VertexColor, spline_vertex_data[0..]);
     return splines_square_buffer;

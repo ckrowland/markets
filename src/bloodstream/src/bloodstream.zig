@@ -278,12 +278,15 @@ fn draw(demo: *DemoState) void {
             pass.setPipeline(sp);
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, spb_info.gpuobj.?, 0, spb_info.size);
-            const num_squares = @intCast(u32, demo.sim.splines.items[0].points.items.len);
-            pass.draw(6, num_squares, 0, 0);
+            var num_points: u32 = 0;
+            for (demo.sim.splines.items) |s| {
+                num_points += @intCast(u32, s.points.items.len);
+            }
+            pass.draw(6, num_points, 0, 0);
 
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, ssb_info.gpuobj.?, 0, ssb_info.size);
-            pass.draw(6, 10000, 0, 0);
+            pass.draw(6, 100000, 0, 0);
         }
 
         {
