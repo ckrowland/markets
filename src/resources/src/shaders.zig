@@ -66,7 +66,7 @@ pub const cs =
 \\    color: vec4<f32>,
 \\    production_rate: i32,
 \\    giving_rate: i32,
-\\    inventory: i32,
+\\    inventory: atomic<i32>,
 \\    max_inventory: i32,
 \\    len: atomic<i32>,
 \\    queue: array<i32, 450>,
@@ -110,7 +110,8 @@ pub const cs =
 \\              var array_len = i32(arrayLength(&producers));
 \\              for(var i = 0; i < array_len; i++){
 \\                  let dist = distance(c.home, producers[i].position);
-\\                  let inventory = producers[i].inventory;
+//\\                  let inventory = producers[i].inventory;//HERE?
+\\                  let inventory = atomicLoad(&producers[i].inventory);
 \\                  if (dist < shortest_distance && inventory > c.consumption_rate) {
 \\                      shortest_distance = dist;
 \\                      consumers[index].destination = producers[i].position;
@@ -131,7 +132,6 @@ pub const cs =
 \\              producers[pid].queue[idx] = i32(index) + 1;
 \\          }
 \\      }
-\\      storageBarrier();
 \\  }
 \\  fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
 \\      let x_num_steps = num_steps(pos.x, dest.x, mr);
@@ -153,7 +153,8 @@ pub const cs =
 \\        return;
 \\      }
 \\      let max_inventory = producers[index].max_inventory;
-\\      let inventory = producers[index].inventory;
+//\\      let inventory = producers[index].inventory;
+\\      let inventory = atomicLoad(&producers[index].inventory);
 \\      var production_rate = producers[index].production_rate;
 \\      let giving_rate = producers[index].giving_rate;
 \\      if (max_inventory > inventory) {
@@ -161,18 +162,20 @@ pub const cs =
 \\          if (diff < production_rate) {
 \\              production_rate = diff;
 \\          }
-\\          producers[index].inventory += production_rate;
+\\          let old_val = atomicAdd(&producers[index].inventory, production_rate);
 \\      }
 \\
 \\      let idx = atomicLoad(&producers[index].len);
 \\      for (var i = 0; i < idx; i++) {
 \\          let cid = producers[index].queue[i] - 1;
 \\          let c = consumers[cid];
-\\          if (producers[index].inventory >= giving_rate) {
+\\          let inventory = atomicLoad(&producers[i].inventory);
+\\          if (inventory >= giving_rate) {
 \\              consumers[cid].destination = c.home;
 \\              consumers[cid].step_size = step_sizes(c.position, c.home, c.moving_rate);
 \\              consumers[cid].inventory += giving_rate;
-\\              producers[index].inventory -= giving_rate; 
+\\              let old_inv = atomicSub(&producers[index].inventory, giving_rate);
+//\\              producers[index].inventory -= giving_rate; 
 \\              stats[0] += 1;
 \\              consumers[cid].color = vec4(0.0, 1.0, 0.0, 0.0);
 \\          }
@@ -181,10 +184,10 @@ pub const cs =
 \\      var total_producer_inventory = 0;
 \\      let array_len = i32(arrayLength(&producers));
 \\      for(var i = 0; i < array_len; i++){
-\\          total_producer_inventory += producers[i].inventory;
+\\          let inventory = atomicLoad(&producers[i].inventory);
+\\          total_producer_inventory += inventory;
 \\      }
 \\      stats[2] = total_producer_inventory;
-\\      storageBarrier();
 \\}
 ;
 // zig fmt: on
