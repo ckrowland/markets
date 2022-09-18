@@ -80,18 +80,16 @@ pub const cs =
 \\    max_x: f32,
 \\    max_y: f32,
 \\  }
-\\  struct Line{
-\\    color: vec4<f32>,
-\\    start: vec2<f32>,
-\\    end: vec2<f32>,
+\\  struct Spline{
 \\    radius: f32,
-\\    num_squares: u32,
+\\    len: u32,
+\\    points: array<vec2<f32>, 10>,
 \\  }
 \\  const PI: f32 = 3.14159;
 \\  @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
 \\  @group(0) @binding(1) var<storage, read_write> stats: vec4<i32>;
 \\  @group(0) @binding(2) var<storage, read> size: Size;
-\\  @group(0) @binding(3) var<storage, read_write> lines: array<Line>;
+\\  @group(0) @binding(3) var<storage, read_write> splines: array<Spline>;
 \\  @compute @workgroup_size(64)
 \\  fn consumer_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 \\      let index : u32 = global_id.x;
@@ -100,32 +98,22 @@ pub const cs =
 \\      if(index >= num_consumers) {
 \\        return;
 \\      }
-\\      let num_lines = arrayLength(&lines);
-\\      for (var i = 0u; i < num_lines; i += 1u) {
-\\          let l = lines[i];
-\\          let d_line = l.end - l.start;
-\\          let line_len = d_line.x * d_line.x + d_line.y * d_line.y;
-\\          let pos_start = src_ball.position.xy - l.start;
-\\          let t = max(0, min(line_len, dot(d_line, pos_start))) / line_len;
-\\          let closest_point = l.start + (t * d_line);
-\\          let n = src_ball.position.xy - closest_point;
-\\          let distance = length(n);
-\\          if (distance >= src_ball.radius + l.radius) {
-\\              continue;
+\\      let num_splines = arrayLength(&splines);
+\\      for (var i = 0u; i < num_splines; i += 1u) {
+\\          let s = splines[i];
+\\          let num_curves = s.len - 3;
+\\          let diameter = s.radius *  0.001;
+\\          let overlap = diameter * 5;
+\\          for (var i = 0u; i < num_curves; i += 1u) {
+\\              let points = getCurvePoints(s, i);
+\\              for (var i = 0.0; i <= 1; i += diameter) {
+\\                  src_ball = updateIfCircleCollision(src_ball,
+\\                                                     i,
+\\                                                     i + diameter + overlap,
+\\                                                     points);
+\\              }
 \\          }
-\\          //COLLISION
-\\          let overlap = src_ball.radius + l.radius - distance;
-\\          let new_pos = src_ball.position.xy + normalize(n) * overlap;
-\\          src_ball.position = vec4(new_pos.x, new_pos.y, 0.0, 0.0);
-\\
-\\          let src_mass = pow(src_ball.radius, 2.0) * PI;
-\\          let other_mass = src_mass;
-\\          let other_velocity = -src_ball.velocity;
-\\          let c = 2.*dot(n, (other_velocity.xy - src_ball.velocity.xy)) / (dot(n, n) * (1./src_mass + 1./other_mass));
-\\          let new_vel = src_ball.velocity.xy + c/src_mass * n;
-\\          src_ball.velocity = vec4(new_vel.x, new_vel.y, 0.0, 0.0);
 \\      }
-\\
 \\      for (var i = 0u; i < num_consumers; i += 1u) {
 \\          if (i == index) {
 \\              continue;
@@ -167,6 +155,52 @@ pub const cs =
 \\      }
 \\      consumers[index].position = position;
 \\      consumers[index].velocity = velocity;
+\\  }
+\\
+\\  fn getCurvePoints(spline: Spline, i: u32) -> mat2x4<f32> {
+\\      let p0 = spline.points[i];
+\\      let p1 = spline.points[i + 1];
+\\      let p2 = spline.points[i + 2];
+\\      let p3 = spline.points[i + 3];
+\\      return mat2x4(p0.x, p1.x, p2.x, p3.x, p0.y, p1.y, p2.y, p3.y);
+\\  }
+\\  fn updateIfCircleCollision(ball: Consumer, start_t: f32, end_t: f32, points: mat2x4<f32>) -> Consumer {
+\\      var updated_ball = ball;
+\\      let n_end_t = min(1, end_t);
+\\      let start_edge = calculateSplinePoint(start_t, points);
+\\      let end_edge = calculateSplinePoint(n_end_t, points);
+\\      let radius = distance(start_edge, end_edge) / 2;
+\\      let to_center = (end_edge - start_edge) / 2;
+\\      let center_pos = start_edge + to_center;
+\\      let n = ball.position.xy - center_pos;
+\\      let distance = length(n);
+\\      if (distance < radius) {
+\\          let overlap = ball.radius + radius - distance;
+\\          let new_pos = ball.position.xy + normalize(n) * overlap;
+\\          updated_ball.position = vec4(new_pos.x, new_pos.y, 0.0, 0.0);
+\\
+\\          let ball_mass = pow(ball.radius, 2.0) * PI;
+\\          let other_mass = ball_mass;
+\\          let other_velocity = -ball.velocity.xy;
+\\          let c = 2.*dot(n, (other_velocity - ball.velocity.xy)) / (dot(n, n) * (1./ball_mass + 1./other_mass));
+\\          let new_vel = ball.velocity.xy + c/ball_mass * n;
+\\          updated_ball.velocity = vec4(new_vel.x, new_vel.y, 0.0, 0.0);
+\\      }
+\\      return updated_ball;
+\\  }
+\\  fn calculateSplinePoint(t: f32, points: mat2x4<f32>) -> vec2<f32> {
+\\      let tt = t * t;
+\\      let ttt = tt * t;
+\\      let q1 = -ttt + (2 * tt) - t;
+\\      let q2 = (3 * ttt) - (5 * tt) + 2;
+\\      let q3 = (-3 * ttt) + (4 * tt) + t;
+\\      let q4 = ttt - tt;
+\\      let influence = vec4(q1, q2, q3, q4);
+\\      let result_x = dot(points[0], influence);
+\\      let result_y = dot(points[1], influence);
+\\      let sx = 0.5 * result_x;
+\\      let sy = 0.5 * result_y;
+\\      return vec2(sx, sy);
 \\  }
 ;
 // zig fmt: on

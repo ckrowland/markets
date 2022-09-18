@@ -17,7 +17,7 @@ const Lines = @import("lines.zig");
 const Splines = @import("splines.zig");
 
 const content_dir = @import("build_options").content_dir;
-const window_title = "Circulatory Simulation";
+const window_title = "Circulatory System";
 
 pub const StagingBuffer = struct {
     slice: ?[]const [4]i32 = null,
@@ -43,6 +43,7 @@ pub const DemoState = struct {
     spline_pipeline: zgpu.RenderPipelineHandle,
     consumer_compute_pipeline: zgpu.ComputePipelineHandle,
     bind_group: zgpu.BindGroupHandle,
+    compute_bind_group_layout: zgpu.BindGroupLayoutHandle,
 
     consumer_vertex_buffer: zgpu.BufferHandle,
     consumer_index_buffer: zgpu.BufferHandle,
@@ -51,12 +52,14 @@ pub const DemoState = struct {
     stats_buffer: zgpu.BufferHandle,
     size_buffer: zgpu.BufferHandle,
     lines_buffer: zgpu.BufferHandle,
+    splines_buffer: zgpu.BufferHandle,
     square_vertex_buffer: zgpu.BufferHandle,
     line_position_buffer: zgpu.BufferHandle,
     splines_point_buffer: zgpu.BufferHandle,
     splines_square_buffer: zgpu.BufferHandle,
     stats_mapped_buffer: zgpu.BufferHandle,
     stats: StagingBuffer,
+    num_spline_points: u32,
 
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
@@ -87,7 +90,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 
     // Simulation struct
     var sim = Simulation.init(allocator);
-    sim.createAgents(allocator);
+    sim.createAgents();
 
     // Create Compute Bind Group and Pipeline
     const compute_bgl = gctx.createBindGroupLayout(&.{
@@ -96,7 +99,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         zgpu.bglBuffer(2, .{ .compute = true }, .read_only_storage, true, 0),
         zgpu.bglBuffer(3, .{ .compute = true }, .storage, true, 0),
     });
-    defer gctx.releaseResource(compute_bgl);
+
     const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
     defer gctx.releaseResource(compute_pl);
     const consumer_compute_pipeline = Consumers.createConsumerComputePipeline(gctx, compute_pl);
@@ -108,10 +111,11 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
     const lines_buffer = Lines.createLinesBuffer(gctx, sim.lines);
-    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines);
+    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines.stationary);
+    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines.stationary);
+    const splines_square_buffer = Splines.createSplinesSquaresBuffer(gctx, sim.splines.stationary);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
     const line_position_buffer = Lines.createSquarePositionBuffer(gctx, sim.lines);
-    const splines_square_buffer = Splines.createSplinesSquaresBuffer(gctx, sim.splines);
 
     const stats_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .storage = true },
@@ -131,11 +135,15 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     };
 
     const size_buffer = Shapes.createCoordinateSizeBuffer(gctx, sim.coordinate_size);
-    var consumer_bind_group = Shapes.createBindGroup(gctx, sim, compute_bgl, consumer_buffer, stats_buffer, size_buffer, lines_buffer);
+    var consumer_bind_group = Shapes.createBindGroup(gctx, sim, compute_bgl, consumer_buffer, stats_buffer, size_buffer, splines_buffer);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
+    var num_spline_points: u32 = 0;
+    for (sim.splines.stationary.items) |s| {
+        num_spline_points += @intCast(u32, s.len);
+    }
     return DemoState{
         .gctx = gctx,
         .consumer_pipeline = consumer_pipeline,
@@ -143,6 +151,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .spline_pipeline = spline_pipeline,
         .consumer_compute_pipeline = consumer_compute_pipeline,
         .bind_group = bind_group,
+        .compute_bind_group_layout = compute_bgl,
         .consumer_vertex_buffer = consumer_vertex_buffer,
         .consumer_index_buffer = consumer_index_buffer,
         .consumer_buffer = consumer_buffer,
@@ -150,12 +159,14 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .stats_buffer = stats_buffer,
         .size_buffer = size_buffer,
         .lines_buffer = lines_buffer,
+        .splines_buffer = splines_buffer,
         .square_vertex_buffer = square_vertex_buffer,
         .line_position_buffer = line_position_buffer,
         .splines_point_buffer = splines_point_buffer,
         .splines_square_buffer = splines_square_buffer,
         .stats_mapped_buffer = stats_mapped_buffer,
         .stats = stats,
+        .num_spline_points = num_spline_points,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
@@ -170,6 +181,13 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
 }
 
 fn update(demo: *DemoState) void {
+    const new_spline = Splines.updateHeartSpline(demo.sim.splines.animated.items[0]);
+    demo.sim.splines.animated.items[0] = new_spline;
+    demo.sim.splines.stationary.items[0] = new_spline.current;
+    demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
+    demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
+    demo.splines_square_buffer = Splines.createSplinesSquaresBuffer(demo.gctx, demo.sim.splines.stationary);
+    demo.consumer_bind_group = Shapes.updateBindGroup(demo);
     gui.update(demo);
 }
 
@@ -278,15 +296,12 @@ fn draw(demo: *DemoState) void {
             pass.setPipeline(sp);
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, spb_info.gpuobj.?, 0, spb_info.size);
-            var num_points: u32 = 0;
-            for (demo.sim.splines.items) |s| {
-                num_points += @intCast(u32, s.points.items.len);
-            }
-            pass.draw(6, num_points, 0, 0);
+            pass.draw(6, demo.num_spline_points, 0, 0);
 
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, ssb_info.gpuobj.?, 0, ssb_info.size);
             pass.draw(6, 100000, 0, 0);
+
         }
 
         {
@@ -321,12 +336,14 @@ pub fn startSimulation(demo: *DemoState) void {
         zgpu.bglBuffer(3, .{ .compute = true }, .storage, true, 0),
     });
     defer demo.gctx.releaseResource(compute_bgl);
-    demo.sim.createAgents(demo.allocator);
+    demo.sim.createAgents();
     demo.consumer_buffer = Consumers.createConsumerBuffer(demo.gctx, demo.sim.consumers);
+    demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
+    demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
+    demo.splines_square_buffer = Splines.createSplinesSquaresBuffer(demo.gctx, demo.sim.splines.stationary);
     const stats_data = [_]i32{ 0, 0, 0, 0 };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, i32, stats_data[0..]);
-    demo.lines_buffer = Lines.createLinesBuffer(demo.gctx, demo.sim.lines);
-    demo.consumer_bind_group = Shapes.createBindGroup(demo.gctx, demo.sim, compute_bgl, demo.consumer_buffer, demo.stats_buffer, demo.size_buffer, demo.lines_buffer);
+    demo.consumer_bind_group = Shapes.updateBindGroup(demo);
     demo.consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
 }
 
