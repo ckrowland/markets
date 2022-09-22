@@ -352,10 +352,10 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    //zgpu.checkSystem(content_dir) catch {
-    //    // In case of error zgpu.checkSystem() will print error message.
-    //    return;
-    //};
+    zgpu.checkSystem(content_dir) catch {
+        // In case of error zgpu.checkSystem() will print error message.
+        return;
+    };
 
     zglfw.defaultWindowHints();
     zglfw.windowHint(.cocoa_retina_framebuffer, 1);

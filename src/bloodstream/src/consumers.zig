@@ -5,8 +5,14 @@ const array = std.ArrayList;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const Simulation = @import("simulation.zig");
-const Vertex = @import("bloodstream.zig").Vertex;
+const CoordinateSize = Simulation.CoordinateSize;
+const main = @import("bloodstream.zig");
+const Vertex = main.Vertex;
+const GPUStats = main.GPUStats;
 const wgsl = @import("shaders.zig");
+const Splines = @import("splines.zig");
+const SplinePoint = Splines.SplinePoint;
+const AnimatedSpline = Splines.AnimatedSpline;
 
 pub const Consumer = struct {
     position: @Vector(4, f32),
@@ -178,4 +184,39 @@ pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layou
     };
 
     return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
+}
+
+pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle, size_buffer: zgpu.BufferHandle, animated_splines_buffer: zgpu.BufferHandle, splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
+    return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
+        .{
+            .binding = 0,
+            .buffer_handle = consumer_buffer,
+            .offset = 0,
+            .size = sim.consumers.items.len * @sizeOf(Consumer),
+        },
+        .{
+            .binding = 1,
+            .buffer_handle = stats_buffer,
+            .offset = 0,
+            .size = @sizeOf(GPUStats),
+        },
+        .{
+            .binding = 2,
+            .buffer_handle = size_buffer,
+            .offset = 0,
+            .size = @sizeOf(CoordinateSize),
+        },
+        .{
+            .binding = 3,
+            .buffer_handle = animated_splines_buffer,
+            .offset = 0,
+            .size = sim.splines.items.len * @sizeOf(AnimatedSpline),
+        },
+        .{
+            .binding = 4,
+            .buffer_handle = splines_buffer,
+            .offset = 0,
+            .size = sim.splines.items.len * @sizeOf(SplinePoint) * 10000,
+        },
+    });
 }

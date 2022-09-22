@@ -4,7 +4,6 @@ const Consumer = Consumers.Consumer;
 const Lines = @import("lines.zig");
 const Line = Lines.Line;
 const Splines = @import("splines.zig");
-const Spline = Splines.Spline;
 const AnimatedSpline = Splines.AnimatedSpline;
 const array = std.ArrayList;
 const random = std.crypto.random;
@@ -27,12 +26,7 @@ coordinate_size: CoordinateSize,
 consumers: array(Consumer),
 stats: Statistics,
 lines: array(Line),
-splines: SplinesStruct,
-
-pub const SplinesStruct = struct {
-    stationary: array(Spline),
-    animated: array(AnimatedSpline),
-};
+splines: array(AnimatedSpline),
 
 pub const Statistics = struct {
     num_transactions: array(i32),
@@ -78,18 +72,14 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .num_total_producer_inventory = array(i32).init(allocator), 
         },
         .lines = array(Line).init(allocator),
-        .splines = .{
-            .stationary = array(Spline).init(allocator),
-            .animated = array(AnimatedSpline).init(allocator),
-        },
+        .splines = array(AnimatedSpline).init(allocator),
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.consumers.deinit();
     self.lines.deinit();
-    self.splines.stationary.deinit();
-    self.splines.animated.deinit();
+    self.splines.deinit();
     self.stats.num_transactions.deinit();
     self.stats.num_empty_consumers.deinit();
     self.stats.num_total_producer_inventory.deinit();
@@ -106,7 +96,6 @@ pub fn createAgents(self: *Self) void {
     self.stats.second = 0;
     self.stats.max_stat_recorded = 0;
     Consumers.createConsumers(self);
-    Lines.createLines(self);
     Splines.createSplines(self);
 }
 

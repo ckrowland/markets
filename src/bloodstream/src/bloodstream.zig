@@ -15,6 +15,9 @@ const gui = @import("gui.zig");
 const Consumers = @import("consumers.zig");
 const Lines = @import("lines.zig");
 const Splines = @import("splines.zig");
+const AnimatedSpline = Splines.AnimatedSpline;
+const SplinePoint = Splines.SplinePoint;
+const VertexColor = Splines.VertexColor;
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "Circulatory System";
@@ -39,24 +42,23 @@ pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
 
     consumer_pipeline: zgpu.RenderPipelineHandle,
-    line_pipeline: zgpu.RenderPipelineHandle,
     spline_pipeline: zgpu.RenderPipelineHandle,
     consumer_compute_pipeline: zgpu.ComputePipelineHandle,
+    animated_spline_compute_pipeline: zgpu.ComputePipelineHandle,
+
     bind_group: zgpu.BindGroupHandle,
+    consumer_bind_group: zgpu.BindGroupHandle,
     compute_bind_group_layout: zgpu.BindGroupLayoutHandle,
 
     consumer_vertex_buffer: zgpu.BufferHandle,
     consumer_index_buffer: zgpu.BufferHandle,
     consumer_buffer: zgpu.BufferHandle,
-    consumer_bind_group: zgpu.BindGroupHandle,
     stats_buffer: zgpu.BufferHandle,
     size_buffer: zgpu.BufferHandle,
-    lines_buffer: zgpu.BufferHandle,
-    splines_buffer: zgpu.BufferHandle,
+    animated_splines_buffer: zgpu.BufferHandle,
     square_vertex_buffer: zgpu.BufferHandle,
-    line_position_buffer: zgpu.BufferHandle,
     splines_point_buffer: zgpu.BufferHandle,
-    splines_square_buffer: zgpu.BufferHandle,
+    splines_buffer: zgpu.BufferHandle,
     stats_mapped_buffer: zgpu.BufferHandle,
     stats: StagingBuffer,
     num_spline_points: u32,
@@ -72,20 +74,18 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.init(allocator, window);
 
     // Uniform Bind Group
-    const bind_group_layout = gctx.createBindGroupLayout(&.{
+    const uniform_bgl = gctx.createBindGroupLayout(&.{
         zgpu.bglBuffer(0, .{ .vertex = true }, .uniform, true, 0),
     });
-    defer gctx.releaseResource(bind_group_layout);
-    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
+    defer gctx.releaseResource(uniform_bgl);
+    const bind_group = gctx.createBindGroup(uniform_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
 
     // Render Pipelines
-    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+    const pipeline_layout = gctx.createPipelineLayout(&.{uniform_bgl});
     defer gctx.releaseResource(pipeline_layout);
-
     const consumer_pipeline = Consumers.createConsumerPipeline(gctx, pipeline_layout);
-    const line_pipeline = Lines.createLinePipeline(gctx, pipeline_layout);
     const spline_pipeline = Splines.createSplinePipeline(gctx, pipeline_layout);
 
     // Simulation struct
@@ -93,16 +93,19 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     sim.createAgents();
 
     // Create Compute Bind Group and Pipeline
-    const compute_bgl = gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .read_only_storage, true, 0),
-        zgpu.bglBuffer(3, .{ .compute = true }, .storage, true, 0),
+    const consumer_compute_bgl = gctx.createBindGroupLayout(&.{
+        zgpu.bglBuffer(0, .{ .compute = true }, .storage, false, 0),
+        zgpu.bglBuffer(1, .{ .compute = true }, .storage, false, 0),
+        zgpu.bglBuffer(2, .{ .compute = true }, .read_only_storage, false, 0),
+        zgpu.bglBuffer(3, .{ .compute = true }, .storage, false, 0),
+        zgpu.bglBuffer(4, .{ .compute = true }, .storage, false, 0),
     });
 
-    const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
+    const compute_pl = gctx.createPipelineLayout(&.{consumer_compute_bgl});
     defer gctx.releaseResource(compute_pl);
     const consumer_compute_pipeline = Consumers.createConsumerComputePipeline(gctx, compute_pl);
+
+    const animated_spline_compute_pipeline = Splines.createAnimatedSplineComputePipeline(gctx, compute_pl);
 
     // Create Buffers
     const num_vertices = 20;
@@ -110,12 +113,11 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const consumer_index_buffer = Consumers.createConsumerIndexBuffer(gctx, num_vertices);
     var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
-    const lines_buffer = Lines.createLinesBuffer(gctx, sim.lines);
-    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines.stationary);
-    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines.stationary);
-    const splines_square_buffer = Splines.createSplinesSquaresBuffer(gctx, sim.splines.stationary);
+    //const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines.stationary);
+    const animated_splines_buffer = Splines.createAnimatedSplinesBuffer(gctx, sim.splines);
+    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines);
+    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
-    const line_position_buffer = Lines.createSquarePositionBuffer(gctx, sim.lines);
 
     const stats_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .storage = true },
@@ -134,36 +136,42 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .buffer = gctx.lookupResource(stats_mapped_buffer).?,
     };
 
-    const size_buffer = Shapes.createCoordinateSizeBuffer(gctx, sim.coordinate_size);
-    var consumer_bind_group = Shapes.createBindGroup(gctx, sim, compute_bgl, consumer_buffer, stats_buffer, size_buffer, splines_buffer);
+    const size_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
+        .size = 4 * @sizeOf(f32),
+    });
+    const size = sim.coordinate_size;
+    const size_data = [_]f32{ size.min_x, size.min_y, size.max_x, size.max_y, };
+    gctx.queue.writeBuffer(gctx.lookupResource(size_buffer).?, 0, f32, size_data[0..]);
+
+    var consumer_bind_group = Consumers.createBindGroup(gctx, sim, consumer_compute_bgl, consumer_buffer, stats_buffer, size_buffer, animated_splines_buffer, splines_buffer);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
     var num_spline_points: u32 = 0;
-    for (sim.splines.stationary.items) |s| {
-        num_spline_points += @intCast(u32, s.len);
+    for (sim.splines.items) |as| {
+        num_spline_points += @intCast(u32, as.len);
     }
+
     return DemoState{
         .gctx = gctx,
         .consumer_pipeline = consumer_pipeline,
-        .line_pipeline = line_pipeline,
         .spline_pipeline = spline_pipeline,
         .consumer_compute_pipeline = consumer_compute_pipeline,
+        .animated_spline_compute_pipeline = animated_spline_compute_pipeline,
         .bind_group = bind_group,
-        .compute_bind_group_layout = compute_bgl,
+        .compute_bind_group_layout = consumer_compute_bgl,
         .consumer_vertex_buffer = consumer_vertex_buffer,
         .consumer_index_buffer = consumer_index_buffer,
         .consumer_buffer = consumer_buffer,
         .consumer_bind_group = consumer_bind_group,
         .stats_buffer = stats_buffer,
         .size_buffer = size_buffer,
-        .lines_buffer = lines_buffer,
-        .splines_buffer = splines_buffer,
+        .animated_splines_buffer = animated_splines_buffer,
         .square_vertex_buffer = square_vertex_buffer,
-        .line_position_buffer = line_position_buffer,
         .splines_point_buffer = splines_point_buffer,
-        .splines_square_buffer = splines_square_buffer,
+        .splines_buffer = splines_buffer,
         .stats_mapped_buffer = stats_mapped_buffer,
         .stats = stats,
         .num_spline_points = num_spline_points,
@@ -181,13 +189,6 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
 }
 
 fn update(demo: *DemoState) void {
-    const new_spline = Splines.updateHeartSpline(demo.sim.splines.animated.items[0]);
-    demo.sim.splines.animated.items[0] = new_spline;
-    demo.sim.splines.stationary.items[0] = new_spline.current;
-    demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
-    demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
-    demo.splines_square_buffer = Splines.createSplinesSquaresBuffer(demo.gctx, demo.sim.splines.stationary);
-    demo.consumer_bind_group = Shapes.updateBindGroup(demo);
     gui.update(demo);
 }
 
@@ -221,12 +222,7 @@ fn draw(demo: *DemoState) void {
         pass: {
             const ccp = gctx.lookupResource(demo.consumer_compute_pipeline) orelse break :pass;
             const bg = gctx.lookupResource(demo.consumer_bind_group) orelse break :pass;
-            const bg_info = gctx.lookupResourceInfo(demo.consumer_bind_group) orelse break :pass;
-            const first = @intCast(u32, bg_info.entries[0].offset);
-            const second = @intCast(u32, bg_info.entries[1].offset);
-            const third = @intCast(u32, bg_info.entries[2].offset);
-            const fourth = @intCast(u32, bg_info.entries[3].offset);
-            const dynamic_offsets = &.{ first, second, third, fourth };
+            const ascp = gctx.lookupResource(demo.animated_spline_compute_pipeline) orelse break :pass;
 
             const pass = encoder.beginComputePass(null);
             defer {
@@ -234,18 +230,25 @@ fn draw(demo: *DemoState) void {
                 pass.release();
             }
 
-            pass.setBindGroup(0, bg, dynamic_offsets);
+            pass.setBindGroup(0, bg, &.{});
             pass.setPipeline(ccp);
             const num_consumers = @intToFloat(f32, demo.sim.consumers.items.len);
             var workgroup_size = @floatToInt(u32, @ceil(num_consumers / 64));
             pass.dispatchWorkgroups(workgroup_size, 1, 1);
+
+            pass.setPipeline(ascp);
+            pass.dispatchWorkgroups(1, 1, 1);
         }
 
-        // Copy transactions number to mapped buffer
         pass: {
+            // Copy transactions number to mapped buffer
             const buf = gctx.lookupResource(demo.stats_buffer) orelse break :pass;
             const cp = gctx.lookupResource(demo.stats_mapped_buffer) orelse break :pass;
             encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(i32) * 4);
+
+            const spb = gctx.lookupResource(demo.splines_point_buffer) orelse break :pass;
+            const asb = gctx.lookupResource(demo.animated_splines_buffer) orelse break :pass;
+            encoder.copyBufferToBuffer(asb, 0, spb, 0, @sizeOf(SplinePoint) * 10);
         }
 
         pass: {
@@ -256,7 +259,7 @@ fn draw(demo: *DemoState) void {
             const sp = gctx.lookupResource(demo.spline_pipeline) orelse break :pass;
             const svb_info = gctx.lookupResourceInfo(demo.square_vertex_buffer) orelse break :pass;
             const spb_info = gctx.lookupResourceInfo(demo.splines_point_buffer) orelse break :pass;
-            const ssb_info = gctx.lookupResourceInfo(demo.splines_square_buffer) orelse break :pass;
+            const sb_info = gctx.lookupResourceInfo(demo.splines_buffer) orelse break :pass;
             const bind_group = gctx.lookupResource(demo.bind_group) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
 
@@ -299,9 +302,8 @@ fn draw(demo: *DemoState) void {
             pass.draw(6, demo.num_spline_points, 0, 0);
 
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
-            pass.setVertexBuffer(1, ssb_info.gpuobj.?, 0, ssb_info.size);
-            pass.draw(6, 100000, 0, 0);
-
+            pass.setVertexBuffer(1, sb_info.gpuobj.?, 0, sb_info.size);
+            pass.draw(6, 10000, 0, 0);
         }
 
         {
@@ -338,12 +340,11 @@ pub fn startSimulation(demo: *DemoState) void {
     defer demo.gctx.releaseResource(compute_bgl);
     demo.sim.createAgents();
     demo.consumer_buffer = Consumers.createConsumerBuffer(demo.gctx, demo.sim.consumers);
-    demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
-    demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
-    demo.splines_square_buffer = Splines.createSplinesSquaresBuffer(demo.gctx, demo.sim.splines.stationary);
+    //demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
+    //demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
     const stats_data = [_]i32{ 0, 0, 0, 0 };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, i32, stats_data[0..]);
-    demo.consumer_bind_group = Shapes.updateBindGroup(demo);
+    //demo.consumer_bind_group = Shapes.updateBindGroup(demo);
     demo.consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
 }
 
@@ -381,10 +382,10 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    //zgpu.checkSystem(content_dir) catch {
-    //    // In case of error zgpu.checkSystem() will print error message.
-    //    return;
-    //};
+    zgpu.checkSystem(content_dir) catch {
+        // In case of error zgpu.checkSystem() will print error message.
+        return;
+    };
 
     zglfw.defaultWindowHints();
     zglfw.windowHint(.cocoa_retina_framebuffer, 1);

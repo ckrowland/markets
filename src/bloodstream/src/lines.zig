@@ -122,68 +122,68 @@ fn createVertexColor(x: f32, y: f32, radius: f32, radians: f32) VertexColor {
     };
 }
 
-pub fn createLinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.line_vs, "vs");
-    defer vs_module.release();
-
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
-    defer fs_module.release();
-
-    const color_targets = [_]wgpu.ColorTargetState{.{
-        .format = zgpu.GraphicsContext.swapchain_format,
-        .blend = &.{ .color = .{}, .alpha = .{} },
-    }};
-
-    const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
-    };
-
-    const instance_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = @offsetOf(VertexColor, "position"), .shader_location = 1 },
-        .{ .format = .float32x4, .offset = @offsetOf(VertexColor, "color"), .shader_location = 2 },
-        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radius"), .shader_location = 3 },
-        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radians"), .shader_location = 4 },
-    };
-
-    const vertex_buffers = [_]wgpu.VertexBufferLayout{
-        .{
-            .array_stride = @sizeOf(Vertex),
-            .attribute_count = vertex_attributes.len,
-            .attributes = &vertex_attributes,
-            .step_mode = .vertex,
-        },
-        .{
-            .array_stride = @sizeOf(VertexColor),
-            .attribute_count = instance_attributes.len,
-            .attributes = &instance_attributes,
-            .step_mode = .instance,
-        },
-    };
-
-    const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
-        .vertex = wgpu.VertexState{
-            .module = vs_module,
-            .entry_point = "main",
-            .buffer_count = vertex_buffers.len,
-            .buffers = &vertex_buffers,
-        },
-        .primitive = wgpu.PrimitiveState{
-            .front_face = .ccw,
-            .cull_mode = .none,
-            .topology = .triangle_list,
-        },
-        .depth_stencil = &wgpu.DepthStencilState{
-            .format = .depth32_float,
-            .depth_write_enabled = true,
-            .depth_compare = .less,
-        },
-        .fragment = &wgpu.FragmentState{
-            .module = fs_module,
-            .entry_point = "main",
-            .target_count = color_targets.len,
-            .targets = &color_targets,
-        },
-    };
-
-    return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
-}
+//pub fn createLinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
+//    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.line_vs, "vs");
+//    defer vs_module.release();
+//
+//    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+//    defer fs_module.release();
+//
+//    const color_targets = [_]wgpu.ColorTargetState{.{
+//        .format = zgpu.GraphicsContext.swapchain_format,
+//        .blend = &.{ .color = .{}, .alpha = .{} },
+//    }};
+//
+//    const vertex_attributes = [_]wgpu.VertexAttribute{
+//        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
+//    };
+//
+//    const instance_attributes = [_]wgpu.VertexAttribute{
+//        .{ .format = .float32x3, .offset = @offsetOf(VertexColor, "position"), .shader_location = 1 },
+//        .{ .format = .float32x4, .offset = @offsetOf(VertexColor, "color"), .shader_location = 2 },
+//        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radius"), .shader_location = 3 },
+//        .{ .format = .float32, .offset = @offsetOf(VertexColor, "radians"), .shader_location = 4 },
+//    };
+//
+//    const vertex_buffers = [_]wgpu.VertexBufferLayout{
+//        .{
+//            .array_stride = @sizeOf(Vertex),
+//            .attribute_count = vertex_attributes.len,
+//            .attributes = &vertex_attributes,
+//            .step_mode = .vertex,
+//        },
+//        .{
+//            .array_stride = @sizeOf(VertexColor),
+//            .attribute_count = instance_attributes.len,
+//            .attributes = &instance_attributes,
+//            .step_mode = .instance,
+//        },
+//    };
+//
+//    const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
+//        .vertex = wgpu.VertexState{
+//            .module = vs_module,
+//            .entry_point = "main",
+//            .buffer_count = vertex_buffers.len,
+//            .buffers = &vertex_buffers,
+//        },
+//        .primitive = wgpu.PrimitiveState{
+//            .front_face = .ccw,
+//            .cull_mode = .none,
+//            .topology = .triangle_list,
+//        },
+//        .depth_stencil = &wgpu.DepthStencilState{
+//            .format = .depth32_float,
+//            .depth_write_enabled = true,
+//            .depth_compare = .less,
+//        },
+//        .fragment = &wgpu.FragmentState{
+//            .module = fs_module,
+//            .entry_point = "main",
+//            .target_count = color_targets.len,
+//            .targets = &color_targets,
+//        },
+//    };
+//
+//    return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
+//}

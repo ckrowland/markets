@@ -18,7 +18,7 @@ pub const vs =
 \\      return output;
 \\  }
 ;
-pub const line_vs =
+pub const spline_vs =
 \\  @group(0) @binding(0) var<uniform> object_to_clip: mat4x4<f32>;
 \\  struct VertexOut {
 \\      @builtin(position) position_clip: vec4<f32>,
@@ -27,13 +27,13 @@ pub const line_vs =
 \\  @vertex fn main(
 \\      @location(0) vertex_position: vec3<f32>,
 \\      @location(1) position: vec4<f32>,
-\\      @location(2) color: vec4<f32>,
-\\      @location(3) radius: f32,
-\\      @location(4) rad: f32,
+\\      @location(2) radius: f32,
+\\      @location(3) color: vec4<f32>,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
 \\      var nx = vertex_position.x;
 \\      var ny = vertex_position.y;
+\\      let rad = 0.0;
 \\      if (vertex_position.x > 0) {
 \\          nx += radius;
 \\      } else {
@@ -80,16 +80,28 @@ pub const cs =
 \\    max_x: f32,
 \\    max_y: f32,
 \\  }
+\\  struct AnimatedSpline{
+\\      current: array<SplinePoint, 10>,
+\\      start: array<SplinePoint, 10>,
+\\      end: array<SplinePoint, 10>,
+\\      len: u32,
+\\      to_start: u32,
+\\  }
 \\  struct Spline{
-\\    radius: f32,
-\\    len: u32,
-\\    points: array<vec2<f32>, 10>,
+\\      points: array<SplinePoint, 1000>,
+\\  } 
+\\  struct SplinePoint{
+\\      color: vec4<f32>,
+\\      position: vec4<f32>,
+\\      radius: f32,
+\\      step_size: f32,
 \\  }
 \\  const PI: f32 = 3.14159;
 \\  @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
 \\  @group(0) @binding(1) var<storage, read_write> stats: vec4<i32>;
 \\  @group(0) @binding(2) var<storage, read> size: Size;
-\\  @group(0) @binding(3) var<storage, read_write> splines: array<Spline>;
+\\  @group(0) @binding(3) var<storage, read_write> animated_splines: array<AnimatedSpline>;
+\\  @group(0) @binding(4) var<storage, read_write> splines: array<Spline>;
 \\  @compute @workgroup_size(64)
 \\  fn consumer_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 \\      let index : u32 = global_id.x;
@@ -98,14 +110,14 @@ pub const cs =
 \\      if(index >= num_consumers) {
 \\        return;
 \\      }
-\\      let num_splines = arrayLength(&splines);
+\\      let num_splines = arrayLength(&animated_splines);
 \\      for (var i = 0u; i < num_splines; i += 1u) {
-\\          let s = splines[i];
+\\          let s = animated_splines[i];
 \\          let num_curves = s.len - 3;
-\\          let diameter = s.radius *  0.001;
+\\          let diameter = s.current[i].radius * 0.001;
 \\          let overlap = diameter * 5;
 \\          for (var i = 0u; i < num_curves; i += 1u) {
-\\              let points = getCurvePoints(s, i);
+\\              let points = getCurvePoints(s.current, i);
 \\              for (var i = 0.0; i <= 1; i += diameter) {
 \\                  src_ball = updateIfCircleCollision(src_ball,
 \\                                                     i,
@@ -157,18 +169,18 @@ pub const cs =
 \\      consumers[index].velocity = velocity;
 \\  }
 \\
-\\  fn getCurvePoints(spline: Spline, i: u32) -> mat2x4<f32> {
-\\      let p0 = spline.points[i];
-\\      let p1 = spline.points[i + 1];
-\\      let p2 = spline.points[i + 2];
-\\      let p3 = spline.points[i + 3];
+\\  fn getCurvePoints(spline: array<SplinePoint, 10>, i: u32) -> mat2x4<f32> {
+\\      let p0 = spline[i].position;
+\\      let p1 = spline[i + 1].position;
+\\      let p2 = spline[i + 2].position;
+\\      let p3 = spline[i + 3].position;
 \\      return mat2x4(p0.x, p1.x, p2.x, p3.x, p0.y, p1.y, p2.y, p3.y);
 \\  }
 \\  fn updateIfCircleCollision(ball: Consumer, start_t: f32, end_t: f32, points: mat2x4<f32>) -> Consumer {
 \\      var updated_ball = ball;
 \\      let n_end_t = min(1, end_t);
-\\      let start_edge = calculateSplinePoint(start_t, points);
-\\      let end_edge = calculateSplinePoint(n_end_t, points);
+\\      let start_edge = calculateSplinePoint(start_t, points).xy;
+\\      let end_edge = calculateSplinePoint(n_end_t, points).xy;
 \\      let radius = distance(start_edge, end_edge) / 2;
 \\      let to_center = (end_edge - start_edge) / 2;
 \\      let center_pos = start_edge + to_center;
@@ -188,7 +200,7 @@ pub const cs =
 \\      }
 \\      return updated_ball;
 \\  }
-\\  fn calculateSplinePoint(t: f32, points: mat2x4<f32>) -> vec2<f32> {
+\\  fn calculateSplinePoint(t: f32, points: mat2x4<f32>) -> vec4<f32> {
 \\      let tt = t * t;
 \\      let ttt = tt * t;
 \\      let q1 = -ttt + (2 * tt) - t;
@@ -200,7 +212,43 @@ pub const cs =
 \\      let result_y = dot(points[1], influence);
 \\      let sx = 0.5 * result_x;
 \\      let sy = 0.5 * result_y;
-\\      return vec2(sx, sy);
+\\      return vec4(sx, sy, 0, 0);
+\\  }
+\\
+\\  @compute @workgroup_size(64)
+\\  fn animated_spline_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+\\      let index: u32 = global_id.x; 
+\\      let num_splines = arrayLength(&animated_splines);
+\\      if (index > num_splines) {
+\\          return;
+\\      }
+\\
+\\      let aspline = animated_splines[index];
+\\      for (var i = 1u; i < aspline.len - 1; i += 1u) {
+\\          let start = aspline.start[i].position;
+\\          let current = aspline.current[i].position;
+\\          let end = aspline.end[i].position;
+\\          var diff = end - current;
+\\          if (all(current.xy == end.xy)) {
+\\              animated_splines[index].to_start = 1;
+\\          }
+\\          if (all(current.xy == start.xy)) {
+\\              animated_splines[index].to_start = 0;
+\\          }
+\\          if (animated_splines[index].to_start == 1) {
+\\              diff = start - current;
+\\          }
+\\          let direction = normalize(diff) * aspline.current[i].step_size;
+\\          animated_splines[index].current[i].position += direction;
+\\
+\\          let points_idx = i - 1;
+\\          let points = getCurvePoints(animated_splines[index].current, points_idx);
+\\          for (var j = 0u; j < 1000; j += 1) {
+\\              let t = f32(j) * 0.001;
+\\              let new_point = calculateSplinePoint(t, points);
+\\              splines[points_idx].points[j].position = new_point;
+\\          }
+\\      }
 \\  }
 ;
 // zig fmt: on
