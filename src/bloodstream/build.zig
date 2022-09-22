@@ -1,9 +1,9 @@
 const std = @import("std");
-const zgpu = @import("../../zig-gamedev/libs/zgpu/build.zig");
-const zmath = @import("../../zig-gamedev/libs/zmath/build.zig");
-const zpool = @import("../../zig-gamedev/libs/zpool/build.zig");
-const zglfw = @import("../../zig-gamedev/libs/zglfw/build.zig");
-const zgui = @import("../../zig-gamedev/libs/zgui/build.zig");
+const zgpu = @import("../../libs/zgpu/build.zig");
+const zmath = @import("../../libs/zmath/build.zig");
+const zpool = @import("../../libs/zpool/build.zig");
+const zglfw = @import("../../libs/zglfw/build.zig");
+const zgui = @import("../../libs/zgui/build.zig");
 
 const Options = @import("../../build.zig").Options;
 const content_dir = "content/";

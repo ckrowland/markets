@@ -39,25 +39,12 @@ pub fn build(b: *std.build.Builder) void {
     //
     const test_step = b.step("test", "Run all tests");
 
-    const zpool_tests = @import("zig-gamedev/libs/zpool/build.zig").buildTests(b, options.build_mode, options.target);
+    const zpool_tests = @import("libs/zpool/build.zig").buildTests(b, options.build_mode, options.target);
     test_step.dependOn(&zpool_tests.step);
-    const zgpu_tests = @import("zig-gamedev/libs/zgpu/build.zig").buildTests(b, options.build_mode, options.target);
+    const zgpu_tests = @import("libs/zgpu/build.zig").buildTests(b, options.build_mode, options.target);
     test_step.dependOn(&zgpu_tests.step);
     const zmath_tests = zmath.buildTests(b, options.build_mode, options.target);
     test_step.dependOn(&zmath_tests.step);
-    const zbullet_tests = @import("zig-gamedev/libs/zbullet/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zbullet_tests.step);
-    const znoise_tests = @import("zig-gamedev/libs/znoise/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&znoise_tests.step);
-    const znetwork_tests = @import("zig-gamedev/libs/znetwork/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&znetwork_tests.step);
-    const zmesh_tests = @import("zig-gamedev/libs/zmesh/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zmesh_tests.step);
-    const zaudio_tests = @import("zig-gamedev/libs/zaudio/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zaudio_tests.step);
-
-    const zjolt_tests = @import("zig-gamedev/libs/zjolt/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zjolt_tests.step);
 
     //
     // Benchmarks
@@ -71,7 +58,7 @@ pub fn build(b: *std.build.Builder) void {
     }
 }
 
-const zmath = @import("zig-gamedev/libs/zmath/build.zig");
+const zmath = @import("libs/zmath/build.zig");
 
 const resources = @import("src/resources/build.zig");
 const bloodstream = @import("src/bloodstream/build.zig");

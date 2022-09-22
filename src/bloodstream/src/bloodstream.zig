@@ -404,11 +404,14 @@ pub fn main() !void {
 
     const scale_factor = scale_factor: {
         const scale = window.getContentScale();
-        break :scale_factor math.max(scale.x, scale.y);
+        break :scale_factor math.max(scale[0], scale[1]);
     };
 
     zgui.init();
     defer zgui.deinit();
+
+    zgui.plot.init();
+    defer zgui.plot.deinit();
 
     _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", 19.0 * scale_factor);
 

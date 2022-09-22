@@ -99,17 +99,16 @@ fn plots(demo: *DemoState) void {
     const margin = 40;
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - tab_bar_height - margin;
+    const plot_flags = .{ .w = plot_width, .h = plot_height, .flags = .{} };
 
-    if (zgui.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{}})) {
-        zgui.setupXAxis("", .{ .auto_fit = true, });
-        zgui.setupYAxis("", .{ .auto_fit = true });
-        zgui.setupLegend(zgui.PlotLocation.north_west, .{});
-        zgui.plotLineValues("Transactions", .{ .slice = nt[0..], .flags = .{}});
-        zgui.plotLineValues("Empty Consumers", .{ .slice = nec[0..],
-                                                  .flags = .{.no_clip = true} });
-        zgui.plotLineValues("Total Producer Inventory", .{ .slice = tpi[0..],
-                                                           .flags = .{}});
-        zgui.endPlot();
+    if (zgui.plot.beginPlot("", plot_flags)){
+        zgui.plot.setupXAxis("", .{ .auto_fit = true, });
+        zgui.plot.setupYAxis("", .{ .auto_fit = true });
+        zgui.plot.setupLegend(zgui.plot.PlotLocation.north_west, .{});
+        zgui.plot.plotLineValuesInt("Transactions", nt[0..], .{});
+        zgui.plot.plotLineValuesInt("Empty Consumers", nec[0..], .{});
+        zgui.plot.plotLineValuesInt("Total Producer Inventory", tpi[0..], .{});
+        zgui.plot.endPlot();
     }
 }
 
