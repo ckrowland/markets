@@ -1,3 +1,0 @@
-[submodule "zig-gamedev"]
-	path = zig-gamedev
-	url = https://github.com/ckrowland/zig-gamedev
