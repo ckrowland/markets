@@ -27,8 +27,7 @@ GPU Accelerated agent-based modeling to visualize and simulate complex systems.
 
 ## Install
 - `git` with [Git LFS](https://git-lfs.github.com/)
-- [Zig 0.10.0-dev.3952 (master)](https://ziglang.org/download/) or newer
-
+- [Zig 0.10.0-dev.4060 (master)](https://ziglang.org/download/) or newer
 ## Run
 ```
 git clone --recurse-submodules https://github.com/ckrowland/simulations.git
