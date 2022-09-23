@@ -10,7 +10,6 @@ params: struct {
     giving_rate: i32,
     max_inventory: i32,
     num_consumers: i32,
-    consumption_rate: i32,
     moving_rate: f32,
     producer_width: f32,
     consumer_radius: f32,
@@ -35,12 +34,12 @@ stats: struct {
 pub const Producer = struct {
     position: @Vector(4, f32),
     color: @Vector(4, f32),
-    production_rate: i32,
-    giving_rate: i32,
-    inventory: i32,
-    max_inventory: i32,
-    len: i32,
-    queue: [450]i32,
+    production_rate: u32,
+    giving_rate: u32,
+    inventory: u32,
+    max_inventory: u32,
+    len: u32,
+    queue: [450]u32,
 };
 
 pub const Consumer = struct {
@@ -49,9 +48,8 @@ pub const Consumer = struct {
     destination: @Vector(4, f32),
     step_size: @Vector(4, f32),
     color: @Vector(4, f32),
-    consumption_rate: i32,
     moving_rate: f32,
-    inventory: i32,
+    inventory: u32,
     radius: f32,
     producer_id: i32,
 };
@@ -72,7 +70,6 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .giving_rate = 10,
             .max_inventory = 10000,
             .num_consumers = 10000,
-            .consumption_rate = 10,
             .moving_rate = 5.0,
             .producer_width = 40.0,
             .consumer_radius = 10.0,
@@ -139,7 +136,6 @@ pub fn createConsumers(self: *Self) void {
             .destination = pos,
             .step_size = step_size,
             .color = init_color,
-            .consumption_rate = self.params.consumption_rate,
             .moving_rate = self.params.moving_rate,
             .inventory = 0,
             .radius = self.params.consumer_radius,
@@ -157,14 +153,14 @@ pub fn createProducers(self: *Self) void {
         const y = @intToFloat(f32, random.intRangeAtMost(i32, self.coordinate_size.min_y, self.coordinate_size.max_y));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
         const init_color = @Vector(4, f32){ 1.0, 1.0, 1.0, 0.0 };
-        const q = [_]i32{0} ** 450;
+        const q = [_]u32{0} ** 450;
         const p = Producer{
             .position = pos,
             .color = init_color,
-            .production_rate = self.params.production_rate,
-            .giving_rate = self.params.giving_rate,
-            .inventory = self.params.max_inventory,
-            .max_inventory = self.params.max_inventory,
+            .production_rate = @intCast(u32, self.params.production_rate),
+            .giving_rate = @intCast(u32, self.params.giving_rate),
+            .inventory = @intCast(u32, self.params.max_inventory),
+            .max_inventory = @intCast(u32, self.params.max_inventory),
             .len = 0,
             .queue = q,
         };

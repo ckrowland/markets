@@ -155,8 +155,8 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
     const instance_attributes = [_]wgpu.VertexAttribute{
         .{ .format = .float32x4, .offset = @offsetOf(Producer, "position"), .shader_location = 1 },
         .{ .format = .float32x4, .offset = @offsetOf(Producer, "color"), .shader_location = 2 },
-        .{ .format = .sint32, .offset = @offsetOf(Producer, "inventory"), .shader_location = 3 },
-        .{ .format = .sint32, .offset = @offsetOf(Producer, "max_inventory"), .shader_location = 4 },
+        .{ .format = .uint32, .offset = @offsetOf(Producer, "inventory"), .shader_location = 3 },
+        .{ .format = .uint32, .offset = @offsetOf(Producer, "max_inventory"), .shader_location = 4 },
     };
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{

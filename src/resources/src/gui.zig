@@ -143,11 +143,6 @@ fn parameters(demo: *DemoState) void {
                               .min = 1,
                               .max = 10000 });
 
-    zgui.text("Consumption Rate", .{});
-    _ = zgui.sliderInt("##cr", .{ .v = &demo.sim.params.consumption_rate,
-                              .min = 1,
-                              .max = 100 });
-
     zgui.text("Moving Rate", .{});
     _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.moving_rate,
                                 .min = 1.0,
