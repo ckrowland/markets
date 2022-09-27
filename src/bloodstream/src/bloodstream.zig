@@ -9,7 +9,6 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const Simulation = @import("simulation.zig");
 const Statistics = Simulation.stats;
-const Shapes = @import("shapes.zig");
 const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
 const Consumers = @import("consumers.zig");
@@ -55,6 +54,7 @@ pub const DemoState = struct {
     consumer_buffer: zgpu.BufferHandle,
     stats_buffer: zgpu.BufferHandle,
     size_buffer: zgpu.BufferHandle,
+    stationary_splines_buffer: zgpu.BufferHandle,
     animated_splines_buffer: zgpu.BufferHandle,
     square_vertex_buffer: zgpu.BufferHandle,
     splines_point_buffer: zgpu.BufferHandle,
@@ -113,10 +113,10 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const consumer_index_buffer = Consumers.createConsumerIndexBuffer(gctx, num_vertices);
     var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
-    //const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines.stationary);
-    const animated_splines_buffer = Splines.createAnimatedSplinesBuffer(gctx, sim.splines);
-    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.splines);
-    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.splines);
+    const stationary_splines_buffer = Splines.createStationarySplinesBuffer(gctx, sim.splines);
+    const animated_splines_buffer = Splines.createAnimatedSplinesBuffer(gctx, sim.asplines);
+    const splines_point_buffer = Splines.createSplinePointsBuffer(gctx, sim.asplines);
+    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.asplines);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
 
     const stats_buffer = gctx.createBuffer(.{
@@ -150,7 +150,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const depth = createDepthTexture(gctx);
 
     var num_spline_points: u32 = 0;
-    for (sim.splines.items) |as| {
+    for (sim.asplines.items) |as| {
         num_spline_points += @intCast(u32, as.len);
     }
 
@@ -168,6 +168,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .consumer_bind_group = consumer_bind_group,
         .stats_buffer = stats_buffer,
         .size_buffer = size_buffer,
+        .stationary_splines_buffer = stationary_splines_buffer,
         .animated_splines_buffer = animated_splines_buffer,
         .square_vertex_buffer = square_vertex_buffer,
         .splines_point_buffer = splines_point_buffer,
@@ -247,8 +248,9 @@ fn draw(demo: *DemoState) void {
             encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(i32) * 4);
 
             const spb = gctx.lookupResource(demo.splines_point_buffer) orelse break :pass;
+            const spb_info = gctx.lookupResourceInfo(demo.splines_point_buffer) orelse break :pass;
             const asb = gctx.lookupResource(demo.animated_splines_buffer) orelse break :pass;
-            encoder.copyBufferToBuffer(asb, 0, spb, 0, @sizeOf(SplinePoint) * 10);
+            encoder.copyBufferToBuffer(asb, 0, spb, 0, spb_info.size);
         }
 
         pass: {
@@ -299,11 +301,13 @@ fn draw(demo: *DemoState) void {
             pass.setPipeline(sp);
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, spb_info.gpuobj.?, 0, spb_info.size);
-            pass.draw(6, demo.num_spline_points, 0, 0);
+            const num_points = @intCast(u32, spb_info.size / @sizeOf(SplinePoint));
+            pass.draw(6, num_points, 0, 0);
 
-            pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
+
             pass.setVertexBuffer(1, sb_info.gpuobj.?, 0, sb_info.size);
-            pass.draw(6, 10000, 0, 0);
+            const num_squares = @intCast(u32, sb_info.size / @sizeOf(SplinePoint));
+            pass.draw(6, num_squares, 0, 0);
         }
 
         {
@@ -344,7 +348,6 @@ pub fn startSimulation(demo: *DemoState) void {
     //demo.splines_point_buffer = Splines.createSplinePointsBuffer(demo.gctx, demo.sim.splines.stationary);
     const stats_data = [_]i32{ 0, 0, 0, 0 };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, i32, stats_data[0..]);
-    //demo.consumer_bind_group = Shapes.updateBindGroup(demo);
     demo.consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
 }
 

@@ -9,7 +9,6 @@ const main = @import("bloodstream.zig");
 const Vertex = main.Vertex;
 const DemoState = main.DemoState;
 const wgsl = @import("shaders.zig");
-const Shapes = @import("shapes.zig");
 
 pub const AnimatedSpline = struct {
     current: [10]SplinePoint,
@@ -20,6 +19,12 @@ pub const AnimatedSpline = struct {
     _padding: u136,
 };
 
+pub const Spline = struct {
+    points: [10]SplinePoint,
+    len: u32,
+    _padding: u168,
+};
+
 pub const SplinePoint = struct {
     color: [4]f32,
     position: [4]f32,
@@ -27,23 +32,6 @@ pub const SplinePoint = struct {
     step_size: f32,
     _padding: u64,
 };
-
-pub fn updateAnimatedSplines(demo: *DemoState) void {
-    const t = @floatCast(f32, demo.gctx.stats.time);
-    const tenth = @floatToInt(i32, (t - @floor(t)) * 10);
-    var new_spline = demo.sim.splines.animated.items[0];
-    if (tenth == 5) {
-        new_spline.to_start = true;
-    } else if (tenth == 0) {
-        new_spline.to_start = false;
-    }
-    //new_spline = updateHeartSpline(new_spline);
-    demo.sim.splines.animated.items[0] = new_spline;
-    demo.sim.splines.stationary.items[0] = new_spline.current;
-    //demo.splines_buffer = createSplinesBuffer(demo.gctx, demo.sim.splines.stationary);
-    //demo.consumer_bind_group = Shapes.updateBindGroup(demo);
-}
-
 
 pub fn createSplines(self: *Simulation) void {
     createSplineHeart(self);
@@ -72,6 +60,7 @@ fn createSplineHeart(self: *Simulation) void {
         createSplinePoint(cx-offset, cy, radius),
         createSplinePoint(0, 0, radius),
     };
+
     width = 200;
     height = 200;
     const inner = [10]SplinePoint{
@@ -86,8 +75,9 @@ fn createSplineHeart(self: *Simulation) void {
         createSplinePoint(cx-offset, cy, radius),
         createSplinePoint(0, 0, radius),
     };
+
     const len = 9;
-    self.splines.append(.{
+    self.asplines.append(.{
         .start = outer,
         .current = outer,
         .end = inner,
@@ -107,57 +97,87 @@ fn createSplinePoint(x: f32, y: f32, radius: f32) SplinePoint {
     };
 }
 
-//fn createSplineBloodstream(self: *Simulation) void {
-//    const c = self.coordinate_size;
-//    const len_x = @fabs(c.min_x) + @fabs(c.max_x);
-//    const len_y = @fabs(c.min_y) + @fabs(c.max_y);
-//    const cx = c.min_x + (len_x / 2);
-//    const cy = c.min_y + (len_y / 2);
-//    var offset: f32 = 100;
-//    var width: f32 = 700 + offset;
-//    var height: f32 = 700;
-//    const points = [10][2]f32{
-//        [2]f32{cx+offset, cy},
-//        [2]f32{cx+offset, cy+height},
-//        [2]f32{cx+width, cy+height},
-//        [2]f32{cx+width, cy},
-//        [2]f32{cx, cy-height},
-//        [2]f32{cx-width, cy},
-//        [2]f32{cx-width, cy+height},
-//        [2]f32{cx-offset, cy+height},
-//        [2]f32{cx-offset, cy},
-//        [2]f32{0, 0},
-//    };
-//    const radius = 5;
-//    const s = Spline{
-//        .points = points,
-//        .radius = radius,
-//        .len = 9,
-//    };
-//    self.splines.append(s) catch unreachable;
-//
-//    offset = 200;
-//    width = 600;
-//    height = 600;
-//    const points2 = [10][2]f32{
-//        [2]f32{cx+offset, cy},
-//        [2]f32{cx+offset, cy+height},
-//        [2]f32{cx+width, cy+height},
-//        [2]f32{cx+width, cy},
-//        [2]f32{cx, cy-height},
-//        [2]f32{cx-width, cy},
-//        [2]f32{cx-width, cy+height},
-//        [2]f32{cx-offset, cy+height},
-//        [2]f32{cx-offset, cy},
-//        [2]f32{0, 0},
-//    };
-//    const s2 = Spline{
-//        .points = points2,
-//        .radius = radius,
-//        .len = 9,
-//    };
-//    self.splines.append(s2) catch unreachable;
-//}
+fn createSplineBloodstream(self: *Simulation) void {
+    const c = self.coordinate_size;
+    const len_x = @fabs(c.min_x) + @fabs(c.max_x);
+    const len_y = @fabs(c.min_y) + @fabs(c.max_y);
+    const cx = c.min_x + (len_x / 2);
+    const cy = c.min_y + (len_y / 2);
+    const radius = 20;
+    var offset: f32 = 100;
+    var width: f32 = 700 + offset;
+    var height: f32 = 700;
+    const outer = [10]SplinePoint{
+        createSplinePoint(cx+offset, cy, radius),
+        createSplinePoint(cx+offset, cy+300, radius),
+        createSplinePoint(cx+width, cy+height, radius),
+        createSplinePoint(cx+width, cy, radius),
+        createSplinePoint(cx, cy-height, radius),
+        createSplinePoint(cx-width, cy, radius),
+        createSplinePoint(cx-width, cy+height, radius),
+        createSplinePoint(cx-offset, cy+300, radius),
+        createSplinePoint(cx-offset, cy, radius),
+        createSplinePoint(0, 0, radius),
+    };
+    const outer_end = [10]SplinePoint{
+        createSplinePoint(cx+offset, cy, radius),
+        createSplinePoint(cx+offset, cy+200, radius),
+        createSplinePoint(cx+width, cy+height, radius),
+        createSplinePoint(cx+width, cy, radius),
+        createSplinePoint(cx, cy-height, radius),
+        createSplinePoint(cx-width, cy, radius),
+        createSplinePoint(cx-width, cy+height, radius),
+        createSplinePoint(cx-offset, cy+200, radius),
+        createSplinePoint(cx-offset, cy, radius),
+        createSplinePoint(0, 0, radius),
+    };
+    const outer_as = AnimatedSpline{
+        .start = outer,
+        .current = outer,
+        .end = outer_end,
+        .len = 9,
+        .to_start = 0,
+        ._padding = 0,
+    };
+    self.asplines.append(outer_as) catch unreachable;
+
+    //offset = 200;
+    //width = 600;
+    //height = 600;
+    //const inner = [10]SplinePoint{
+    //    createSplinePoint(cx+offset, cy, radius),
+    //    createSplinePoint(cx+offset, cy+300, radius),
+    //    createSplinePoint(cx+width, cy+height, radius),
+    //    createSplinePoint(cx+width, cy, radius),
+    //    createSplinePoint(cx, cy-height, radius),
+    //    createSplinePoint(cx-width, cy, radius),
+    //    createSplinePoint(cx-width, cy+height, radius),
+    //    createSplinePoint(cx-offset, cy+300, radius),
+    //    createSplinePoint(cx-offset, cy, radius),
+    //    createSplinePoint(0, 0, radius),
+    //};
+    //const inner_end = [10]SplinePoint{
+    //    createSplinePoint(cx+offset, cy, radius),
+    //    createSplinePoint(cx+offset, cy+200, radius),
+    //    createSplinePoint(cx+width, cy+height, radius),
+    //    createSplinePoint(cx+width, cy, radius),
+    //    createSplinePoint(cx, cy-height, radius),
+    //    createSplinePoint(cx-width, cy, radius),
+    //    createSplinePoint(cx-width, cy+height, radius),
+    //    createSplinePoint(cx-offset, cy+200, radius),
+    //    createSplinePoint(cx-offset, cy, radius),
+    //    createSplinePoint(0, 0, radius),
+    //};
+    //const inner_as = AnimatedSpline{
+    //    .start = inner,
+    //    .current = inner,
+    //    .end = inner_end,
+    //    .len = 9,
+    //    .to_start = 0,
+    //    ._padding = 0,
+    //};
+    //self.asplines.append(inner_as) catch unreachable;
+}
 
 pub fn getSplinePoint(i: f32, points: [10]SplinePoint) [4]f32 {
     const p0: u32 = @floatToInt(u32, i);
@@ -197,12 +217,16 @@ pub fn createAnimatedSplinesBuffer(gctx: *zgpu.GraphicsContext, splines: array(A
 }
 
 pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(AnimatedSpline)) zgpu.BufferHandle {
-    const max_num_points = 1000;
+    //const max_num_points = 1000;
+    var num_points: u32 = 0;
+    for (splines.items) |as| {
+        num_points += as.len;
+    }
     const spline_points_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = max_num_points * @sizeOf(SplinePoint),
+        .size = num_points * @sizeOf(SplinePoint),
     });
-    var points_buffer: [max_num_points]SplinePoint = undefined;
+    var points_buffer: [1000]SplinePoint = undefined;
     var buffer_idx: u32 = 0;
     var point_idx: u32 = 0;
     for (splines.items) |as| {
@@ -214,22 +238,22 @@ pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(Anim
         }
         point_idx = 0;
     }
-    gctx.queue.writeBuffer(gctx.lookupResource(spline_points_buffer).?, 0, SplinePoint, points_buffer[0..]);
+    gctx.queue.writeBuffer(gctx.lookupResource(spline_points_buffer).?, 0, SplinePoint, points_buffer[0..num_points]);
     return spline_points_buffer;
 }
 
 pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, asplines: array(AnimatedSpline)) zgpu.BufferHandle {
-    //const num_curves = asplines.items.len - 3;
-    const num_curves = 6;
-    const max_num_points = num_curves * 10000;
+    const max_num_curves = 7;
+    const max_num_points = max_num_curves * 1000;
     const splines_point_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = max_num_points * @sizeOf(SplinePoint),
+        .size = asplines.items.len * max_num_points * @sizeOf(SplinePoint),
     });
     var spline_vertex_data: [max_num_points]SplinePoint = undefined;
     var t: f32 = 0;
     var i: u32 = 0;
     for (asplines.items) |as| {
+        const num_curves = as.len - 3;
         const num_points = @intToFloat(f32, num_curves);
         while (t < num_points) {
             const p = getSplinePoint(t, as.current);
@@ -243,6 +267,44 @@ pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, asplines: array(Animated
     }
     gctx.queue.writeBuffer(gctx.lookupResource(splines_point_buffer).?, 0, SplinePoint, spline_vertex_data[0..]);
     return splines_point_buffer;
+}
+
+// STATIONARY SPLINES DRAWING BUFFERS
+pub fn createStationarySplinesBuffer(gctx: *zgpu.GraphicsContext, splines: array(Spline)) zgpu.BufferHandle {
+    const max_num_curves = 7;
+    const max_num_splines = 2;
+    const max_num_points = max_num_curves * 10000 * max_num_splines;
+    const stationary_splines_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
+        .size = max_num_points * @sizeOf(SplinePoint),
+    });
+
+    var spline_vertex_data: [max_num_points]SplinePoint = undefined;
+    var t: f32 = 0;
+    var i: u32 = 0;
+    var point_idx: u32 = 0;
+    for (splines.items) |s| {
+        while (point_idx < s.len) {
+            spline_vertex_data[i] = s.points[point_idx];
+            point_idx += 1;
+            i += 1;
+        }
+        point_idx = 0;
+
+        const num_curves = s.len - 3;
+        const num_points = @intToFloat(f32, num_curves);
+        while (t < num_points) {
+            const p = getSplinePoint(t, s.points);
+            const prev_point = @floatToInt(u32, t);
+            const radius = s.points[prev_point].radius - 15;
+            spline_vertex_data[i] = createSplinePoint(p[0], p[1], radius);
+            i += 1;
+            t += 0.001;
+        }
+        t = 0;
+    }
+    gctx.queue.writeBuffer(gctx.lookupResource(stationary_splines_buffer).?, 0, SplinePoint, spline_vertex_data[0..]);
+    return stationary_splines_buffer;
 }
 
 pub fn createAnimatedSplineBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, animated_splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {

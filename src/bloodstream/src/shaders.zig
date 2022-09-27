@@ -228,6 +228,9 @@ pub const cs =
 \\          let start = aspline.start[i].position;
 \\          let current = aspline.current[i].position;
 \\          let end = aspline.end[i].position;
+\\          if (all(current.xy == start.xy) && all(current.xy == end.xy)) {
+\\              continue;
+\\          }
 \\          var diff = end - current;
 \\          if (all(current.xy == end.xy)) {
 \\              animated_splines[index].to_start = 1;

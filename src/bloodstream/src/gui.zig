@@ -5,7 +5,6 @@ const std = @import("std");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
-const Shapes = @import("shapes.zig");
 const StagingBuffer = main.StagingBuffer;
 const Statistics = @import("simulation.zig").Statistics;
 

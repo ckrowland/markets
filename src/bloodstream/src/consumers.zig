@@ -210,13 +210,13 @@ pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl
             .binding = 3,
             .buffer_handle = animated_splines_buffer,
             .offset = 0,
-            .size = sim.splines.items.len * @sizeOf(AnimatedSpline),
+            .size = sim.asplines.items.len * @sizeOf(AnimatedSpline),
         },
         .{
             .binding = 4,
             .buffer_handle = splines_buffer,
             .offset = 0,
-            .size = sim.splines.items.len * @sizeOf(SplinePoint) * 10000,
+            .size = sim.asplines.items.len * @sizeOf(SplinePoint) * 1000 * 7,
         },
     });
 }

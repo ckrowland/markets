@@ -1,9 +1,8 @@
 const std = @import("std");
 const Consumers = @import("consumers.zig");
 const Consumer = Consumers.Consumer;
-const Lines = @import("lines.zig");
-const Line = Lines.Line;
 const Splines = @import("splines.zig");
+const Spline = Splines.Spline;
 const AnimatedSpline = Splines.AnimatedSpline;
 const array = std.ArrayList;
 const random = std.crypto.random;
@@ -25,8 +24,9 @@ params: struct {
 coordinate_size: CoordinateSize,
 consumers: array(Consumer),
 stats: Statistics,
-lines: array(Line),
-splines: array(AnimatedSpline),
+asplines: array(AnimatedSpline),
+splines: array(Spline),
+allocator: std.mem.Allocator,
 
 pub const Statistics = struct {
     num_transactions: array(i32),
@@ -71,14 +71,15 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .num_empty_consumers = array(i32).init(allocator),
             .num_total_producer_inventory = array(i32).init(allocator), 
         },
-        .lines = array(Line).init(allocator),
-        .splines = array(AnimatedSpline).init(allocator),
+        .asplines = array(AnimatedSpline).init(allocator),
+        .splines = array(Spline).init(allocator),
+        .allocator = allocator,
     };
 }
 
 pub fn deinit(self: *Self) void {
     self.consumers.deinit();
-    self.lines.deinit();
+    self.asplines.deinit();
     self.splines.deinit();
     self.stats.num_transactions.deinit();
     self.stats.num_empty_consumers.deinit();
