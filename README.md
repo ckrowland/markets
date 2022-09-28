@@ -30,7 +30,8 @@ GPU Accelerated agent-based modeling to visualize and simulate complex systems.
 - [Zig 0.10.0-dev.4060 (master)](https://ziglang.org/download/) or newer
 ## Run
 ```
-git clone --recurse-submodules https://github.com/ckrowland/simulations.git
+git clone https://github.com/ckrowland/simulations.git
 cd simulations
+git submodule update --init --remote
 zig build resources-run
 ```
