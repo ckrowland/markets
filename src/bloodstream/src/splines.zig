@@ -35,7 +35,7 @@ pub const SplinePoint = struct {
 
 pub fn createSplines(self: *Simulation) void {
     createSplineHeart(self);
-    //createSplineBloodstream(self);
+    createSplineBloodstream(self);
 }
 
 fn createSplineHeart(self: *Simulation) void {
@@ -76,12 +76,11 @@ fn createSplineHeart(self: *Simulation) void {
         createSplinePoint(0, 0, radius),
     };
 
-    const len = 9;
     self.asplines.append(.{
         .start = outer,
         .current = outer,
         .end = inner,
-        .len = len,
+        .len = 9,
         .to_start = 0,
         ._padding = 0,
     }) catch unreachable;
@@ -217,7 +216,6 @@ pub fn createAnimatedSplinesBuffer(gctx: *zgpu.GraphicsContext, splines: array(A
 }
 
 pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(AnimatedSpline)) zgpu.BufferHandle {
-    //const max_num_points = 1000;
     var num_points: u32 = 0;
     for (splines.items) |as| {
         num_points += as.len;
@@ -244,11 +242,14 @@ pub fn createSplinePointsBuffer(gctx: *zgpu.GraphicsContext, splines: array(Anim
 
 pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, asplines: array(AnimatedSpline)) zgpu.BufferHandle {
     const max_num_curves = 7;
-    const max_num_points = max_num_curves * 1000;
+    const max_num_spline_points = max_num_curves * 1000;
     const splines_point_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = asplines.items.len * max_num_points * @sizeOf(SplinePoint),
+        .size = asplines.items.len * max_num_spline_points * @sizeOf(SplinePoint),
     });
+
+    const max_num_asplines = 2;
+    const max_num_points = max_num_asplines * max_num_curves * 1000;
     var spline_vertex_data: [max_num_points]SplinePoint = undefined;
     var t: f32 = 0;
     var i: u32 = 0;

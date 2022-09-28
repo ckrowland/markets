@@ -119,10 +119,10 @@ pub const cs =
 \\          for (var i = 0u; i < num_curves; i += 1u) {
 \\              let points = getCurvePoints(s.current, i);
 \\              for (var i = 0.0; i <= 1; i += diameter) {
-\\                  src_ball = updateIfCircleCollision(src_ball,
-\\                                                     i,
-\\                                                     i + diameter + overlap,
-\\                                                     points);
+//\\                  src_ball = updateIfCircleCollision(src_ball,
+//\\                                                     i,
+//\\                                                     i + diameter + overlap,
+//\\                                                     points);
 \\              }
 \\          }
 \\      }
@@ -225,32 +225,32 @@ pub const cs =
 \\
 \\      let aspline = animated_splines[index];
 \\      for (var i = 1u; i < aspline.len - 1; i += 1u) {
-\\          let start = aspline.start[i].position;
-\\          let current = aspline.current[i].position;
-\\          let end = aspline.end[i].position;
-\\          if (all(current.xy == start.xy) && all(current.xy == end.xy)) {
-\\              continue;
-\\          }
-\\          var diff = end - current;
-\\          if (all(current.xy == end.xy)) {
-\\              animated_splines[index].to_start = 1;
-\\          }
-\\          if (all(current.xy == start.xy)) {
-\\              animated_splines[index].to_start = 0;
-\\          }
-\\          if (animated_splines[index].to_start == 1) {
-\\              diff = start - current;
-\\          }
-\\          let direction = normalize(diff) * aspline.current[i].step_size;
-\\          animated_splines[index].current[i].position += direction;
-\\
-\\          let points_idx = i - 1;
-\\          let points = getCurvePoints(animated_splines[index].current, points_idx);
-\\          for (var j = 0u; j < 1000; j += 1) {
-\\              let t = f32(j) * 0.001;
-\\              let new_point = calculateSplinePoint(t, points);
-\\              splines[points_idx].points[j].position = new_point;
-\\          }
+//\\          let start = aspline.start[i].position;
+//\\          let current = aspline.current[i].position;
+//\\          let end = aspline.end[i].position;
+//\\          if (all(current.xy == start.xy) && all(current.xy == end.xy)) {
+//\\              continue;
+//\\          }
+//\\          var diff = end - current;
+//\\          if (all(current.xy == end.xy)) {
+//\\              animated_splines[index].to_start = 1;
+//\\          }
+//\\          if (all(current.xy == start.xy)) {
+//\\              animated_splines[index].to_start = 0;
+//\\          }
+//\\          if (animated_splines[index].to_start == 1) {
+//\\              diff = start - current;
+//\\          }
+//\\          let direction = normalize(diff) * aspline.current[i].step_size;
+//\\          animated_splines[index].current[i].position += direction;
+//\\
+//\\          let points_idx = i - 1;
+//\\          let points = getCurvePoints(animated_splines[index].current, points_idx);
+//\\          for (var j = 0u; j < 1000; j += 1) {
+//\\              let t = f32(j) * 0.001;
+//\\              let new_point = calculateSplinePoint(t, points);
+//\\              splines[points_idx].points[j].position = new_point;
+//\\          }
 \\      }
 \\  }
 ;
