@@ -110,22 +110,22 @@ pub const cs =
 \\      if(index >= num_consumers) {
 \\        return;
 \\      }
-\\      let num_splines = arrayLength(&animated_splines);
-\\      for (var i = 0u; i < num_splines; i += 1u) {
-\\          let s = animated_splines[i];
-\\          let num_curves = s.len - 3;
-\\          let diameter = s.current[i].radius * 0.001;
-\\          let overlap = diameter * 5;
-\\          for (var i = 0u; i < num_curves; i += 1u) {
-\\              let points = getCurvePoints(s.current, i);
-\\              for (var i = 0.0; i <= 1; i += diameter) {
+//\\      let num_splines = arrayLength(&animated_splines);
+//\\      for (var i = 0u; i < num_splines; i += 1u) {
+//\\          let s = animated_splines[i];
+//\\          let num_curves = s.len - 3;
+//\\          let diameter = s.current[i].radius * 0.001;
+//\\          let overlap = diameter * 5;
+//\\          for (var i = 0u; i < num_curves; i += 1u) {
+//\\              let points = getCurvePoints(s.current, i);
+//\\              for (var i = 0.0; i <= 1; i += diameter) {
 //\\                  src_ball = updateIfCircleCollision(src_ball,
 //\\                                                     i,
 //\\                                                     i + diameter + overlap,
 //\\                                                     points);
-\\              }
-\\          }
-\\      }
+//\\              }
+//\\          }
+//\\      }
 \\      for (var i = 0u; i < num_consumers; i += 1u) {
 \\          if (i == index) {
 \\              continue;
@@ -223,8 +223,8 @@ pub const cs =
 \\          return;
 \\      }
 \\
-\\      let aspline = animated_splines[index];
-\\      for (var i = 1u; i < aspline.len - 1; i += 1u) {
+//\\      let aspline = animated_splines[index];
+//\\      for (var i = 1u; i < aspline.len - 1; i += 1u) {
 //\\          let start = aspline.start[i].position;
 //\\          let current = aspline.current[i].position;
 //\\          let end = aspline.end[i].position;
@@ -251,7 +251,7 @@ pub const cs =
 //\\              let new_point = calculateSplinePoint(t, points);
 //\\              splines[points_idx].points[j].position = new_point;
 //\\          }
-\\      }
+//\\      }
 \\  }
 ;
 // zig fmt: on
