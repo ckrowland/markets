@@ -186,7 +186,9 @@ pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layou
     return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
 }
 
-pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle, size_buffer: zgpu.BufferHandle, animated_splines_buffer: zgpu.BufferHandle, splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
+pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle, size_buffer: zgpu.BufferHandle, splines_point_buffer: zgpu.BufferHandle, splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
+    const spb_info = gctx.lookupResourceInfo(splines_point_buffer).?;
+    const sb_info = gctx.lookupResourceInfo(splines_buffer).?;
     return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
@@ -208,15 +210,15 @@ pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl
         },
         .{
             .binding = 3,
-            .buffer_handle = animated_splines_buffer,
+            .buffer_handle = splines_point_buffer,
             .offset = 0,
-            .size = sim.asplines.items.len * @sizeOf(AnimatedSpline),
+            .size = spb_info.size,
         },
         .{
             .binding = 4,
             .buffer_handle = splines_buffer,
             .offset = 0,
-            .size = sim.asplines.items.len * @sizeOf(SplinePoint) * 1000 * 7,
+            .size = sb_info.size,
         },
     });
 }

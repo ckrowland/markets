@@ -2,8 +2,7 @@ const std = @import("std");
 const Consumers = @import("consumers.zig");
 const Consumer = Consumers.Consumer;
 const Splines = @import("splines.zig");
-const Spline = Splines.Spline;
-const AnimatedSpline = Splines.AnimatedSpline;
+const SplinePoint = Splines.SplinePoint;
 const array = std.ArrayList;
 const random = std.crypto.random;
 
@@ -24,8 +23,7 @@ params: struct {
 coordinate_size: CoordinateSize,
 consumers: array(Consumer),
 stats: Statistics,
-asplines: array(AnimatedSpline),
-splines: array(Spline),
+asplines: array(SplinePoint),
 allocator: std.mem.Allocator,
 
 pub const Statistics = struct {
@@ -41,6 +39,8 @@ pub const CoordinateSize = struct {
     min_y: f32,
     max_x: f32,
     max_y: f32,
+    center_x: f32,
+    center_y: f32,
 };
 
 pub fn init(allocator: std.mem.Allocator) Self {
@@ -62,6 +62,8 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .min_y = -500,
             .max_x = 1800,
             .max_y = 1200,
+            .center_x = 400,
+            .center_y = 350,
         },
         .consumers = array(Consumer).init(allocator),
         .stats = .{
@@ -71,8 +73,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .num_empty_consumers = array(i32).init(allocator),
             .num_total_producer_inventory = array(i32).init(allocator), 
         },
-        .asplines = array(AnimatedSpline).init(allocator),
-        .splines = array(Spline).init(allocator),
+        .asplines = array(SplinePoint).init(allocator),
         .allocator = allocator,
     };
 }
@@ -80,7 +81,6 @@ pub fn init(allocator: std.mem.Allocator) Self {
 pub fn deinit(self: *Self) void {
     self.consumers.deinit();
     self.asplines.deinit();
-    self.splines.deinit();
     self.stats.num_transactions.deinit();
     self.stats.num_empty_consumers.deinit();
     self.stats.num_total_producer_inventory.deinit();
