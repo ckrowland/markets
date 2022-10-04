@@ -121,7 +121,8 @@ pub const cs =
 \\              continue;
 \\          }
 \\          let diameter = p.radius * 0.001;
-\\          let overlap = diameter * 5;
+//\\          let overlap = diameter * 5;
+\\          let overlap = diameter * 2;
 \\          let p0 = points[i - 2].current_pos;
 \\          let p1 = points[i - 1].current_pos;
 \\          let p2 = p.current_pos;
@@ -232,12 +233,6 @@ pub const cs =
 \\          return;
 \\      }
 \\      let p = points[index];
-\\      if (p.point_id == 0) {
-\\          return;
-\\      }
-\\      if (p.point_id == p.len - 1) {
-\\          return;
-\\      }
 \\
 \\      let start = points[index].start_pos;
 \\      let current = points[index].current_pos;
@@ -261,7 +256,10 @@ pub const cs =
 \\      }
 \\
 \\      //Update Spline positions
-\\      if (p.point_id == 1) {
+\\      let first_point = p.point_id == 0;
+\\      let second_point = p.point_id == 1;
+\\      let last_point = p.point_id == p.len - 1;
+\\      if (first_point || second_point || last_point) {
 \\          return;
 \\      }
 \\      let p0 = points[index - 2].current_pos;

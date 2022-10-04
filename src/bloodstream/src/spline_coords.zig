@@ -1,78 +1,14 @@
 const std = @import("std");
 const array = std.ArrayList;
 const Simulation = @import("simulation.zig");
+const Spline = @import("splines.zig");
 
 pub const SplinePointCoords = struct {
     start: [2]f32,
     delta: [2]f32,
 };
 
-pub fn topLeftHeart(sim: *Simulation) array(SplinePointCoords) {
-    var points = array(SplinePointCoords).init(sim.allocator);
-    const cx = sim.coordinate_size.center_x;
-    const cy = sim.coordinate_size.center_y;
-
-    var heart_width: f32 = 300;
-    var half_heart_width = heart_width / 2;
-    var heart_height: f32 = 300;
-
-    const beat_y: f32 = 100;
-
-    points.appendSlice(&.{
-        .{
-            .start = [2]f32{cx - 200 - half_heart_width, cy - 100},
-            .delta = [2]f32{0, 0},
-        },
-        .{
-            .start = [2]f32{cx - half_heart_width, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
-        },
-        .{
-            .start = [2]f32{cx, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
-        },
-        .{
-            .start = [2]f32{cx + 200, cy - 100},
-            .delta = [2]f32{0, 0},
-        },
-    }) catch unreachable;
-    return points;
-}
-
-pub fn topRightHeart(sim: *Simulation) array(SplinePointCoords) {
-    var points = array(SplinePointCoords).init(sim.allocator);
-    const cx = sim.coordinate_size.center_x;
-    const cy = sim.coordinate_size.center_y;
-
-    var heart_width: f32 = 300;
-    var half_heart_width = heart_width / 2;
-    var heart_height: f32 = 300;
-
-    const beat_y: f32 = 100;
-
-    points.appendSlice(&.{
-        .{
-            .start = [2]f32{cx - 200, cy - 100},
-            .delta = [2]f32{0, 0},
-        },
-        .{
-            .start = [2]f32{cx, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
-        },
-        .{
-            .start = [2]f32{cx + half_heart_width, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
-        },
-        .{
-            .start = [2]f32{cx + 200 + half_heart_width, cy - 100},
-            .delta = [2]f32{0, 0},
-        },
-    }) catch unreachable;
-    return points;
-}
-
-pub fn bottomHeart(sim: *Simulation) array(SplinePointCoords) {
-    var points = array(SplinePointCoords).init(sim.allocator);
+fn getHeartPoints(sim: *Simulation) [9]SplinePointCoords {
     const cx = sim.coordinate_size.center_x;
     const cy = sim.coordinate_size.center_y;
 
@@ -81,11 +17,15 @@ pub fn bottomHeart(sim: *Simulation) array(SplinePointCoords) {
 
     const beat_x: f32 = 100;
     const beat_y: f32 = 100;
-
-    points.appendSlice(&.{
+    
+    return [9]SplinePointCoords{
         .{
-            .start = [2]f32{cx, cy},
-            .delta = [2]f32{0, 0},
+            .start = [2]f32{cx, cy - heart_height},
+            .delta = [2]f32{0, beat_y},
+        },
+        .{
+            .start = [2]f32{cx, cy + heart_height},
+            .delta = [2]f32{0, -beat_y},
         },
         .{
             .start = [2]f32{cx + heart_width, cy + heart_height},
@@ -108,66 +48,187 @@ pub fn bottomHeart(sim: *Simulation) array(SplinePointCoords) {
             .delta = [2]f32{beat_x, -beat_y},
         },
         .{
-            .start = [2]f32{cx, cy},
-            .delta = [2]f32{0, 0},
+            .start = [2]f32{cx, cy + heart_height},
+            .delta = [2]f32{0, -beat_y},
         },
-    }) catch unreachable;
-    return points;
+        .{
+            .start = [2]f32{cx, cy - heart_height},
+            .delta = [2]f32{0, beat_y},
+        }
+    };
 }
 
-pub fn outerBloodstream(sim: *Simulation) array(SplinePointCoords) {
-    var points = array(SplinePointCoords).init(sim.allocator);
+fn getBloodstreamCoords(sim: *Simulation, width: f32, height: f32) [9]SplinePointCoords {
     const cx = sim.coordinate_size.center_x;
     const cy = sim.coordinate_size.center_y;
+    const heart_width = 300;
+    const heart_height = 300;
+    const beat_x = 100;
+    const beat_y = 100;
 
-    var heart_width: f32 = 300;
-    var half_heart_width = heart_width / 2;
-    var heart_height: f32 = 300;
-
-    const beat_y: f32 = 100;
-
-    var bloodstream_width: f32 = 1000;
-    var bloodstream_height: f32 = 800;
-
-    const outer_points = [_]SplinePointCoords{
+    return [9]SplinePointCoords{
         .{
             .start = [2]f32{cx, cy},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx + half_heart_width, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
+            .start = [2]f32{cx + heart_width, cy + heart_height},
+            .delta = [2]f32{-beat_x, -beat_y},
         },
         .{
-            .start = [2]f32{cx + bloodstream_width, cy + bloodstream_height},
+            .start = [2]f32{cx + width, cy + height},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx + bloodstream_width, cy},
+            .start = [2]f32{cx + width, cy},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx, cy - bloodstream_height},
+            .start = [2]f32{cx, cy - height},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx - bloodstream_width, cy},
+            .start = [2]f32{cx - width, cy},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx - bloodstream_width, cy + bloodstream_height},
+            .start = [2]f32{cx - width, cy + height},
             .delta = [2]f32{0, 0},
         },
         .{
-            .start = [2]f32{cx - half_heart_width, cy + heart_height},
-            .delta = [2]f32{0, -beat_y},
+            .start = [2]f32{cx - heart_width, cy + heart_height},
+            .delta = [2]f32{beat_x, -beat_y},
         },
         .{
             .start = [2]f32{cx, cy},
             .delta = [2]f32{0, 0},
         },
     };
-    points.appendSlice(outer_points[0..]) catch unreachable;
+}
+fn getHeartOpenings(sim: *Simulation) [4]SplinePointCoords {
+    const heart = getHeartPoints(sim);
+
+    var points = [4][2]f32{
+        heart[4].start,
+        heart[5].start,
+        heart[6].start,
+        heart[7].start,
+    };
+    const left_opening = Spline.getSplinePoint(0.9, points);
+
+    points = [4][2]f32{
+        heart[5].start,
+        heart[6].start,
+        heart[7].start,
+        heart[8].start,
+    };
+    const left_closing = Spline.getSplinePoint(0.1, points);
+
+    points = [4][2]f32{
+        heart[0].start,
+        heart[1].start,
+        heart[2].start,
+        heart[3].start,
+    };
+    const right_opening = Spline.getSplinePoint(0.9, points);
+
+    points = [4][2]f32{
+        heart[1].start,
+        heart[2].start,
+        heart[3].start,
+        heart[4].start,
+    };
+    const right_closing = Spline.getSplinePoint(0.1, points);
+
+    return [4]SplinePointCoords{
+        .{
+            .start = left_opening,
+            .delta = heart[6].delta,
+        },
+        .{
+            .start = left_closing,
+            .delta = heart[6].delta,
+        },
+        .{
+            .start = right_opening,
+            .delta = heart[2].delta,
+        },
+        .{
+            .start = right_closing,
+            .delta = heart[2].delta,
+        },
+    };
+}
+
+pub fn topLeftHeart(sim: *Simulation) array(SplinePointCoords) {
+    var points_array = array(SplinePointCoords).init(sim.allocator);
+
+    const heart = getHeartPoints(sim);
+    const opening = getHeartOpenings(sim);
+
+    points_array.appendSlice(&.{
+        heart[5],
+        opening[1],
+        heart[7],
+        heart[8],
+    }) catch unreachable;
+
+    return points_array;
+}
+
+pub fn topRightHeart(sim: *Simulation) array(SplinePointCoords) {
+    var points_array = array(SplinePointCoords).init(sim.allocator);
+
+    const heart = getHeartPoints(sim);
+    const opening = getHeartOpenings(sim);
+
+    points_array.appendSlice(&.{
+        heart[0],
+        heart[1],
+        opening[2],
+        heart[3],
+    }) catch unreachable;
+    return points_array;
+}
+
+pub fn bottomHeart(sim: *Simulation) array(SplinePointCoords) {
+    var points_array = array(SplinePointCoords).init(sim.allocator);
+
+    const heart = getHeartPoints(sim);
+    const opening = getHeartOpenings(sim);
+
+    points_array.appendSlice(&.{
+        heart[7],
+        opening[0],
+        heart[5],
+        heart[4],
+        heart[3],
+        opening[3],
+        heart[1],
+    }) catch unreachable;
+    return points_array;
+}
+
+pub fn innerBloodstream(sim: *Simulation) array(SplinePointCoords) {
+    var points = array(SplinePointCoords).init(sim.allocator);
+    var bloodstream = getBloodstreamCoords(sim, 800, 600);
+
+    const opening = getHeartOpenings(sim);
+    bloodstream[1] = opening[3];
+    bloodstream[7] = opening[0];
+
+    points.appendSlice(bloodstream[0..]) catch unreachable;
     return points;
 }
 
+pub fn outerBloodstream(sim: *Simulation) array(SplinePointCoords) {
+    var points = array(SplinePointCoords).init(sim.allocator);
+    var bloodstream = getBloodstreamCoords(sim, 1000, 800);
+
+    const opening = getHeartOpenings(sim);
+    bloodstream[1] = opening[2];
+    bloodstream[7] = opening[1];
+
+    points.appendSlice(bloodstream[0..]) catch unreachable;
+    return points;
+}

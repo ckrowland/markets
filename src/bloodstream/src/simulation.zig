@@ -54,7 +54,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .consumption_rate = 10,
             .velocity = 50.0,
             .producer_width = 40.0,
-            .consumer_radius = 10.0,
+            .consumer_radius = 5.0,
             .num_consumer_sides = 20,
         },
         .coordinate_size = .{

@@ -35,12 +35,14 @@ pub const Point = struct {
 
 pub fn createSplines(self: *Simulation) void {
     const outer_bloodstream = SplineCoords.outerBloodstream(self);
+    const inner_bloodstream = SplineCoords.innerBloodstream(self);
     const top_left_heart = SplineCoords.topLeftHeart(self);
     const top_right_heart = SplineCoords.topRightHeart(self);
     const bottom_heart = SplineCoords.bottomHeart(self);
 
     var splines = array(array(SplinePointCoords)).init(self.allocator);
     splines.append(outer_bloodstream) catch unreachable;
+    splines.append(inner_bloodstream) catch unreachable;
     splines.append(top_left_heart) catch unreachable;
     splines.append(top_right_heart) catch unreachable;
     splines.append(bottom_heart) catch unreachable;
@@ -80,6 +82,7 @@ pub fn createSplines(self: *Simulation) void {
     }
 
     outer_bloodstream.deinit();
+    inner_bloodstream.deinit();
     top_left_heart.deinit();
     top_right_heart.deinit();
     bottom_heart.deinit();
@@ -104,7 +107,7 @@ fn createBlankPoint() Point {
     };
 }
 
-pub fn getSplinePoint(i: f32, points: [4]SplinePoint) [4]f32 {
+pub fn getSplinePoint(i: f32, points: [4][2]f32) [2]f32 {
     const t = i;
     const tt = t * t;
     const ttt = tt * t;
@@ -114,15 +117,15 @@ pub fn getSplinePoint(i: f32, points: [4]SplinePoint) [4]f32 {
     const q3 = (-3 * ttt) + (4 * tt) + t;
     const q4 = ttt - tt;
 
-    const p0x = points[0].current_pos[0];
-    const p1x = points[1].current_pos[0];
-    const p2x = points[2].current_pos[0];
-    const p3x = points[3].current_pos[0];
+    const p0x = points[0][0];
+    const p1x = points[1][0];
+    const p2x = points[2][0];
+    const p3x = points[3][0];
 
-    const p0y = points[0].current_pos[1];
-    const p1y = points[1].current_pos[1];
-    const p2y = points[2].current_pos[1];
-    const p3y = points[3].current_pos[1];
+    const p0y = points[0][1];
+    const p1y = points[1][1];
+    const p2y = points[2][1];
+    const p3y = points[3][1];
 
     var tx = (p0x * q1) + (p1x * q2) + (p2x * q3) + (p3x * q4);
     var ty = (p0y * q1) + (p1y * q2) + (p2y * q3) + (p3y * q4);
@@ -130,7 +133,7 @@ pub fn getSplinePoint(i: f32, points: [4]SplinePoint) [4]f32 {
     tx *= 0.5;
     ty *= 0.5;
 
-    return [4]f32{ tx, ty, 0, 0 };
+    return [2]f32{ tx, ty };
 }
 
 pub fn createSplinesPointBuffer(gctx: *zgpu.GraphicsContext, splines: array(SplinePoint)) zgpu.BufferHandle {
@@ -165,17 +168,17 @@ pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, points: array(SplinePoin
             continue;
         }
 
-        const spline_points = [4]SplinePoint{
-            points.items[idx - 2],
-            points.items[idx - 1],
-            points.items[idx + 0],
-            points.items[idx + 1],
+        const spline_points = [4][2]f32{
+            points.items[idx - 2].current_pos[0..2].*,
+            points.items[idx - 1].current_pos[0..2].*,
+            points.items[idx + 0].current_pos[0..2].*,
+            points.items[idx + 1].current_pos[0..2].*,
         };
         while (t < 1000) {
             const position = getSplinePoint(t / 1000, spline_points);
             point_data.append(.{
                 .color = [4]f32{ 0, 1, 1, 0 },
-                .position = position,
+                .position = position ++ [_]f32{ 0, 0 },
                 .radius = sp.radius - 15,
                 ._padding = 0,
             }) catch unreachable;
