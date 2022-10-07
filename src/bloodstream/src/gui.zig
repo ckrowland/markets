@@ -100,12 +100,12 @@ fn plots(demo: *DemoState) void {
     const plot_flags = .{ .w = plot_width, .h = plot_height, .flags = .{} };
 
     if (zgui.plot.beginPlot("", plot_flags)){
-        zgui.plot.setupXAxis("", .{ .auto_fit = true, });
-        zgui.plot.setupYAxis("", .{ .auto_fit = true });
-        zgui.plot.setupLegend(zgui.plot.PlotLocation.north_west, .{});
-        zgui.plot.plotLineValuesInt("Transactions", nt[0..], .{});
-        zgui.plot.plotLineValuesInt("Empty Consumers", nec[0..], .{});
-        zgui.plot.plotLineValuesInt("Total Producer Inventory", tpi[0..], .{});
+        zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true }});
+        zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true }});
+        zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
+        zgui.plot.plotLineValues("Transactions", i32, .{ .v = nt[0..] });
+        zgui.plot.plotLineValues("Empty Consumers", i32, .{ .v = nec[0..] });
+        zgui.plot.plotLineValues("Total Producer Inventory", i32, .{ .v = tpi[0..]});
         zgui.plot.endPlot();
     }
 }

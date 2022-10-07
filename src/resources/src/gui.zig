@@ -77,7 +77,7 @@ fn updateStats(demo: *DemoState) void {
     const stats = demo.sim.stats;
     const previous_second = stats.second;
     const diff = current_time - previous_second;
-    if (diff > 0.5) {
+    if (diff >= 1) {
         const gpu_stats = getGPUStatistics(demo);
         const vec_stats: @Vector(4, i32) = [_]i32{ gpu_stats[0], gpu_stats[1], gpu_stats[2], stats.max_stat_recorded};
         const max_stat = @reduce(.Max, vec_stats);
@@ -102,12 +102,12 @@ fn plots(demo: *DemoState) void {
     const plot_flags = .{ .w = plot_width, .h = plot_height, .flags = .{} };
 
     if (zgui.plot.beginPlot("", plot_flags)){
-        zgui.plot.setupXAxis("", .{ .auto_fit = true, });
-        zgui.plot.setupYAxis("", .{ .auto_fit = true });
-        zgui.plot.setupLegend(zgui.plot.PlotLocation.north_west, .{});
-        zgui.plot.plotLineValuesInt("Transactions", nt[0..], .{});
-        zgui.plot.plotLineValuesInt("Empty Consumers", nec[0..], .{});
-        zgui.plot.plotLineValuesInt("Total Producer Inventory", tpi[0..], .{});
+        zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true }});
+        zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true }});
+        zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
+        zgui.plot.plotLineValues("Transactions", i32, .{ .v = nt[0..] });
+        zgui.plot.plotLineValues("Empty Consumers", i32, .{ .v = nec[0..] });
+        zgui.plot.plotLineValues("Total Producer Inventory", i32, .{ .v = tpi[0..]});
         zgui.plot.endPlot();
     }
 }
@@ -131,7 +131,7 @@ fn parameters(demo: *DemoState) void {
                               .min = 1,
                               .max = 1000 });
 
-    zgui.text("Max Inventory", .{});
+    zgui.text("Max Producer Inventory", .{});
     _ = zgui.sliderInt("##mi", .{ .v = &demo.sim.params.max_inventory,
                               .min = 1,
                               .max = 10000 });

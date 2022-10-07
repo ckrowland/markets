@@ -4,9 +4,10 @@ const array = std.ArrayList;
 const random = std.crypto.random;
 const zm = @import("zmath");
 const zglfw = @import("zglfw");
+const zgui = @import("zgui");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const zgui = @import("zgui");
+const Wgpu = @import("wgpu.zig");
 const Simulation = @import("simulation.zig");
 const CoordinateSize = Simulation.CoordinateSize;
 const Statistics = Simulation.stats;
@@ -46,7 +47,7 @@ pub const DemoState = struct {
     consumer_compute_pipeline: zgpu.ComputePipelineHandle,
     animated_spline_compute_pipeline: zgpu.ComputePipelineHandle,
 
-    bind_group: zgpu.BindGroupHandle,
+    uniform_bind_group: zgpu.BindGroupHandle,
     consumer_bind_group: zgpu.BindGroupHandle,
     compute_bind_group_layout: zgpu.BindGroupLayoutHandle,
 
@@ -69,23 +70,17 @@ pub const DemoState = struct {
 };
 
 fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.init(allocator, window);
+    const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
-    // Uniform Bind Group
-    const uniform_bgl = gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .vertex = true }, .uniform, true, 0),
-    });
+    const uniform_bgl = Wgpu.getUniformBindGroupLayout(gctx);
     defer gctx.releaseResource(uniform_bgl);
-    const bind_group = gctx.createBindGroup(uniform_bgl, &[_]zgpu.BindGroupEntryInfo{
-        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
-    });
-
-    // Render Pipelines
+    const uniform_bind_group = Wgpu.getUniformBindGroup(gctx, uniform_bgl);
     const pipeline_layout = gctx.createPipelineLayout(&.{uniform_bgl});
     defer gctx.releaseResource(pipeline_layout);
-    const consumer_pipeline = Consumers.createConsumerPipeline(gctx, pipeline_layout);
-    const spline_pipeline = Splines.createSplinePipeline(gctx, pipeline_layout);
-    const spline_point_pipeline = Splines.createSplinePointPipeline(gctx, pipeline_layout);
+
+    const consumer_pipeline = Consumers.createPipeline(gctx, pipeline_layout);
+    const spline_pipeline = Splines.createPipeline(gctx, pipeline_layout);
+    const spline_point_pipeline = Splines.createPointPipeline(gctx, pipeline_layout);
 
     // Simulation struct
     var sim = Simulation.init(allocator);
@@ -93,13 +88,12 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 
     // Create Compute Bind Group and Pipeline
     const consumer_compute_bgl = gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, false, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, false, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .read_only_storage, false, 0),
-        zgpu.bglBuffer(3, .{ .compute = true }, .storage, false, 0),
-        zgpu.bglBuffer(4, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .read_only_storage, false, 0),
+        zgpu.bufferEntry(3, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(4, .{ .compute = true }, .storage, false, 0),
     });
-
     const compute_pl = gctx.createPipelineLayout(&.{consumer_compute_bgl});
     defer gctx.releaseResource(compute_pl);
     const consumer_compute_pipeline = Consumers.createConsumerComputePipeline(gctx, compute_pl);
@@ -151,7 +145,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .spline_point_pipeline = spline_point_pipeline,
         .consumer_compute_pipeline = consumer_compute_pipeline,
         .animated_spline_compute_pipeline = animated_spline_compute_pipeline,
-        .bind_group = bind_group,
+        .uniform_bind_group = uniform_bind_group,
         .compute_bind_group_layout = consumer_compute_bgl,
         .consumer_vertex_buffer = consumer_vertex_buffer,
         .consumer_index_buffer = consumer_index_buffer,
@@ -172,7 +166,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 }
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
-    demo.gctx.deinit(allocator);
+    demo.gctx.destroy(allocator);
     demo.sim.deinit();
     demo.* = undefined;
 }
@@ -241,12 +235,12 @@ fn draw(demo: *DemoState) void {
             const cpb_info = gctx.lookupResourceInfo(demo.consumer_buffer) orelse break :pass;
             const cib_info = gctx.lookupResourceInfo(demo.consumer_index_buffer) orelse break :pass;
             const consumer_pipeline = gctx.lookupResource(demo.consumer_pipeline) orelse break :pass;
-            const sp = gctx.lookupResource(demo.spline_pipeline) orelse break :pass;
+            //const sp = gctx.lookupResource(demo.spline_pipeline) orelse break :pass;
             const spp = gctx.lookupResource(demo.spline_point_pipeline) orelse break :pass;
             const svb_info = gctx.lookupResourceInfo(demo.square_vertex_buffer) orelse break :pass;
             const spb_info = gctx.lookupResourceInfo(demo.splines_point_buffer) orelse break :pass;
-            const sb_info = gctx.lookupResourceInfo(demo.splines_buffer) orelse break :pass;
-            const bind_group = gctx.lookupResource(demo.bind_group) orelse break :pass;
+            //const sb_info = gctx.lookupResourceInfo(demo.splines_buffer) orelse break :pass;
+            const uniform_bind_group = gctx.lookupResource(demo.uniform_bind_group) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
 
             const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
@@ -273,7 +267,7 @@ fn draw(demo: *DemoState) void {
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
             mem.slice[0] = zm.transpose(cam_world_to_clip);
-            pass.setBindGroup(0, bind_group, &.{mem.offset});
+            pass.setBindGroup(0, uniform_bind_group, &.{mem.offset});
 
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cpb_info.gpuobj.?, 0, cpb_info.size);
@@ -289,15 +283,15 @@ fn draw(demo: *DemoState) void {
             pass.draw(6, num_points, 0, 0);
 
 
-            pass.setPipeline(sp);
-            pass.setVertexBuffer(1, sb_info.gpuobj.?, 0, sb_info.size);
-            const num_squares = @intCast(u32, sb_info.size / @sizeOf(Point));
-            pass.draw(6, num_squares, 0, 0);
+            //pass.setPipeline(sp);
+            //pass.setVertexBuffer(1, sb_info.gpuobj.?, 0, sb_info.size);
+            //const num_squares = @intCast(u32, sb_info.size / @sizeOf(Point));
+            //pass.draw(6, num_squares, 0, 0);
         }
 
         {
-            const pass = zgpu.util.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
-            defer zgpu.util.endRelease(pass);
+            const pass = zgpu.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
+            defer zgpu.endReleasePass(pass);
             zgui.backend.draw(pass);
         }
 
@@ -367,11 +361,6 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    zgpu.checkSystem(content_dir) catch {
-        // In case of error zgpu.checkSystem() will print error message.
-        return;
-    };
-
     zglfw.defaultWindowHints();
     zglfw.windowHint(.cocoa_retina_framebuffer, 1);
     zglfw.windowHint(.client_api, 0);
@@ -392,7 +381,7 @@ pub fn main() !void {
         break :scale_factor math.max(scale[0], scale[1]);
     };
 
-    zgui.init();
+    zgui.init(allocator);
     defer zgui.deinit();
 
     zgui.plot.init();

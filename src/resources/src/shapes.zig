@@ -137,10 +137,10 @@ pub fn createProducerBuffer(gctx: *zgpu.GraphicsContext, producers: array(Produc
 }
 
 pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
+    const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+    const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -203,10 +203,10 @@ pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 }
 
 pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+    const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+    const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -266,7 +266,7 @@ pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
@@ -279,7 +279,7 @@ pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layou
     return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
 }
 pub fn createProducerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{

@@ -102,8 +102,8 @@ pub fn clearAgents(self: *Self) void {
 pub fn createAgents(self: *Self) void {
     clearAgents(self);
     Consumers.createConsumers(self);
-    Splines.createSplines(self);
-    //Splines.createTestSpline(self, 1000, 4000);
+    //Splines.createSplines(self);
+    Splines.createTestSpline(self, 1000, 4000);
 }
 
 pub fn supplyShock(self: *Self) void {

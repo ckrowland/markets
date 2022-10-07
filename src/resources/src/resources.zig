@@ -59,11 +59,11 @@ pub const DemoState = struct {
 };
 
 fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.init(allocator, window);
+    const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
     // Render Pipeline and Bind Group
     const bind_group_layout = gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .vertex = true }, .uniform, true, 0),
+        zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
     });
     defer gctx.releaseResource(bind_group_layout);
     const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
@@ -80,9 +80,9 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 
     // Create Compute Bind Group and Pipeline
     const compute_bgl = gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .storage, true, 0),
     });
     defer gctx.releaseResource(compute_bgl);
     const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
@@ -145,7 +145,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 }
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
-    demo.gctx.deinit(allocator);
+    demo.gctx.destroy(allocator);
     demo.sim.deinit();
     demo.* = undefined;
 }
@@ -267,8 +267,8 @@ fn draw(demo: *DemoState) void {
         }
 
         {
-            const pass = zgpu.util.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
-            defer zgpu.util.endRelease(pass);
+            const pass = zgpu.beginRenderPassSimple(encoder, .load, back_buffer_view, null, null, null);
+            defer zgpu.endReleasePass(pass);
             zgui.backend.draw(pass);
         }
 
@@ -292,9 +292,9 @@ fn draw(demo: *DemoState) void {
 
 pub fn startSimulation(demo: *DemoState) void {
     const compute_bgl = demo.gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .storage, true, 0),
     });
     defer demo.gctx.releaseResource(compute_bgl);
     demo.sim.createAgents();
@@ -308,9 +308,9 @@ pub fn startSimulation(demo: *DemoState) void {
 
 pub fn supplyShock(demo: *DemoState) void {
     const compute_bgl = demo.gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .storage, true, 0),
     });
     defer demo.gctx.releaseResource(compute_bgl);
     demo.sim.supplyShock();
@@ -352,11 +352,6 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    zgpu.checkSystem(content_dir) catch {
-        // In case of error zgpu.checkSystem() will print error message.
-        return;
-    };
-
     zglfw.defaultWindowHints();
     zglfw.windowHint(.cocoa_retina_framebuffer, 1);
     zglfw.windowHint(.client_api, 0);
@@ -377,7 +372,7 @@ pub fn main() !void {
         break :scale_factor math.max(scale[0], scale[1]);
     };
 
-    zgui.init();
+    zgui.init(allocator);
     defer zgui.deinit();
 
     zgui.plot.init();

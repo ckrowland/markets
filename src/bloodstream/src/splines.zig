@@ -232,14 +232,14 @@ pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, points: array(SplinePoin
     return splines_point_buffer;
 }
 
-pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
+pub fn createPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
     const vs = @embedFile("shaders/vertex/radius.wgsl");
     const fs = @embedFile("shaders/fragment/basic.wgsl");
 
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
+    const vs_module = zgpu.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
+    const fs_module = zgpu.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -315,14 +315,14 @@ pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.P
 
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
-pub fn createSplinePointPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
+pub fn createPointPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
     const vs = @embedFile("shaders/vertex/radius.wgsl");
     const fs = @embedFile("shaders/fragment/basic.wgsl");
 
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
+    const vs_module = zgpu.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
+    const fs_module = zgpu.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -402,7 +402,7 @@ pub fn createSplinePointPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: z
 pub fn createAnimatedSplineComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
     const common_cs = @embedFile("shaders/compute/common.wgsl");
     const cs = common_cs ++ @embedFile("shaders/compute/spline_animation.wgsl");
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, cs, "cs");
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{

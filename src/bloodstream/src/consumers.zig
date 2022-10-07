@@ -39,8 +39,8 @@ pub fn createConsumers(self: *Simulation) void {
 
         const x = @intToFloat(f32, random.intRangeAtMost(i32, min_x, max_x));
         const y = @intToFloat(f32, random.intRangeAtMost(i32, min_y, max_y));
-        const rand_x_vel = @intToFloat(f32, random.intRangeAtMost(i32, -5, 5));
-        const rand_y_vel = @intToFloat(f32, random.intRangeAtMost(i32, -5, 5));
+        const rand_x_vel = @intToFloat(f32, random.intRangeAtMost(i32, -15, 15));
+        const rand_y_vel = @intToFloat(f32, random.intRangeAtMost(i32, -15, 15));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
         const red = @Vector(4, f32){ 1.0, 0.0, 0.0, 0.0 };
         const vel = @Vector(4, f32){ rand_x_vel, rand_y_vel, 0.0, 0.0 };
@@ -117,14 +117,14 @@ pub fn createConsumerIndexData(comptime num_triangles: u32) [num_triangles * 3]i
     return consumer_index_data;
 }
 
-pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
+pub fn createPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
     const vs = @embedFile("shaders/vertex/position.wgsl");
     const fs = @embedFile("shaders/fragment/basic.wgsl");
 
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
+    const vs_module = zgpu.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
+    const fs_module = zgpu.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -187,7 +187,7 @@ pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
     const common_cs = @embedFile("shaders/compute/common.wgsl");
     const cs = common_cs ++ @embedFile("shaders/compute/consumers.wgsl");
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, cs, "cs");
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
