@@ -50,7 +50,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
             .production_rate = 100,
             .giving_rate = 10,
             .max_inventory = 10000,
-            .num_consumers = 1000,
+            .num_consumers = 7000,
             .consumption_rate = 10,
             .velocity = 50.0,
             .producer_width = 40.0,
@@ -86,8 +86,9 @@ pub fn deinit(self: *Self) void {
     self.stats.num_total_producer_inventory.deinit();
 }
 
-pub fn createAgents(self: *Self) void {
+pub fn clearAgents(self: *Self) void {
     self.consumers.clearAndFree();
+    self.asplines.clearAndFree();
     self.stats.num_transactions.clearAndFree();
     self.stats.num_empty_consumers.clearAndFree();
     self.stats.num_total_producer_inventory.clearAndFree();
@@ -96,8 +97,13 @@ pub fn createAgents(self: *Self) void {
     self.stats.num_total_producer_inventory.append(0) catch unreachable;
     self.stats.second = 0;
     self.stats.max_stat_recorded = 0;
+}
+
+pub fn createAgents(self: *Self) void {
+    clearAgents(self);
     Consumers.createConsumers(self);
     Splines.createSplines(self);
+    //Splines.createTestSpline(self, 1000, 4000);
 }
 
 pub fn supplyShock(self: *Self) void {

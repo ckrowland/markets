@@ -10,7 +10,6 @@ const zgui = @import("zgui");
 const Simulation = @import("simulation.zig");
 const CoordinateSize = Simulation.CoordinateSize;
 const Statistics = Simulation.stats;
-const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
 const Consumers = @import("consumers.zig");
 const Lines = @import("lines.zig");
@@ -113,7 +112,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const consumer_index_buffer = Consumers.createConsumerIndexBuffer(gctx, num_vertices);
     var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
-    const splines_point_buffer = Splines.createSplinesPointBuffer(gctx, sim.asplines);
+    const splines_point_buffer = Splines.createSplinePointBuffer(gctx, sim.asplines);
     const splines_buffer = Splines.createSplinesBuffer(gctx, sim.asplines, allocator);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
 
@@ -321,18 +320,17 @@ fn draw(demo: *DemoState) void {
 }
 
 pub fn startSimulation(demo: *DemoState) void {
-    const compute_bgl = demo.gctx.createBindGroupLayout(&.{
-        zgpu.bglBuffer(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bglBuffer(2, .{ .compute = true }, .read_only_storage, true, 0),
-        zgpu.bglBuffer(3, .{ .compute = true }, .storage, true, 0),
-    });
-    defer demo.gctx.releaseResource(compute_bgl);
     demo.sim.createAgents();
+
     demo.consumer_buffer = Consumers.createConsumerBuffer(demo.gctx, demo.sim.consumers);
+    demo.consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
+    demo.splines_point_buffer = Splines.createSplinePointBuffer(demo.gctx, demo.sim.asplines);
+    demo.splines_buffer = Splines.createSplinesBuffer(demo.gctx, demo.sim.asplines, demo.allocator);
+
     const stats_data = [_]i32{ 0, 0, 0, 0 };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, i32, stats_data[0..]);
-    demo.consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius, 20);
+
+    demo.consumer_bind_group = Consumers.createBindGroup(demo.gctx, demo.sim, demo.compute_bind_group_layout, demo.consumer_buffer, demo.stats_buffer, demo.size_buffer, demo.splines_point_buffer, demo.splines_buffer);
 }
 
 pub fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {

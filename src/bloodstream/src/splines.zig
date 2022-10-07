@@ -8,7 +8,6 @@ const Simulation = @import("simulation.zig");
 const main = @import("bloodstream.zig");
 const Vertex = main.Vertex;
 const DemoState = main.DemoState;
-const wgsl = @import("shaders.zig");
 const SplineCoords = @import("spline_coords.zig");
 const SplinePointCoords = SplineCoords.SplinePointCoords;
 
@@ -33,6 +32,48 @@ pub const Point = struct {
     _padding: u64,
 };
 
+pub fn createTestSpline(self: *Simulation, ox: f32, oy: f32) void {
+    const test_points = SplineCoords.getTestPoints(self, ox, oy);
+    var splines = array(array(SplinePointCoords)).init(self.allocator);
+    splines.append(test_points) catch unreachable;
+
+    for (splines.items) |spline, idx| {
+        for (spline.items) |p, i| {
+            const len = @intCast(u32, spline.items.len);
+            const color = [4]f32 { 0, 1, 1, 0 };
+            const num_steps = 100;
+            const radius = 5;
+
+            const x = p.start[0];
+            const y = p.start[1];
+            const dx = p.delta[0];
+            const dy = p.delta[1];
+
+            const x_step_size = -dx / @intToFloat(f32, num_steps);
+            const y_step_size = -dy / @intToFloat(f32, num_steps);
+            const step_size = [4]f32{ x_step_size, y_step_size, 0, 0 };
+            const start = [4]f32{ x, y, 0, 0 };
+            const end = [4]f32{ x + dx, y + dy, 0, 0 };
+
+            self.asplines.append(.{
+                .color = color,
+                .start_pos = start,
+                .current_pos = start,
+                .end_pos = end,
+                .step_size = step_size,
+                .radius = radius,
+                .to_start = 0,
+                .spline_id = @intCast(u32, idx),
+                .point_id = @intCast(u32, i),
+                .len = len,
+                ._padding = 0,
+            }) catch unreachable;
+        }
+    }
+    test_points.deinit();
+    splines.deinit();
+}
+
 pub fn createSplines(self: *Simulation) void {
     const outer_bloodstream = SplineCoords.outerBloodstream(self);
     const inner_bloodstream = SplineCoords.innerBloodstream(self);
@@ -52,7 +93,7 @@ pub fn createSplines(self: *Simulation) void {
             const len = @intCast(u32, spline.items.len);
             const color = [4]f32 { 0, 1, 1, 0 };
             const num_steps = 100;
-            const radius = 20;
+            const radius = 5;
 
             const x = p.start[0];
             const y = p.start[1];
@@ -136,7 +177,7 @@ pub fn getSplinePoint(i: f32, points: [4][2]f32) [2]f32 {
     return [2]f32{ tx, ty };
 }
 
-pub fn createSplinesPointBuffer(gctx: *zgpu.GraphicsContext, splines: array(SplinePoint)) zgpu.BufferHandle {
+pub fn createSplinePointBuffer(gctx: *zgpu.GraphicsContext, splines: array(SplinePoint)) zgpu.BufferHandle {
     const splines_point_buffer = gctx.createBuffer(.{
         .usage = .{ 
             .copy_dst = true, 
@@ -179,7 +220,7 @@ pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, points: array(SplinePoin
             point_data.append(.{
                 .color = [4]f32{ 0, 1, 1, 0 },
                 .position = position ++ [_]f32{ 0, 0 },
-                .radius = sp.radius - 15,
+                .radius = sp.radius,
                 ._padding = 0,
             }) catch unreachable;
             t += 1;
@@ -192,10 +233,13 @@ pub fn createSplinesBuffer(gctx: *zgpu.GraphicsContext, points: array(SplinePoin
 }
 
 pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.spline_vs, "spline_vs");
+    const vs = @embedFile("shaders/vertex/radius.wgsl");
+    const fs = @embedFile("shaders/fragment/basic.wgsl");
+
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -272,10 +316,13 @@ pub fn createSplinePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.P
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 pub fn createSplinePointPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.spline_vs, "spline_vs");
+    const vs = @embedFile("shaders/vertex/radius.wgsl");
+    const fs = @embedFile("shaders/fragment/basic.wgsl");
+
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -353,13 +400,15 @@ pub fn createSplinePointPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: z
 }
 
 pub fn createAnimatedSplineComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
+    const common_cs = @embedFile("shaders/compute/common.wgsl");
+    const cs = common_cs ++ @embedFile("shaders/compute/spline_animation.wgsl");
+    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
         .compute = wgpu.ProgrammableStageDescriptor{
             .module = cs_module,
-            .entry_point = "animated_spline_main",
+            .entry_point = "main",
         },
     };
 

@@ -9,7 +9,6 @@ const CoordinateSize = Simulation.CoordinateSize;
 const main = @import("bloodstream.zig");
 const Vertex = main.Vertex;
 const GPUStats = main.GPUStats;
-const wgsl = @import("shaders.zig");
 const Splines = @import("splines.zig");
 const SplinePoint = Splines.SplinePoint;
 const AnimatedSpline = Splines.AnimatedSpline;
@@ -28,8 +27,18 @@ pub fn createConsumers(self: *Simulation) void {
     var i: usize = 0;
 
     while (i < self.params.num_consumers) {
-        const x = @intToFloat(f32, random.intRangeAtMost(i32, @floatToInt(i32, self.coordinate_size.min_x), @floatToInt(i32, self.coordinate_size.max_x)));
-        const y = @intToFloat(f32, random.intRangeAtMost(i32, @floatToInt(i32, self.coordinate_size.min_y), @floatToInt(i32, self.coordinate_size.max_y)));
+        //const max_x = @floatToInt(i32, self.coordinate_size.max_x);
+        //const min_x = @floatToInt(i32, self.coordinate_size.min_x);
+        //const max_y = @floatToInt(i32, self.coordinate_size.max_y);
+        //const min_y = @floatToInt(i32, self.coordinate_size.min_y);
+        const box_width = 100;
+        const max_x = @floatToInt(i32, self.coordinate_size.center_x) + box_width; 
+        const min_x = @floatToInt(i32, self.coordinate_size.center_x) - box_width; 
+        const max_y = @floatToInt(i32, self.coordinate_size.center_y) + box_width; 
+        const min_y = @floatToInt(i32, self.coordinate_size.center_y) - box_width;
+
+        const x = @intToFloat(f32, random.intRangeAtMost(i32, min_x, max_x));
+        const y = @intToFloat(f32, random.intRangeAtMost(i32, min_y, max_y));
         const rand_x_vel = @intToFloat(f32, random.intRangeAtMost(i32, -5, 5));
         const rand_y_vel = @intToFloat(f32, random.intRangeAtMost(i32, -5, 5));
         const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
@@ -109,10 +118,13 @@ pub fn createConsumerIndexData(comptime num_triangles: u32) [num_triangles * 3]i
 }
 
 pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
+    const vs = @embedFile("shaders/vertex/position.wgsl");
+    const fs = @embedFile("shaders/fragment/basic.wgsl");
+
+    const vs_module = zgpu.util.createWgslShaderModule(gctx.device, vs, "vs");
     defer vs_module.release();
 
-    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
+    const fs_module = zgpu.util.createWgslShaderModule(gctx.device, fs, "fs");
     defer fs_module.release();
 
     const color_targets = [_]wgpu.ColorTargetState{.{
@@ -173,13 +185,15 @@ pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu
 }
 
 pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
+    const common_cs = @embedFile("shaders/compute/common.wgsl");
+    const cs = common_cs ++ @embedFile("shaders/compute/consumers.wgsl");
+    const cs_module = zgpu.util.createWgslShaderModule(gctx.device, cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
         .compute = wgpu.ProgrammableStageDescriptor{
             .module = cs_module,
-            .entry_point = "consumer_main",
+            .entry_point = "main",
         },
     };
 

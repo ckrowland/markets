@@ -8,6 +8,33 @@ pub const SplinePointCoords = struct {
     delta: [2]f32,
 };
 
+pub fn getTestPoints(sim: *Simulation, ox: f32, oy: f32) array(SplinePointCoords) {
+    var points_array = array(SplinePointCoords).init(sim.allocator);
+    const cx = sim.coordinate_size.center_x;
+    const cy = sim.coordinate_size.center_y;
+
+    points_array.appendSlice(&.{
+        .{
+            .start = [2]f32{cx - ox, cy - oy},
+            .delta = [2]f32{0, 0},
+        },
+        .{
+            .start = [2]f32{cx - ox, cy},
+            .delta = [2]f32{0, 0},
+        },
+        .{
+            .start = [2]f32{cx + ox, cy},
+            .delta = [2]f32{0, 0},
+        },
+        .{
+            .start = [2]f32{cx + ox, cy - oy},
+            .delta = [2]f32{0, 0},
+        },
+    }) catch unreachable;
+
+    return points_array;
+}
+
 fn getHeartPoints(sim: *Simulation) [9]SplinePointCoords {
     const cx = sim.coordinate_size.center_x;
     const cy = sim.coordinate_size.center_y;
@@ -114,7 +141,7 @@ fn getHeartOpenings(sim: *Simulation) [4]SplinePointCoords {
         heart[6].start,
         heart[7].start,
     };
-    const left_opening = Spline.getSplinePoint(0.9, points);
+    const left_opening = Spline.getSplinePoint(0.8, points);
 
     points = [4][2]f32{
         heart[5].start,
@@ -122,7 +149,7 @@ fn getHeartOpenings(sim: *Simulation) [4]SplinePointCoords {
         heart[7].start,
         heart[8].start,
     };
-    const left_closing = Spline.getSplinePoint(0.1, points);
+    const left_closing = Spline.getSplinePoint(0.2, points);
 
     points = [4][2]f32{
         heart[0].start,
@@ -130,7 +157,7 @@ fn getHeartOpenings(sim: *Simulation) [4]SplinePointCoords {
         heart[2].start,
         heart[3].start,
     };
-    const right_opening = Spline.getSplinePoint(0.9, points);
+    const right_opening = Spline.getSplinePoint(0.8, points);
 
     points = [4][2]f32{
         heart[1].start,
@@ -138,7 +165,7 @@ fn getHeartOpenings(sim: *Simulation) [4]SplinePointCoords {
         heart[3].start,
         heart[4].start,
     };
-    const right_closing = Spline.getSplinePoint(0.1, points);
+    const right_closing = Spline.getSplinePoint(0.2, points);
 
     return [4]SplinePointCoords{
         .{

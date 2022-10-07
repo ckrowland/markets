@@ -6,7 +6,6 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const Simulation = @import("simulation.zig");
 const Vertex = @import("bloodstream.zig").Vertex;
-const wgsl = @import("shaders.zig");
 
 pub const Line = struct {
     color: @Vector(4, f32),
