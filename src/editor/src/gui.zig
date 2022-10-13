@@ -71,13 +71,13 @@ fn placeAgent(demo: *DemoState) void {
                 ),
                 zm.translation(-1, 1, 0.0),
             );
-            const sim_size = demo.sim.coordinate_size;
-            const clip_to_object = zm.scaling(sim_size.max_x, sim_size.max_y, 1.0);
+
+            const clip_to_object = zm.scaling(3000, 3000, 1.0);
             const clip_position = zm.mul(screen_position, screen_to_clip);
             const object_position = zm.mul(clip_position, clip_to_object);
 
-            std.debug.print("Clip position\n{any}\n\n", .{clip_position});
-            std.debug.print("Object position\n{any}\n\n", .{object_position});
+            std.debug.print("Clip position\n{d}\n", .{clip_position});
+            std.debug.print("Object position\n{d}\n\n", .{object_position});
 
         } else if (on_release) {
             demo.editor.placing_producer = false;

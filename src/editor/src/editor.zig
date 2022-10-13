@@ -21,7 +21,7 @@ const SplinePoint = Splines.SplinePoint;
 const VertexColor = Splines.VertexColor;
 
 const content_dir = @import("build_options").content_dir;
-const window_title = "Circulatory System";
+const window_title = "Editor";
 
 pub const StagingBuffer = struct {
     slice: ?[]const [4]i32 = null,

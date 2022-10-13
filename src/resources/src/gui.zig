@@ -12,21 +12,27 @@ const Statistics = @import("simulation.zig").Statistics;
 pub fn update(demo: *DemoState) void {
     updateStats(demo);
 
-    zgui.backend.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
+    const width = demo.gctx.swapchain_descriptor.width;
+    const height = demo.gctx.swapchain_descriptor.height;
 
-    const window_width = @intToFloat(f32, demo.gctx.swapchain_descriptor.width);
-    const window_height = @intToFloat(f32, demo.gctx.swapchain_descriptor.height);
+    zgui.backend.newFrame(width, height);
+
+    const window_width = @intToFloat(f32, width);
+    const window_height = @intToFloat(f32, height);
     const margin: f32 = 40;
-    const stats_height: f32 = 400;
-    const params_width: f32 = 600;
+    const params_width: f32 = window_width / 5;
+    const stats_height: f32 = window_height / 5 + 30;
     zgui.setNextWindowPos(.{ .x = margin,
                             .y = margin,
-                            .cond = zgui.Condition.once });
+                            .cond = zgui.Condition.always });
     zgui.setNextWindowSize(.{ .w = params_width,
                             .h = window_height - stats_height - (margin * 3),
-                            .cond = zgui.Condition.once });
+                            .cond = zgui.Condition.always });
+    const zgui_window_flags = .{
+        .flags = zgui.WindowFlags.no_decoration,
+    };
 
-    if (zgui.begin("Parameters", .{})) {
+    if (zgui.begin("Parameters", zgui_window_flags)) {
         zgui.pushIntId(1);
         parameters(demo);
         zgui.popId();
@@ -35,12 +41,12 @@ pub fn update(demo: *DemoState) void {
 
     zgui.setNextWindowPos(.{ .x = margin,
                             .y = window_height - stats_height - margin,
-                            .cond = zgui.Condition.once });
+                            .cond = zgui.Condition.always });
     zgui.setNextWindowSize(.{ .w = window_width - (2 * margin),
                             .h = stats_height,
-                            .cond = zgui.Condition.once });
+                            .cond = zgui.Condition.always });
 
-    if (zgui.begin("Data", .{})) {
+    if (zgui.begin("Data", zgui_window_flags)) {
         zgui.pushIntId(2);
         plots(demo);
         zgui.popId();
@@ -95,10 +101,9 @@ fn plots(demo: *DemoState) void {
     const nec = stats.num_empty_consumers.items;
     const tpi = stats.num_total_producer_inventory.items;
     const window_size = zgui.getWindowSize();
-    const tab_bar_height = 50;
     const margin = 40;
     const plot_width = window_size[0] - margin;
-    const plot_height = window_size[1] - tab_bar_height - margin;
+    const plot_height = window_size[1] - margin;
     const plot_flags = .{ .w = plot_width, .h = plot_height, .flags = .{} };
 
     if (zgui.plot.beginPlot("", plot_flags)){

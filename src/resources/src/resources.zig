@@ -156,10 +156,6 @@ fn update(demo: *DemoState) void {
 
 fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
-    const fb_width = gctx.swapchain_descriptor.width;
-    const fb_height = gctx.swapchain_descriptor.height;
-    //const t = @floatCast(f32, gctx.stats.time);
-    //const frame_num = gctx.stats.gpu_frame_number;
 
     const cam_world_to_view = zm.lookAtLh(
         //eye position 
@@ -171,12 +167,13 @@ fn draw(demo: *DemoState) void {
         //up direction
         zm.f32x4(0.0, 1.0, 0.0, 0.0),
     );
+
     const cam_view_to_clip = zm.perspectiveFovLh(
         //fovy
         0.25 * math.pi,
 
         //aspect
-        @intToFloat(f32, fb_width) / @intToFloat(f32, fb_height),
+        1.8,
 
         //near
         0.01,
