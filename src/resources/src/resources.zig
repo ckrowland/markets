@@ -13,6 +13,7 @@ const Statistics = Simulation.stats;
 const Shapes = @import("shapes.zig");
 const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
+const Wgpu = @import("wgpu.zig");
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "Resource Simulation";
@@ -62,15 +63,14 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
     // Render Pipeline and Bind Group
-    const bind_group_layout = gctx.createBindGroupLayout(&.{
-        zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
-    });
-    defer gctx.releaseResource(bind_group_layout);
-    const bind_group = gctx.createBindGroup(bind_group_layout, &[_]zgpu.BindGroupEntryInfo{
-        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
-    });
-    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+    const uniform_bgl = Wgpu.createUniformBindGroupLayout(gctx);
+    defer gctx.releaseResource(uniform_bgl);
+
+    const bind_group = Wgpu.createUniformBindGroup(gctx, uniform_bgl);
+
+    const pipeline_layout = gctx.createPipelineLayout(&.{uniform_bgl});
     defer gctx.releaseResource(pipeline_layout);
+
     const producer_pipeline = Shapes.createProducerPipeline(gctx, pipeline_layout);
     const consumer_pipeline = Shapes.createConsumerPipeline(gctx, pipeline_layout);
 
@@ -162,14 +162,26 @@ fn draw(demo: *DemoState) void {
     //const frame_num = gctx.stats.gpu_frame_number;
 
     const cam_world_to_view = zm.lookAtLh(
-        zm.f32x4(0.0, 0.0, -3000.0, 1.0),
-        zm.f32x4(0.0, 0.0, 0.0, 1.0),
+        //eye position 
+        zm.f32x4(0.0, 0.0, -3000.0, 0.0),
+
+        //focus position
+        zm.f32x4(0.0, 0.0, 0.0, 0.0),
+
+        //up direction
         zm.f32x4(0.0, 1.0, 0.0, 0.0),
     );
     const cam_view_to_clip = zm.perspectiveFovLh(
+        //fovy
         0.25 * math.pi,
+
+        //aspect
         @intToFloat(f32, fb_width) / @intToFloat(f32, fb_height),
+
+        //near
         0.01,
+
+        //far
         3001.0,
     );
     const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);

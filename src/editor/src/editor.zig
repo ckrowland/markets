@@ -39,6 +39,11 @@ pub const GPUStats = struct {
     num_total_producer_inventory: i32,
 };
 
+pub const EditorState = struct {
+    place_producer_button: bool = true,
+    placing_producer: bool = false,
+};
+
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
 
@@ -67,6 +72,7 @@ pub const DemoState = struct {
 
     sim: Simulation,
     allocator: std.mem.Allocator,
+    editor: EditorState,
 };
 
 fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
@@ -118,7 +124,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
 
     // Simulation struct
     var sim = Simulation.init(allocator);
-    sim.createAgents();
+    //sim.createAgents();
 
     // Create Compute Bind Group and Pipeline
     const consumer_compute_bgl = gctx.createBindGroupLayout(&.{
@@ -137,11 +143,11 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     // Create Buffers
     const num_vertices = 20;
     const consumer_vertex_buffer = Consumers.createConsumerVertexBuffer(gctx, sim.params.consumer_radius, num_vertices);
-    const consumer_index_buffer = Consumers.createConsumerIndexBuffer(gctx, num_vertices);
-    var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
+    //const consumer_index_buffer = Consumers.createConsumerIndexBuffer(gctx, num_vertices);
+    //var consumer_buffer = Consumers.createConsumerBuffer(gctx, sim.consumers);
 
-    const splines_point_buffer = Splines.createSplinePointBuffer(gctx, &sim.asplines);
-    const splines_buffer = Splines.createSplinesBuffer(gctx, sim.asplines, allocator);
+    //const splines_point_buffer = Splines.createSplinePointBuffer(gctx, &sim.asplines);
+    //const splines_buffer = Splines.createSplinesBuffer(gctx, sim.asplines, allocator);
     const square_vertex_buffer = Lines.createSquareVertexBuffer(gctx);
 
     const stats_buffer = gctx.createBuffer(.{
@@ -167,7 +173,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     });
     gctx.queue.writeBuffer(gctx.lookupResource(size_buffer).?, 0, CoordinateSize, &.{sim.coordinate_size});
 
-    var consumer_bind_group = Consumers.createBindGroup(gctx, sim, consumer_compute_bgl, consumer_buffer, stats_buffer, size_buffer, splines_point_buffer, splines_buffer);
+    //var consumer_bind_group = Consumers.createBindGroup(gctx, sim, consumer_compute_bgl, consumer_buffer, stats_buffer, size_buffer, splines_point_buffer, splines_buffer);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -181,20 +187,21 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .uniform_bind_group = uniform_bind_group,
         .compute_bind_group_layout = consumer_compute_bgl,
         .consumer_vertex_buffer = consumer_vertex_buffer,
-        .consumer_index_buffer = consumer_index_buffer,
-        .consumer_buffer = consumer_buffer,
-        .consumer_bind_group = consumer_bind_group,
+        .consumer_index_buffer = undefined,
+        .consumer_buffer = undefined,
+        .consumer_bind_group = undefined,
         .stats_buffer = stats_buffer,
         .size_buffer = size_buffer,
         .square_vertex_buffer = square_vertex_buffer,
-        .splines_point_buffer = splines_point_buffer,
-        .splines_buffer = splines_buffer,
+        .splines_point_buffer = undefined,
+        .splines_buffer = undefined,
         .stats_mapped_buffer = stats_mapped_buffer,
         .stats = stats,
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
         .sim = sim,
+        .editor = EditorState{},
     };
 }
 
@@ -216,14 +223,26 @@ fn draw(demo: *DemoState) void {
     //const frame_num = gctx.stats.gpu_frame_number;
 
     const cam_world_to_view = zm.lookAtLh(
+        //eye position
         zm.f32x4(0.0, 0.0, -3000.0, 1.0),
+        
+        //focus position
         zm.f32x4(0.0, 0.0, 0.0, 1.0),
+
+        //up direction
         zm.f32x4(0.0, 1.0, 0.0, 0.0),
     );
     const cam_view_to_clip = zm.perspectiveFovLh(
+        //fovy
         0.25 * math.pi,
+
+        //aspect ratio
         @intToFloat(f32, fb_width) / @intToFloat(f32, fb_height),
+
+        //near
         0.01,
+
+        //far
         3001.0,
     );
     const cam_world_to_clip = zm.mul(cam_world_to_view, cam_view_to_clip);

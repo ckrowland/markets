@@ -32,6 +32,7 @@ pub fn build(b: *std.build.Builder) void {
     if (!builtin.is_test) {
         installDemo(b, resources.build(b, options), "resources");
         installDemo(b, bloodstream.build(b, options), "bloodstream");
+        installDemo(b, editor.build(b, options), "editor");
     }
 
     //
@@ -62,6 +63,7 @@ const zmath = @import("libs/zmath/build.zig");
 
 const resources = @import("src/resources/build.zig");
 const bloodstream = @import("src/bloodstream/build.zig");
+const editor = @import("src/editor/build.zig");
 
 
 pub const Options = struct {

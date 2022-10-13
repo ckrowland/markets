@@ -1,5 +1,5 @@
 # Simulations
-GPU Accelerated agent-based modeling to visualize and simulate complex systems.
+GPU Accelerated agent-based simulations.
 
 ## Current Simulations
 ![demo](gh_demo.gif)

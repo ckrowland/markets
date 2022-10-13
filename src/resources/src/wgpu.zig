@@ -3,13 +3,12 @@ const zgpu = @import("zgpu");
 const zm = @import("zmath");
 const Gctx = zgpu.GraphicsContext;
 const wgpu = zgpu.wgpu;
-const main = @import("bloodstream.zig");
+const main = @import("resources.zig");
 const Vertex = main.Vertex;
 const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
-const Consumers = @import("consumers.zig");
-const Consumer = Consumers.Consumer;
 const Simulation = @import("simulation.zig");
+const Consumer = Simulation.Consumer;
 const CoordinateSize = Simulation.CoordinateSize;
 
 pub const PipelineInfo = struct {
@@ -24,13 +23,13 @@ pub const PipelineInfo = struct {
     inst_attrs: []const Attribute,
 };
 
-pub fn getUniformBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
+pub fn createUniformBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
     return gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
     });
 }
 
-pub fn getUniformBindGroup(gctx: *Gctx, bgl: zgpu.BindGroupLayoutHandle) zgpu.BindGroupHandle {
+pub fn createUniformBindGroup(gctx: *Gctx, bgl: zgpu.BindGroupLayoutHandle) zgpu.BindGroupHandle {
     return gctx.createBindGroup(bgl, &.{
         .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
