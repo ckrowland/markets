@@ -1,6 +1,6 @@
 const main = @import("resources.zig");
 const Vertex = main.Vertex;
-const GPUStats = main.GPUStats;
+const Statistics = @import("statistics.zig");
 const std = @import("std");
 const math = std.math;
 const zgpu = @import("zgpu");
@@ -10,19 +10,22 @@ const Consumer = Simulation.Consumer;
 const Producer = Simulation.Producer;
 const wgsl = @import("shaders.zig");
 const array = std.ArrayList;
+const Wgpu = @import("wgpu.zig");
 
-pub fn createConsumerIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32) zgpu.BufferHandle {
+const num_vertices = 20;
+
+pub fn createConsumerIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     const num_triangles = num_vertices - 1;
     const consumer_index_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .index = true },
         .size = num_triangles * 3 * @sizeOf(u32),
     });
-    const consumer_index_data = createConsumerIndexData(num_vertices - 1);
+    const consumer_index_data = createConsumerIndexData(num_triangles);
     gctx.queue.writeBuffer(gctx.lookupResource(consumer_index_buffer).?, 0, i32, consumer_index_data[0..]);
     return consumer_index_buffer;
 }
 
-pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comptime num_vertices: u32) zgpu.BufferHandle {
+pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32) zgpu.BufferHandle {
     const consumer_vertex_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = num_vertices * @sizeOf(Vertex),
@@ -44,31 +47,30 @@ pub fn createConsumerVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32, comp
     return consumer_vertex_buffer;
 }
 
-pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, producer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
-    var consumer_bind_group: zgpu.BindGroupHandle = undefined;
-    const num_consumers = sim.consumers.items.len;
-    const num_producers = sim.producers.items.len;
-    consumer_bind_group = gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
+pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: Simulation, consumer_buffer: zgpu.BufferHandle, producer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
+    const compute_bgl = Wgpu.createComputeBindGroupLayout(gctx);
+    defer gctx.releaseResource(compute_bgl);
+
+    return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
             .buffer_handle = consumer_buffer,
             .offset = 0,
-            .size = num_consumers * @sizeOf(Consumer),
+            .size = sim.consumers.items.len * @sizeOf(Consumer),
         },
         .{
             .binding = 1,
             .buffer_handle = producer_buffer,
             .offset = 0,
-            .size = num_producers * @sizeOf(Producer),
+            .size = sim.producers.items.len * @sizeOf(Producer),
         },
         .{
             .binding = 2,
             .buffer_handle = stats_buffer,
             .offset = 0,
-            .size = @sizeOf(GPUStats),
+            .size = @sizeOf(u32) * Statistics.array.len,
         },
     });
-    return consumer_bind_group;
 }
 
 pub fn createConsumerBuffer(gctx: *zgpu.GraphicsContext, consumers: array(Consumer)) zgpu.BufferHandle {
@@ -134,160 +136,4 @@ pub fn createProducerBuffer(gctx: *zgpu.GraphicsContext, producers: array(Produc
     });
     gctx.queue.writeBuffer(gctx.lookupResource(producer_buffer).?, 0, Producer, producers.items[0..]);
     return producer_buffer;
-}
-
-pub fn createProducerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.producer_vs, "vs");
-    defer vs_module.release();
-
-    const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
-    defer fs_module.release();
-
-    const color_targets = [_]wgpu.ColorTargetState{.{
-        .format = zgpu.GraphicsContext.swapchain_format,
-        .blend = &.{ .color = .{}, .alpha = .{} },
-    }};
-
-    const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
-    };
-
-    const instance_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x4, .offset = @offsetOf(Producer, "position"), .shader_location = 1 },
-        .{ .format = .float32x4, .offset = @offsetOf(Producer, "color"), .shader_location = 2 },
-        .{ .format = .uint32, .offset = @offsetOf(Producer, "inventory"), .shader_location = 3 },
-        .{ .format = .uint32, .offset = @offsetOf(Producer, "max_inventory"), .shader_location = 4 },
-    };
-
-    const vertex_buffers = [_]wgpu.VertexBufferLayout{
-        .{
-            .array_stride = @sizeOf(Vertex),
-            .attribute_count = vertex_attributes.len,
-            .attributes = &vertex_attributes,
-            .step_mode = .vertex,
-        },
-        .{
-            .array_stride = @sizeOf(Producer),
-            .attribute_count = instance_attributes.len,
-            .attributes = &instance_attributes,
-            .step_mode = .instance,
-        },
-    };
-
-    const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
-        .vertex = wgpu.VertexState{
-            .module = vs_module,
-            .entry_point = "main",
-            .buffer_count = vertex_buffers.len,
-            .buffers = &vertex_buffers,
-        },
-        .primitive = wgpu.PrimitiveState{
-            .front_face = .ccw,
-            .cull_mode = .none,
-            .topology = .triangle_list,
-        },
-        .depth_stencil = &wgpu.DepthStencilState{
-            .format = .depth32_float,
-            .depth_write_enabled = true,
-            .depth_compare = .less,
-        },
-        .fragment = &wgpu.FragmentState{
-            .module = fs_module,
-            .entry_point = "main",
-            .target_count = color_targets.len,
-            .targets = &color_targets,
-        },
-    };
-
-    return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
-}
-
-pub fn createConsumerPipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.RenderPipelineHandle {
-    const vs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.vs, "vs");
-    defer vs_module.release();
-
-    const fs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.fs, "fs");
-    defer fs_module.release();
-
-    const color_targets = [_]wgpu.ColorTargetState{.{
-        .format = zgpu.GraphicsContext.swapchain_format,
-        .blend = &.{ .color = .{}, .alpha = .{} },
-    }};
-
-    const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
-    };
-
-    const instance_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x4, .offset = @offsetOf(Consumer, "position"), .shader_location = 1 },
-        .{ .format = .float32x4, .offset = @offsetOf(Consumer, "color"), .shader_location = 2 },
-    };
-
-    const vertex_buffers = [_]wgpu.VertexBufferLayout{
-        .{
-            .array_stride = @sizeOf(Vertex),
-            .attribute_count = vertex_attributes.len,
-            .attributes = &vertex_attributes,
-            .step_mode = .vertex,
-        },
-        .{
-            .array_stride = @sizeOf(Consumer),
-            .attribute_count = instance_attributes.len,
-            .attributes = &instance_attributes,
-            .step_mode = .instance,
-        },
-    };
-
-    const pipeline_descriptor = wgpu.RenderPipelineDescriptor{
-        .vertex = wgpu.VertexState{
-            .module = vs_module,
-            .entry_point = "main",
-            .buffer_count = vertex_buffers.len,
-            .buffers = &vertex_buffers,
-        },
-        .primitive = wgpu.PrimitiveState{
-            .front_face = .ccw,
-            .cull_mode = .none,
-            .topology = .triangle_list,
-        },
-        .depth_stencil = &wgpu.DepthStencilState{
-            .format = .depth32_float,
-            .depth_write_enabled = true,
-            .depth_compare = .less,
-        },
-        .fragment = &wgpu.FragmentState{
-            .module = fs_module,
-            .entry_point = "main",
-            .target_count = color_targets.len,
-            .targets = &color_targets,
-        },
-    };
-
-    return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
-}
-pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
-    defer cs_module.release();
-
-    const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
-        .compute = wgpu.ProgrammableStageDescriptor{
-            .module = cs_module,
-            .entry_point = "consumer_main",
-        },
-    };
-
-    return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
-}
-pub fn createProducerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const cs_module = zgpu.createWgslShaderModule(gctx.device, wgsl.cs, "cs");
-    defer cs_module.release();
-
-    const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
-        .compute = wgpu.ProgrammableStageDescriptor{
-            .module = cs_module,
-            .entry_point = "producer_main",
-        },
-    };
-
-    return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
 }

@@ -11,7 +11,7 @@ const Simulation = @import("simulation.zig");
 const Consumer = Simulation.Consumer;
 const CoordinateSize = Simulation.CoordinateSize;
 
-pub const PipelineInfo = struct {
+pub const RenderPipelineInfo = struct {
     pub const Attribute = struct {
         name: []const u8,
         type: type,
@@ -23,30 +23,68 @@ pub const PipelineInfo = struct {
     inst_attrs: []const Attribute,
 };
 
+pub const ComputePipelineInfo = struct {
+    cs: [:0]const u8,
+    entry_point: [:0]const u8,
+};
+
+
+// Bind Group Layouts
 pub fn createUniformBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
     return gctx.createBindGroupLayout(&.{
         zgpu.bufferEntry(0, .{ .vertex = true }, .uniform, true, 0),
     });
 }
 
-pub fn createUniformBindGroup(gctx: *Gctx, bgl: zgpu.BindGroupLayoutHandle) zgpu.BindGroupHandle {
-    return gctx.createBindGroup(bgl, &.{
-        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
+pub fn createComputeBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
+    return gctx.createBindGroupLayout(&.{
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .storage, true, 0),
+    });
+}
+
+
+// Bind Groups
+pub fn createUniformBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
+    const bind_group_layout = createUniformBindGroupLayout(gctx);
+    defer gctx.releaseResource(bind_group_layout);
+
+    return gctx.createBindGroup(bind_group_layout, &.{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @sizeOf(zm.Mat)
+        },
+    });
+}
+pub fn createComputeBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
+    const bind_group_layout = createUniformBindGroupLayout(gctx);
+    defer gctx.releaseResource(bind_group_layout);
+
+    return gctx.createBindGroup(bind_group_layout, &.{
+        .{
+            .binding = 0,
+            .buffer_handle = gctx.uniforms.buffer,
+            .offset = 0,
+            .size = @sizeOf(zm.Mat)
+        },
     });
 }
 
 fn getWgpuType(comptime T: type) !wgpu.VertexFormat {
     return switch (T) {
+        u32 => .uint32,
         f32 => .float32,
         [4]f32 => .float32x4,
         else => error.NoValidWgpuType, 
     };
 }
 
-pub fn createPipeline(
+pub fn createRenderPipeline(
     gctx: *zgpu.GraphicsContext,
-    layout: zgpu.PipelineLayoutHandle,
-    comptime args: PipelineInfo,
+    comptime args: RenderPipelineInfo,
 ) zgpu.RenderPipelineHandle {
     const vs_module = zgpu.createWgslShaderModule(gctx.device, args.vs, "vs");
     defer vs_module.release();
@@ -115,23 +153,32 @@ pub fn createPipeline(
         },
     };
 
-    return gctx.createRenderPipeline(layout, pipeline_descriptor);
+    const bind_group_layout = createUniformBindGroupLayout(gctx);
+    defer gctx.releaseResource(bind_group_layout);
+
+    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+
+    return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 
-pub fn createConsumerComputePipeline(gctx: *zgpu.GraphicsContext, pipeline_layout: zgpu.PipelineLayoutHandle) zgpu.ComputePipelineHandle {
-    const common_cs = @embedFile("shaders/compute/common.wgsl");
-    const cs = common_cs ++ @embedFile("shaders/compute/consumers.wgsl");
-    const cs_module = zgpu.createWgslShaderModule(gctx.device, cs, "cs");
+pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, cpi: ComputePipelineInfo) zgpu.ComputePipelineHandle {
+    const compute_bgl = createComputeBindGroupLayout(gctx);
+    defer gctx.releaseResource(compute_bgl);
+
+    const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
+    defer gctx.releaseResource(compute_pl);
+
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, cpi.cs, "cs");
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{
         .compute = wgpu.ProgrammableStageDescriptor{
             .module = cs_module,
-            .entry_point = "main",
+            .entry_point = cpi.entry_point,
         },
     };
 
-    return gctx.createComputePipeline(pipeline_layout, pipeline_descriptor);
+    return gctx.createComputePipeline(compute_pl, pipeline_descriptor);
 }
 
 pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: DemoState.Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle, size_buffer: zgpu.BufferHandle, splines_point_buffer: zgpu.BufferHandle, splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {

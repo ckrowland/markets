@@ -71,9 +71,9 @@ pub const cs =
 \\    queue: array<u32, 450>,
 \\  }
 \\  struct Stats {
-\\    num_transactions: i32,
-\\    num_empty_consumers: i32,
-\\    num_total_producer_inventory: i32,
+\\    num_transactions: u32,
+\\    num_empty_consumers: u32,
+\\    num_total_producer_inventory: u32,
 \\  }
 \\
 \\  @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;

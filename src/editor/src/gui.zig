@@ -72,12 +72,11 @@ fn placeAgent(demo: *DemoState) void {
                 zm.translation(-1, 1, 0.0),
             );
 
-            const clip_to_object = zm.scaling(3000, 3000, 1.0);
+            const clip_to_object = zm.scaling(1800, 1200, 1.0);
             const clip_position = zm.mul(screen_position, screen_to_clip);
             const object_position = zm.mul(clip_position, clip_to_object);
 
-            std.debug.print("Clip position\n{d}\n", .{clip_position});
-            std.debug.print("Object position\n{d}\n\n", .{object_position});
+            // TODO: Create consumer at object position
 
         } else if (on_release) {
             demo.editor.placing_producer = false;

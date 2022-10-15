@@ -24,11 +24,11 @@ coordinate_size: struct {
 producers: array(Producer),
 consumers: array(Consumer),
 stats: struct {
-    num_transactions: array(i32),
+    num_transactions: array(u32),
     second: f32,
-    max_stat_recorded: i32,
-    num_empty_consumers: array(i32),
-    num_total_producer_inventory: array(i32),
+    max_stat_recorded: u32,
+    num_empty_consumers: array(u32),
+    num_total_producer_inventory: array(u32),
 },
 
 pub const Producer = struct {
@@ -54,14 +54,6 @@ pub const Consumer = struct {
     producer_id: i32,
 };
 
-pub const Statistics = struct {
-    num_transactions: array(i32),
-    second: i32,
-    max_stat_recorded: i32,
-    num_empty_consumers: array(i32),
-    num_total_producer_inventory: array(i32),
-};
-
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .params = .{
@@ -84,11 +76,11 @@ pub fn init(allocator: std.mem.Allocator) Self {
         .consumers = array(Consumer).init(allocator),
         .producers = array(Producer).init(allocator),
         .stats = .{
-            .num_transactions = array(i32).init(allocator),
+            .num_transactions = array(u32).init(allocator),
             .second = 0,
             .max_stat_recorded = 0,
-            .num_empty_consumers = array(i32).init(allocator),
-            .num_total_producer_inventory = array(i32).init(allocator), 
+            .num_empty_consumers = array(u32).init(allocator),
+            .num_total_producer_inventory = array(u32).init(allocator), 
         },
     };
 }

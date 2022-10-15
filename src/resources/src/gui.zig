@@ -1,13 +1,16 @@
 const main = @import("resources.zig");
-const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
 const std = @import("std");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
 const Shapes = @import("shapes.zig");
-const StagingBuffer = main.StagingBuffer;
-const Statistics = @import("simulation.zig").Statistics;
+const Statistics = @import("statistics.zig");
+
+const StagingBuffer = struct {
+    slice: ?[]const u32 = null,
+    buffer: wgpu.Buffer = undefined,
+};
 
 pub fn update(demo: *DemoState) void {
     updateStats(demo);
@@ -54,16 +57,18 @@ pub fn update(demo: *DemoState) void {
     zgui.end();
 }
 
-fn getGPUStatistics(demo: *DemoState) [3]i32 {
+fn getGPUStatistics(demo: *DemoState) [Statistics.array.len]u32 {
     var buf: StagingBuffer = .{
         .slice = null,
-        .buffer = demo.gctx.lookupResource(demo.stats_mapped_buffer).?,
+        .buffer = demo.gctx.lookupResource(demo.buffers.data.stats_mapped).?,
     };
-    buf.buffer.mapAsync(.{ .read = true },
-                        0,
-                        @sizeOf(i32) * 3,
-                        main.buffersMappedCallback,
-                        @ptrCast(*anyopaque, &buf));
+    buf.buffer.mapAsync(
+        .{ .read = true },
+        0,
+        @sizeOf(u32) * Statistics.array.len,
+        buffersMappedCallback,
+        @ptrCast(*anyopaque, &buf)
+    );
     wait_loop: while (true) {
         demo.gctx.device.tick();
         if (buf.slice == null) {
@@ -71,11 +76,19 @@ fn getGPUStatistics(demo: *DemoState) [3]i32 {
         }
         break;
     }
+    buf.buffer.unmap();
+    Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
+    return buf.slice.?[0..Statistics.array.len].*;
+}
 
-    const stats_data = [_][3]i32{ [3]i32{ 0, 0, 0 }, };
-    demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.stats_buffer).?, 0, [3]i32, stats_data[0..]);
-    demo.stats.buffer.unmap();
-    return buf.slice.?[0];
+fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
+    const usb = @ptrCast(*StagingBuffer, @alignCast(@sizeOf(usize), userdata));
+    std.debug.assert(usb.slice == null);
+    if (status == .success) {
+        usb.slice = usb.buffer.getConstMappedRange(u32, 0, Statistics.array.len).?;
+    } else {
+        std.debug.print("[zgpu] Failed to map buffer (code: {any})\n", .{status});
+    }
 }
 
 fn updateStats(demo: *DemoState) void {
@@ -85,7 +98,7 @@ fn updateStats(demo: *DemoState) void {
     const diff = current_time - previous_second;
     if (diff >= 1) {
         const gpu_stats = getGPUStatistics(demo);
-        const vec_stats: @Vector(4, i32) = [_]i32{ gpu_stats[0], gpu_stats[1], gpu_stats[2], stats.max_stat_recorded};
+        const vec_stats: @Vector(4, u32) = [_]u32{ gpu_stats[0], gpu_stats[1], gpu_stats[2], stats.max_stat_recorded};
         const max_stat = @reduce(.Max, vec_stats);
         demo.sim.stats.num_transactions.append(gpu_stats[0]) catch unreachable;
         demo.sim.stats.second = current_time;
@@ -110,9 +123,9 @@ fn plots(demo: *DemoState) void {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true }});
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true }});
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
-        zgui.plot.plotLineValues("Transactions", i32, .{ .v = nt[0..] });
-        zgui.plot.plotLineValues("Empty Consumers", i32, .{ .v = nec[0..] });
-        zgui.plot.plotLineValues("Total Producer Inventory", i32, .{ .v = tpi[0..]});
+        zgui.plot.plotLineValues("Transactions", u32, .{ .v = nt[0..] });
+        zgui.plot.plotLineValues("Empty Consumers", u32, .{ .v = nec[0..] });
+        zgui.plot.plotLineValues("Total Producer Inventory", u32, .{ .v = tpi[0..]});
         zgui.plot.endPlot();
     }
 }
