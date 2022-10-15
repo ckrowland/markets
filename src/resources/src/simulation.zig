@@ -1,84 +1,46 @@
 const std = @import("std");
 const array = std.ArrayList;
 const random = std.crypto.random;
+const Consumer = @import("consumer.zig");
+const Producer = @import("producer.zig");
 
 const Self = @This();
 
 params: struct {
-    num_producers: i32,
-    production_rate: i32,
-    giving_rate: i32,
-    max_inventory: i32,
-    num_consumers: i32,
-    moving_rate: f32,
-    producer_width: f32,
-    consumer_radius: f32,
-    num_consumer_sides: u32,
+    num_producers: i32 = 10,
+    production_rate: i32 = 100,
+    giving_rate: i32 = 10,
+    max_inventory: i32 = 10000,
+    num_consumers: i32 = 10000,
+    moving_rate: f32 = 5.0,
+    producer_width: f32 = 40.0,
+    consumer_radius: f32 = 10.0,
+    num_consumer_sides: u32 = 20,
 },
 coordinate_size: struct {
-    min_x: i32,
-    min_y: i32,
-    max_x: i32,
-    max_y: i32,
+    min_x: i32 = -1000,
+    min_y: i32 = -500,
+    max_x: i32 = 1800,
+    max_y: i32 = 1200,
 },
 producers: array(Producer),
 consumers: array(Consumer),
 stats: struct {
     num_transactions: array(u32),
-    second: f32,
-    max_stat_recorded: u32,
+    second: f32 = 0,
+    max_stat_recorded: u32 = 0,
     num_empty_consumers: array(u32),
     num_total_producer_inventory: array(u32),
 },
 
-pub const Producer = struct {
-    position: @Vector(4, f32),
-    color: @Vector(4, f32),
-    production_rate: u32,
-    giving_rate: u32,
-    inventory: u32,
-    max_inventory: u32,
-    len: u32,
-    queue: [450]u32,
-};
-
-pub const Consumer = struct {
-    position: @Vector(4, f32),
-    home: @Vector(4, f32),
-    destination: @Vector(4, f32),
-    step_size: @Vector(4, f32),
-    color: @Vector(4, f32),
-    moving_rate: f32,
-    inventory: u32,
-    radius: f32,
-    producer_id: i32,
-};
-
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
-        .params = .{
-            .num_producers = 10,
-            .production_rate = 100,
-            .giving_rate = 10,
-            .max_inventory = 10000,
-            .num_consumers = 10000,
-            .moving_rate = 5.0,
-            .producer_width = 40.0,
-            .consumer_radius = 10.0,
-            .num_consumer_sides = 20,
-        },
-        .coordinate_size = .{
-            .min_x = -1000,
-            .min_y = -500,
-            .max_x = 1800,
-            .max_y = 1200,
-        },
+        .params = .{},
+        .coordinate_size = .{},
         .consumers = array(Consumer).init(allocator),
         .producers = array(Producer).init(allocator),
         .stats = .{
             .num_transactions = array(u32).init(allocator),
-            .second = 0,
-            .max_stat_recorded = 0,
             .num_empty_consumers = array(u32).init(allocator),
             .num_total_producer_inventory = array(u32).init(allocator), 
         },
@@ -93,7 +55,7 @@ pub fn deinit(self: *Self) void {
     self.stats.num_total_producer_inventory.deinit();
 }
 
-pub fn createAgents(self: *Self) void {
+fn clearSimulation(self: *Self) void {
     self.producers.clearAndFree();
     self.consumers.clearAndFree();
     self.stats.num_transactions.clearAndFree();
@@ -104,6 +66,10 @@ pub fn createAgents(self: *Self) void {
     self.stats.num_total_producer_inventory.append(0) catch unreachable;
     self.stats.second = 0;
     self.stats.max_stat_recorded = 0;
+}
+
+pub fn createAgents(self: *Self) void {
+    clearSimulation(self);
     createProducers(self);
     createConsumers(self);
 }

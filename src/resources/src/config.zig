@@ -1,11 +1,12 @@
-const Simulation = @import("simulation.zig");
+const Consumer = @import("consumer.zig");
+const Producer = @import("producer.zig");
 const wgsl = @import("shaders.zig");
 const Wgpu = @import("wgpu.zig");
 
 pub const cpi = .{
     .vs = wgsl.vs,
     .fs = wgsl.fs,
-    .inst_type = Simulation.Consumer,
+    .inst_type = Consumer,
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
             .name = "position",
@@ -19,9 +20,9 @@ pub const cpi = .{
 };
 
 pub const ppi = .{
-    .vs = wgsl.vs,
+    .vs = wgsl.producer_vs,
     .fs = wgsl.fs,
-    .inst_type = Simulation.Producer,
+    .inst_type = Producer,
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
             .name = "position",

@@ -4,11 +4,12 @@ const zm = @import("zmath");
 const Gctx = zgpu.GraphicsContext;
 const wgpu = zgpu.wgpu;
 const main = @import("resources.zig");
-const Vertex = main.Vertex;
 const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
 const Simulation = @import("simulation.zig");
-const Consumer = Simulation.Consumer;
+const Statistics = @import("statistics.zig");
+const Consumer = @import("consumer.zig");
+const Producer = @import("producer.zig");
 const CoordinateSize = Simulation.CoordinateSize;
 
 pub const RenderPipelineInfo = struct {
@@ -59,16 +60,36 @@ pub fn createUniformBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
         },
     });
 }
-pub fn createComputeBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
-    const bind_group_layout = createUniformBindGroupLayout(gctx);
-    defer gctx.releaseResource(bind_group_layout);
 
-    return gctx.createBindGroup(bind_group_layout, &.{
+pub fn createComputeBindGroup(
+    gctx: *zgpu.GraphicsContext,
+    sim: Simulation,
+    consumer_buffer: zgpu.BufferHandle,
+    producer_buffer: zgpu.BufferHandle,
+    stats_buffer: zgpu.BufferHandle
+) zgpu.BindGroupHandle {
+
+    const compute_bgl = createComputeBindGroupLayout(gctx);
+    defer gctx.releaseResource(compute_bgl);
+
+    return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
-            .buffer_handle = gctx.uniforms.buffer,
+            .buffer_handle = consumer_buffer,
             .offset = 0,
-            .size = @sizeOf(zm.Mat)
+            .size = sim.consumers.items.len * @sizeOf(Consumer),
+        },
+        .{
+            .binding = 1,
+            .buffer_handle = producer_buffer,
+            .offset = 0,
+            .size = sim.producers.items.len * @sizeOf(Producer),
+        },
+        .{
+            .binding = 2,
+            .buffer_handle = stats_buffer,
+            .offset = 0,
+            .size = @sizeOf(u32) * Statistics.array.len,
         },
     });
 }
@@ -98,7 +119,7 @@ pub fn createRenderPipeline(
     }};
 
     const vertex_attributes = [_]wgpu.VertexAttribute{
-        .{ .format = .float32x3, .offset = @offsetOf(Vertex, "position"), .shader_location = 0 },
+        .{ .format = .float32x3, .offset = 0, .shader_location = 0 },
     };
 
     const instance_attributes = init: {
@@ -115,7 +136,7 @@ pub fn createRenderPipeline(
 
     const vertex_buffers = [_]wgpu.VertexBufferLayout{
         .{
-            .array_stride = @sizeOf(Vertex),
+            .array_stride = @sizeOf(f32) * 3,
             .attribute_count = vertex_attributes.len,
             .attributes = &vertex_attributes,
             .step_mode = .vertex,
@@ -181,39 +202,3 @@ pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, cpi: ComputePipelineIn
     return gctx.createComputePipeline(compute_pl, pipeline_descriptor);
 }
 
-pub fn createBindGroup(gctx: *zgpu.GraphicsContext, sim: DemoState.Simulation, compute_bgl: zgpu.BindGroupLayoutHandle, consumer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle, size_buffer: zgpu.BufferHandle, splines_point_buffer: zgpu.BufferHandle, splines_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
-    const spb_info = gctx.lookupResourceInfo(splines_point_buffer).?;
-    const sb_info = gctx.lookupResourceInfo(splines_buffer).?;
-    return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
-        .{
-            .binding = 0,
-            .buffer_handle = consumer_buffer,
-            .offset = 0,
-            .size = sim.consumers.items.len * @sizeOf(Consumer),
-        },
-        .{
-            .binding = 1,
-            .buffer_handle = stats_buffer,
-            .offset = 0,
-            .size = @sizeOf(GPUStats),
-        },
-        .{
-            .binding = 2,
-            .buffer_handle = size_buffer,
-            .offset = 0,
-            .size = @sizeOf(CoordinateSize),
-        },
-        .{
-            .binding = 3,
-            .buffer_handle = splines_point_buffer,
-            .offset = 0,
-            .size = spb_info.size,
-        },
-        .{
-            .binding = 4,
-            .buffer_handle = splines_buffer,
-            .offset = 0,
-            .size = sb_info.size,
-        },
-    });
-}

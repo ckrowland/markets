@@ -15,14 +15,11 @@ const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
 const config = @import("config.zig");
+const Consumer = @import("consumer.zig");
+const Producer = @import("producer.zig");
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "Resource Simulation";
-
-
-pub const Vertex = struct {
-    position: [3]f32,
-};
 
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
@@ -67,12 +64,12 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     sim.createAgents();
 
     // Create Buffers
-    const producer_buffer = Shapes.createProducerBuffer(gctx, sim.producers);
-    var consumer_buffer = Shapes.createConsumerBuffer(gctx, sim.consumers);
+    const consumer_buffer = Consumer.createBuffer(gctx, sim.consumers);
+    const producer_buffer = Producer.createBuffer(gctx, sim.producers);
     const stats_buffer = Statistics.createStatsBuffer(gctx);
     const stats_mapped_buffer = Statistics.createStatsMappedBuffer(gctx);
 
-    const consumer_bind_group = Shapes.createBindGroup(
+    const compute_bind_group = Wgpu.createComputeBindGroup(
         gctx,
         sim,
         consumer_buffer,
@@ -95,7 +92,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         },
         .bind_groups = .{
             .render = Wgpu.createUniformBindGroup(gctx),
-            .compute = consumer_bind_group,
+            .compute = compute_bind_group,
         },
         .buffers = .{
             .data = .{
@@ -105,11 +102,11 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
                 .stats_mapped = stats_mapped_buffer,
             },
             .index = .{
-                .consumer = Shapes.createConsumerIndexBuffer(gctx),
+                .consumer = Consumer.createIndexBuffer(gctx),
             },
             .vertex = .{
-                .consumer = Shapes.createConsumerVertexBuffer(gctx, sim.params.consumer_radius),
-                .producer = Shapes.createProducerVertexBuffer(gctx, sim.params.producer_width),
+                .consumer = Consumer.createVertexBuffer(gctx, sim.params.consumer_radius),
+                .producer = Producer.createVertexBuffer(gctx, sim.params.producer_width),
             },
         },
         .depth_texture = depth.texture,
@@ -279,12 +276,12 @@ pub fn startSimulation(demo: *DemoState) void {
     defer demo.gctx.releaseResource(compute_bgl);
 
     demo.sim.createAgents();
-    demo.buffers.data.producer = Shapes.createProducerBuffer(demo.gctx, demo.sim.producers);
-    demo.buffers.data.consumer = Shapes.createConsumerBuffer(demo.gctx, demo.sim.consumers);
+    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
+    demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim.consumers);
     const stats_data = [_][3]i32{ [3]i32{ 0, 0, 0 }, };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.buffers.data.stats).?, 0, [3]i32, stats_data[0..]);
-    demo.bind_groups.compute = Shapes.createBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
-    demo.buffers.vertex.consumer = Shapes.createConsumerVertexBuffer(demo.gctx, demo.sim.params.consumer_radius);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim.params.consumer_radius);
 }
 
 pub fn supplyShock(demo: *DemoState) void {
@@ -292,8 +289,8 @@ pub fn supplyShock(demo: *DemoState) void {
     defer demo.gctx.releaseResource(compute_bgl);
 
     demo.sim.supplyShock();
-    demo.buffers.data.producer = Shapes.createProducerBuffer(demo.gctx, demo.sim.producers);
-    demo.bind_groups.compute = Shapes.createBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
 
 
