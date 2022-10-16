@@ -4,7 +4,6 @@ const std = @import("std");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
-const Shapes = @import("shapes.zig");
 const Statistics = @import("statistics.zig");
 
 const StagingBuffer = struct {
@@ -135,41 +134,55 @@ fn parameters(demo: *DemoState) void {
     zgui.bulletText("{d:.1} fps", .{ demo.gctx.stats.fps });
     zgui.spacing();
     zgui.text("Number Of Producers", .{});
-    _ = zgui.sliderInt("##np", .{ .v = &demo.sim.params.num_producers,
-                              .min = 1,
-                              .max = 100 });
+    _ = zgui.sliderScalar(
+        "##np",
+        u32,
+        .{ .v = &demo.sim.params.num_producers, .min = 1, .max = 100 },
+    );
 
     zgui.text("Production Rate", .{});
-    _ = zgui.sliderInt("##pr", .{ .v = &demo.sim.params.production_rate,
-                              .min = 1,
-                              .max = 1000 });
+    _ = zgui.sliderScalar(
+        "##pr",
+        u32,
+        .{ .v = &demo.sim.params.production_rate, .min = 1, .max = 1000 },
+    );
 
     zgui.text("Giving Rate", .{});
-    _ = zgui.sliderInt("##gr", .{ .v = &demo.sim.params.giving_rate,
-                              .min = 1,
-                              .max = 1000 });
+    _ = zgui.sliderScalar(
+        "##gr",
+        u32,
+        .{ .v = &demo.sim.params.giving_rate, .min = 1, .max = 1000 },
+    );
 
     zgui.text("Max Producer Inventory", .{});
-    _ = zgui.sliderInt("##mi", .{ .v = &demo.sim.params.max_inventory,
-                              .min = 1,
-                              .max = 10000 });
+    _ = zgui.sliderScalar(
+        "##mi",
+        u32,
+        .{ .v = &demo.sim.params.max_inventory, .min = 1, .max = 10000 }
+    );
 
     zgui.dummy(.{.w = 1.0, .h = 40.0});
 
     zgui.text("Number of Consumers", .{});
-    _ = zgui.sliderInt("##nc", .{ .v = &demo.sim.params.num_consumers,
-                              .min = 1,
-                              .max = 10000 });
+    _ = zgui.sliderScalar(
+        "##nc", 
+        u32,
+        .{ .v = &demo.sim.params.num_consumers, .min = 1, .max = 10000 }
+    );
 
     zgui.text("Moving Rate", .{});
-    _ = zgui.sliderFloat("##mr", .{ .v = &demo.sim.params.moving_rate,
-                                .min = 1.0,
-                                .max = 20 });
+    _ = zgui.sliderScalar(
+        "##mr",
+        f32,
+        .{ .v = &demo.sim.params.moving_rate, .min = 1.0, .max = 20 }
+    );
 
     zgui.text("Consumer Size", .{});
-    _ = zgui.sliderFloat("##cs", .{ .v = &demo.sim.params.consumer_radius,
-                                .min = 1,
-                                .max = 20 });
+    _ = zgui.sliderScalar(
+        "##cs",
+        f32,
+        .{ .v = &demo.sim.params.consumer_radius, .min = 1, .max = 20 }
+    );
 
     if (zgui.button("Start", .{})) {
         main.startSimulation(demo);
@@ -178,6 +191,6 @@ fn parameters(demo: *DemoState) void {
     zgui.dummy(.{.w = 1.0, .h = 40.0});
 
     if (zgui.button("Supply Shock", .{})) {
-        main.supplyShock(demo);
+        //main.supplyShock(demo);
     }
 }

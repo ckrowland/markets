@@ -1,7 +1,10 @@
 const std = @import("std");
 const math = std.math;
 const array = std.ArrayList;
+const Allocator = std.mem.Allocator;
+const random = std.crypto.random;
 const zgpu = @import("zgpu");
+const Simulation = @import("simulation.zig");
 
 const Self = @This();
 
@@ -15,15 +18,63 @@ inventory: u32,
 radius: f32,
 producer_id: i32,
 
+const max_num_consumers = 10000;
 const num_vertices = 20;
 
-pub fn createBuffer(gctx: *zgpu.GraphicsContext, consumers: array(Self)) zgpu.BufferHandle {
-    const max_num_consumer = 10000;
+pub fn createConsumers(sim: Simulation) []Self {
+    var consumers: [max_num_consumers]Self = undefined;
+    
+    var i: usize = 0;
+    while (i < sim.params.num_consumers) {
+        const x = @intToFloat(
+            f32,
+            random.intRangeAtMost(
+                i32,
+                sim.coordinate_size.min_x,
+                sim.coordinate_size.max_x
+            )
+        );
+
+        const y = @intToFloat(
+            f32,
+            random.intRangeAtMost(
+                i32,
+                sim.coordinate_size.min_y,
+                sim.coordinate_size.max_y
+            )
+        );
+
+        const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
+        const step_size = @Vector(4, f32){ 0.0, 0.0, 0.0, 0.0 };
+        const init_color = @Vector(4, f32){ 0.0, 1.0, 0.0, 0.0 };
+        consumers[i] = Self{
+            .position = pos,
+            .home = pos,
+            .destination = pos,
+            .step_size = step_size,
+            .color = init_color,
+            .moving_rate = sim.params.moving_rate,
+            .inventory = 0,
+            .radius = sim.params.consumer_radius,
+            .producer_id = 1000,
+        };
+        i += 1;
+    }
+    return consumers[0..i];
+}
+
+pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const consumer_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = max_num_consumer * @sizeOf(Self),
+        .size = max_num_consumers * @sizeOf(Self),
     });
-    gctx.queue.writeBuffer(gctx.lookupResource(consumer_buffer).?, 0, Self, consumers.items[0..]);
+
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(consumer_buffer).?,
+        0,
+        Self,
+        createConsumers(sim)
+    );
     return consumer_buffer;
 }
 

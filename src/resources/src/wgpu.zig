@@ -63,7 +63,6 @@ pub fn createUniformBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
 
 pub fn createComputeBindGroup(
     gctx: *zgpu.GraphicsContext,
-    sim: Simulation,
     consumer_buffer: zgpu.BufferHandle,
     producer_buffer: zgpu.BufferHandle,
     stats_buffer: zgpu.BufferHandle
@@ -72,24 +71,28 @@ pub fn createComputeBindGroup(
     const compute_bgl = createComputeBindGroupLayout(gctx);
     defer gctx.releaseResource(compute_bgl);
 
+    const c_info = gctx.lookupResourceInfo(consumer_buffer) orelse unreachable;
+    const p_info = gctx.lookupResourceInfo(producer_buffer) orelse unreachable;
+    const s_info = gctx.lookupResourceInfo(stats_buffer) orelse unreachable;
+
     return gctx.createBindGroup(compute_bgl, &[_]zgpu.BindGroupEntryInfo{
         .{
             .binding = 0,
             .buffer_handle = consumer_buffer,
             .offset = 0,
-            .size = sim.consumers.items.len * @sizeOf(Consumer),
+            .size = c_info.size,
         },
         .{
             .binding = 1,
             .buffer_handle = producer_buffer,
             .offset = 0,
-            .size = sim.producers.items.len * @sizeOf(Producer),
+            .size = p_info.size,
         },
         .{
             .binding = 2,
             .buffer_handle = stats_buffer,
             .offset = 0,
-            .size = @sizeOf(u32) * Statistics.array.len,
+            .size = s_info.size,
         },
     });
 }

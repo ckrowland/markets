@@ -1,6 +1,9 @@
 const std = @import("std");
 const array = std.ArrayList;
+const random = std.crypto.random;
+const Allocator = std.mem.Allocator;
 const zgpu = @import("zgpu");
+const Simulation = @import("simulation.zig");
 
 const Self = @This();
 
@@ -13,13 +16,68 @@ max_inventory: u32,
 len: u32,
 queue: [450]u32,
 
-pub fn createBuffer(gctx: *zgpu.GraphicsContext, producers: array(Self)) zgpu.BufferHandle {
-    const max_num_producers = 100;
+const max_num_producers = 100;
+
+pub fn createProducers(sim: Simulation) []Self {
+    var producers: [max_num_producers]Self = undefined;
+
+    var i: usize = 0;
+    while (i < sim.params.num_producers) {
+        const x = @intToFloat(
+            f32, 
+            random.intRangeAtMost(
+                i32,
+                sim.coordinate_size.min_x,
+                sim.coordinate_size.max_x
+            )
+        );
+
+        const y = @intToFloat(
+            f32,
+            random.intRangeAtMost(
+                i32,
+                sim.coordinate_size.min_y,
+                sim.coordinate_size.max_y
+            )
+        );
+
+        const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
+        const init_color = @Vector(4, f32){ 1.0, 1.0, 1.0, 0.0 };
+        const q = [_]u32{0} ** 450;
+        producers[i] = Self{
+            .position = pos,
+            .color = init_color,
+            .production_rate = @intCast(u32, sim.params.production_rate),
+            .giving_rate = @intCast(u32, sim.params.giving_rate),
+            .inventory = @intCast(u32, sim.params.max_inventory),
+            .max_inventory = @intCast(u32, sim.params.max_inventory),
+            .len = 0,
+            .queue = q,
+        };
+        i += 1;
+    }
+    return producers[0..i];
+}
+
+//pub fn supplyShock(self: *) void {
+//    for (self.producers.items) |_, i| {
+//        self.producers.items[i].inventory = 0;
+//    }
+//}
+
+pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const producer_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
         .size = max_num_producers * @sizeOf(Self),
     });
-    gctx.queue.writeBuffer(gctx.lookupResource(producer_buffer).?, 0, Self, producers.items[0..]);
+
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(producer_buffer).?,
+        0,
+        Self,
+        createProducers(sim),
+    );
+
     return producer_buffer;
 }
 

@@ -10,7 +10,6 @@ const random = std.crypto.random;
 const F32x4 = @Vector(4, f32);
 const Simulation = @import("simulation.zig");
 const Statistics = @import("statistics.zig");
-const Shapes = @import("shapes.zig");
 const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
@@ -59,19 +58,17 @@ pub const DemoState = struct {
 fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
-    // Simulation struct
+    // Simulation parameters, stats and coordinate size 
     var sim = Simulation.init(allocator);
-    sim.createAgents();
 
     // Create Buffers
-    const consumer_buffer = Consumer.createBuffer(gctx, sim.consumers);
-    const producer_buffer = Producer.createBuffer(gctx, sim.producers);
+    const consumer_buffer = Consumer.createBuffer(gctx, sim);
+    const producer_buffer = Producer.createBuffer(gctx, sim);
     const stats_buffer = Statistics.createStatsBuffer(gctx);
     const stats_mapped_buffer = Statistics.createStatsMappedBuffer(gctx);
 
     const compute_bind_group = Wgpu.createComputeBindGroup(
         gctx,
-        sim,
         consumer_buffer,
         producer_buffer,
         stats_buffer
@@ -128,6 +125,8 @@ fn update(demo: *DemoState) void {
 
 fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
+    const num_consumers = demo.sim.params.num_consumers;
+    const num_producers = demo.sim.params.num_producers;
 
     const cam_world_to_view = zm.lookAtLh(
         //eye position 
@@ -179,14 +178,18 @@ fn draw(demo: *DemoState) void {
             }
             pass.setPipeline(pcp);
             pass.setBindGroup(0, bg, dynamic_offsets);
-            const num_producers = @intToFloat(f32, demo.sim.producers.items.len);
-            var workgroup_size = @floatToInt(u32, @ceil(num_producers / 64));
-            pass.dispatchWorkgroups(workgroup_size, 1, 1);
+            pass.dispatchWorkgroups(
+                @divFloor(num_producers, 64) + 1,
+                1,
+                1
+            );
 
             pass.setPipeline(ccp);
-            const num_consumers = @intToFloat(f32, demo.sim.consumers.items.len);
-            workgroup_size = @floatToInt(u32, @ceil(num_consumers / 64));
-            pass.dispatchWorkgroups(workgroup_size, 1, 1);
+            pass.dispatchWorkgroups(
+                @divFloor(num_consumers, 64) + 1,
+                1,
+                1
+            );
         }
 
         // Copy transactions number to mapped buffer
@@ -235,14 +238,12 @@ fn draw(demo: *DemoState) void {
 
             pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
             pass.setVertexBuffer(1, vpb_info.gpuobj.?, 0, vpb_info.size);
-            const num_producers = @intCast(u32, demo.sim.producers.items.len);
             pass.setPipeline(producer_rp);
             pass.draw(6, num_producers, 0, 0);
 
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cpb_info.gpuobj.?, 0, cpb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
-            const num_consumers = @intCast(u32, demo.sim.consumers.items.len);
             pass.setPipeline(consumer_rp);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
         }
@@ -275,23 +276,23 @@ pub fn startSimulation(demo: *DemoState) void {
     const compute_bgl = Wgpu.createComputeBindGroupLayout(demo.gctx);
     defer demo.gctx.releaseResource(compute_bgl);
 
-    demo.sim.createAgents();
-    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
-    demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim.consumers);
+    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim);
+
     const stats_data = [_][3]i32{ [3]i32{ 0, 0, 0 }, };
     demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.buffers.data.stats).?, 0, [3]i32, stats_data[0..]);
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
     demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim.params.consumer_radius);
 }
 
-pub fn supplyShock(demo: *DemoState) void {
-    const compute_bgl = Wgpu.createComputeBindGroupLayout(demo.gctx);
-    defer demo.gctx.releaseResource(compute_bgl);
-
-    demo.sim.supplyShock();
-    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.sim, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
-}
+//pub fn supplyShock(demo: *DemoState) void {
+//    const compute_bgl = Wgpu.createComputeBindGroupLayout(demo.gctx);
+//    defer demo.gctx.releaseResource(compute_bgl);
+//
+//    ..supplyShock();
+//    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
+//    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+//}
 
 
 fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
