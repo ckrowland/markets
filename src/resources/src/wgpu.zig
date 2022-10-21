@@ -39,9 +39,9 @@ pub fn createUniformBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
 
 pub fn createComputeBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
     return gctx.createBindGroupLayout(&.{
-        zgpu.bufferEntry(0, .{ .compute = true }, .storage, true, 0),
-        zgpu.bufferEntry(1, .{ .compute = true }, .storage, true, 0),
-        zgpu.bufferEntry(2, .{ .compute = true }, .storage, true, 0),
+        zgpu.bufferEntry(0, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(1, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(2, .{ .compute = true }, .storage, false, 0),
     });
 }
 

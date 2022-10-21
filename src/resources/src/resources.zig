@@ -125,8 +125,6 @@ fn update(demo: *DemoState) void {
 
 fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
-    const num_consumers = demo.sim.params.num_consumers;
-    const num_producers = demo.sim.params.num_producers;
 
     const cam_world_to_view = zm.lookAtLh(
         //eye position 
@@ -162,34 +160,27 @@ fn draw(demo: *DemoState) void {
         defer encoder.release();
 
         pass: {
+            const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
+            const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
             const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
             const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
             const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
-            const bg_info = gctx.lookupResourceInfo(demo.bind_groups.compute) orelse break :pass;
-            const first_offset = @intCast(u32, bg_info.entries[0].offset);
-            const second_offset = @intCast(u32, bg_info.entries[1].offset);
-            const third_offset = @intCast(u32, bg_info.entries[2].offset);
-            const dynamic_offsets = &.{ first_offset, second_offset, third_offset };
+
+            const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Consumer));
+            const num_producers = @intCast(u32, pb_info.size / @sizeOf(Producer));
 
             const pass = encoder.beginComputePass(null);
             defer {
                 pass.end();
                 pass.release();
             }
+            pass.setBindGroup(0, bg, &.{});
+
             pass.setPipeline(pcp);
-            pass.setBindGroup(0, bg, dynamic_offsets);
-            pass.dispatchWorkgroups(
-                @divFloor(num_producers, 64) + 1,
-                1,
-                1
-            );
+            pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1);
 
             pass.setPipeline(ccp);
-            pass.dispatchWorkgroups(
-                @divFloor(num_consumers, 64) + 1,
-                1,
-                1
-            );
+            pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1);
         }
 
         // Copy transactions number to mapped buffer
@@ -201,9 +192,9 @@ fn draw(demo: *DemoState) void {
 
         pass: {
             const vb_info = gctx.lookupResourceInfo(demo.buffers.vertex.producer) orelse break :pass;
-            const vpb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
+            const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
             const cvb_info = gctx.lookupResourceInfo(demo.buffers.vertex.consumer) orelse break :pass;
-            const cpb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
+            const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
             const cib_info = gctx.lookupResourceInfo(demo.buffers.index.consumer) orelse break :pass;
             const producer_rp = gctx.lookupResource(demo.render_pipelines.producer) orelse break :pass;
             const consumer_rp = gctx.lookupResource(demo.render_pipelines.consumer) orelse break :pass;
@@ -231,18 +222,20 @@ fn draw(demo: *DemoState) void {
                 pass.end();
                 pass.release();
             }
+            const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Consumer));
+            const num_producers = @intCast(u32, pb_info.size / @sizeOf(Producer));
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
             mem.slice[0] = zm.transpose(cam_world_to_clip);
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
             pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
-            pass.setVertexBuffer(1, vpb_info.gpuobj.?, 0, vpb_info.size);
+            pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
             pass.setPipeline(producer_rp);
             pass.draw(6, num_producers, 0, 0);
 
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
-            pass.setVertexBuffer(1, cpb_info.gpuobj.?, 0, cpb_info.size);
+            pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
             pass.setPipeline(consumer_rp);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
@@ -273,16 +266,11 @@ fn draw(demo: *DemoState) void {
 }
 
 pub fn startSimulation(demo: *DemoState) void {
-    const compute_bgl = Wgpu.createComputeBindGroupLayout(demo.gctx);
-    defer demo.gctx.releaseResource(compute_bgl);
-
-    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim);
     demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim);
 
-    const stats_data = [_][3]i32{ [3]i32{ 0, 0, 0 }, };
-    demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.buffers.data.stats).?, 0, [3]i32, stats_data[0..]);
+    Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
-    demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim.params.consumer_radius);
 }
 
 //pub fn supplyShock(demo: *DemoState) void {

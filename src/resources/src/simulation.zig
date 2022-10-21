@@ -6,7 +6,6 @@ const Producer = @import("producer.zig");
 
 const Self = @This();
 
-//Make Params unsigned ints
 params: struct {
     num_producers: u32 = 10,
     production_rate: u32 = 100,

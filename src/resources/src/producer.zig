@@ -7,14 +7,15 @@ const Simulation = @import("simulation.zig");
 
 const Self = @This();
 
-position: @Vector(4, f32),
-color: @Vector(4, f32),
+position: [4]f32,
+color: [4]f32,
 production_rate: u32,
 giving_rate: u32,
 inventory: u32,
 max_inventory: u32,
 len: u32,
 queue: [450]u32,
+_padding: u32 = 0,
 
 const max_num_producers = 100;
 
@@ -41,18 +42,15 @@ pub fn createProducers(sim: Simulation) []Self {
             )
         );
 
-        const pos = @Vector(4, f32){ x, y, 0.0, 0.0 };
-        const init_color = @Vector(4, f32){ 1.0, 1.0, 1.0, 0.0 };
-        const q = [_]u32{0} ** 450;
         producers[i] = Self{
-            .position = pos,
-            .color = init_color,
-            .production_rate = @intCast(u32, sim.params.production_rate),
-            .giving_rate = @intCast(u32, sim.params.giving_rate),
-            .inventory = @intCast(u32, sim.params.max_inventory),
-            .max_inventory = @intCast(u32, sim.params.max_inventory),
+            .position = [4]f32{ x, y, 0, 0 },
+            .color = [4]f32{ 1, 1, 1, 0 },
+            .production_rate = sim.params.production_rate,
+            .giving_rate = sim.params.giving_rate,
+            .inventory = sim.params.max_inventory,
+            .max_inventory = sim.params.max_inventory,
             .len = 0,
-            .queue = q,
+            .queue = [_]u32{0} ** 450,
         };
         i += 1;
     }
@@ -68,7 +66,7 @@ pub fn createProducers(sim: Simulation) []Self {
 pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const producer_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = max_num_producers * @sizeOf(Self),
+        .size = sim.params.num_producers * @sizeOf(Self),
     });
 
     gctx.queue.writeBuffer(
