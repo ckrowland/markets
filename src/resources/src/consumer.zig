@@ -92,7 +92,7 @@ pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     return consumer_index_buffer;
 }
 
-pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32) zgpu.BufferHandle {
+pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const consumer_vertex_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = num_vertices * @sizeOf(f32) * 3,
@@ -100,7 +100,7 @@ pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32) zgpu.BufferH
     var consumer_vertex_data: [num_vertices][3]f32 = undefined;
     const num_sides = @as(f32, num_vertices - 1);
     const angle = 2 * math.pi / num_sides;
-
+    const radius = sim.params.consumer_radius;
     consumer_vertex_data[0] = [3]f32{ 0, 0, 0, };
     var i: u32 = 1;
     while (i < num_vertices) {

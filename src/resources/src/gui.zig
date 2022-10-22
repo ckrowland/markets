@@ -5,6 +5,7 @@ const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
 const Statistics = @import("statistics.zig");
+const Consumer = @import("consumer.zig");
 
 const StagingBuffer = struct {
     slice: ?[]const u32 = null,
@@ -178,11 +179,13 @@ fn parameters(demo: *DemoState) void {
     );
 
     zgui.text("Consumer Size", .{});
-    _ = zgui.sliderScalar(
-        "##cs",
-        f32,
-        .{ .v = &demo.sim.params.consumer_radius, .min = 1, .max = 20 }
-    );
+    if(zgui.sliderScalar("##cs", f32, .{
+        .v = &demo.sim.params.consumer_radius,
+        .min = 1,
+        .max = 20
+    })) {
+        demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim);
+    }
 
     if (zgui.button("Start", .{})) {
         main.startSimulation(demo);

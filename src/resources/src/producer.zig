@@ -79,12 +79,13 @@ pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHan
     return producer_buffer;
 }
 
-pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.BufferHandle {
+pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const producer_vertex_buffer = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = 6 * @sizeOf(f32) * 3,
     });
 
+    const width = sim.params.producer_width;
     const upper_left = [3]f32{ -width, width, 0.0 };
     const lower_left = [3]f32{ -width, -width, 0.0 };
     const upper_right = [3]f32{ width, width, 0.0 };

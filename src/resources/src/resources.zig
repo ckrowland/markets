@@ -102,8 +102,8 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
                 .consumer = Consumer.createIndexBuffer(gctx),
             },
             .vertex = .{
-                .consumer = Consumer.createVertexBuffer(gctx, sim.params.consumer_radius),
-                .producer = Producer.createVertexBuffer(gctx, sim.params.producer_width),
+                .consumer = Consumer.createVertexBuffer(gctx, sim),
+                .producer = Producer.createVertexBuffer(gctx, sim),
             },
         },
         .depth_texture = depth.texture,
@@ -187,7 +187,7 @@ fn draw(demo: *DemoState) void {
         pass: {
             const buf = gctx.lookupResource(demo.buffers.data.stats) orelse break :pass;
             const cp = gctx.lookupResource(demo.buffers.data.stats_mapped) orelse break :pass;
-            encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(f32) * 3);
+            encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(u32) * 3);
         }
 
         pass: {
@@ -266,6 +266,7 @@ fn draw(demo: *DemoState) void {
 }
 
 pub fn startSimulation(demo: *DemoState) void {
+    demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim);
     demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim);
     demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim);
 
@@ -273,14 +274,10 @@ pub fn startSimulation(demo: *DemoState) void {
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
 
-//pub fn supplyShock(demo: *DemoState) void {
-//    const compute_bgl = Wgpu.createComputeBindGroupLayout(demo.gctx);
-//    defer demo.gctx.releaseResource(compute_bgl);
-//
-//    ..supplyShock();
-//    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
-//    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
-//}
+pub fn supplyShock(demo: *DemoState) void {
+    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+}
 
 
 fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
