@@ -27,7 +27,7 @@ GPU Accelerated agent-based simulations.
 
 ## Install
 - `git` with [Git LFS](https://git-lfs.github.com/)
-- [Zig 0.10.0-dev.4060 (master)](https://ziglang.org/download/) or newer
+- [Zig (master)](https://ziglang.org/download/)
 ## Run
 ```
 git clone https://github.com/ckrowland/simulations.git
