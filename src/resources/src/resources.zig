@@ -5,12 +5,8 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
-const array = std.ArrayList;
-const random = std.crypto.random;
-const F32x4 = @Vector(4, f32);
 const Simulation = @import("simulation.zig");
 const Statistics = @import("statistics.zig");
-const wgsl = @import("shaders.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
 const config = @import("config.zig");
@@ -38,6 +34,7 @@ pub const DemoState = struct {
        data: struct {
            consumer: zgpu.BufferHandle,
            producer: zgpu.BufferHandle,
+           producer_mapped: zgpu.BufferHandle,
            stats: zgpu.BufferHandle,
            stats_mapped: zgpu.BufferHandle,
        },
@@ -52,6 +49,7 @@ pub const DemoState = struct {
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
     sim: Simulation,
+    stats: Statistics,
     allocator: std.mem.Allocator,
 };
 
@@ -59,13 +57,12 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
     // Simulation parameters, stats and coordinate size 
-    var sim = Simulation.init(allocator);
+    var sim = Simulation.init();
 
     // Create Buffers
     const consumer_buffer = Consumer.createBuffer(gctx, sim);
-    const producer_buffer = Producer.createBuffer(gctx, sim);
-    const stats_buffer = Statistics.createStatsBuffer(gctx);
-    const stats_mapped_buffer = Statistics.createStatsMappedBuffer(gctx);
+    const producer_buffer = Producer.generateBuffer(gctx, sim);
+    const stats_buffer = Statistics.createBuffer(gctx);
 
     const compute_bind_group = Wgpu.createComputeBindGroup(
         gctx,
@@ -95,8 +92,9 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
             .data = .{
                 .consumer = consumer_buffer,
                 .producer = producer_buffer,
+                .producer_mapped = Producer.createMappedBuffer(gctx, sim),
                 .stats = stats_buffer,
-                .stats_mapped = stats_mapped_buffer,
+                .stats_mapped = Statistics.createMappedBuffer(gctx),
             },
             .index = .{
                 .consumer = Consumer.createIndexBuffer(gctx),
@@ -110,12 +108,13 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .depth_texture_view = depth.view,
         .allocator = allocator,
         .sim = sim,
+        .stats = Statistics.init(allocator),
     };
 }
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
-    demo.sim.deinit();
+    demo.stats.deinit();
     demo.* = undefined;
 }
 
@@ -185,9 +184,17 @@ fn draw(demo: *DemoState) void {
 
         // Copy transactions number to mapped buffer
         pass: {
-            const buf = gctx.lookupResource(demo.buffers.data.stats) orelse break :pass;
-            const cp = gctx.lookupResource(demo.buffers.data.stats_mapped) orelse break :pass;
-            encoder.copyBufferToBuffer(buf, 0, cp, 0, @sizeOf(u32) * 3);
+            const s = gctx.lookupResource(demo.buffers.data.stats) orelse break :pass;
+            const s_info = gctx.lookupResourceInfo(demo.buffers.data.stats) orelse break :pass;
+            const sm = gctx.lookupResource(demo.buffers.data.stats_mapped) orelse break :pass;
+            encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
+
+
+            const p = gctx.lookupResource(demo.buffers.data.producer) orelse break :pass;
+            const p_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
+            const pm = gctx.lookupResource(demo.buffers.data.producer_mapped) orelse break :pass;
+            encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
+
         }
 
         pass: {
@@ -268,17 +275,12 @@ fn draw(demo: *DemoState) void {
 pub fn startSimulation(demo: *DemoState) void {
     demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim);
     demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim);
-    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.producer = Producer.generateBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.producer_mapped = Producer.createMappedBuffer(demo.gctx, demo.sim);
 
     Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
-
-pub fn supplyShock(demo: *DemoState) void {
-    demo.buffers.data.producer = Producer.createBuffer(demo.gctx, demo.sim.producers);
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
-}
-
 
 fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     texture: zgpu.TextureHandle,

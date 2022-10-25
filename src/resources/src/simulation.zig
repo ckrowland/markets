@@ -23,39 +23,10 @@ coordinate_size: struct {
     max_x: i32 = 1800,
     max_y: i32 = 1200,
 },
-stats: struct {
-    num_transactions: array(u32),
-    second: f32 = 0,
-    max_stat_recorded: u32 = 0,
-    num_empty_consumers: array(u32),
-    num_total_producer_inventory: array(u32),
-},
 
-pub fn init(allocator: std.mem.Allocator) Self {
+pub fn init() Self {
     return Self{
         .params = .{},
         .coordinate_size = .{},
-        .stats = .{
-            .num_transactions = array(u32).init(allocator),
-            .num_empty_consumers = array(u32).init(allocator),
-            .num_total_producer_inventory = array(u32).init(allocator), 
-        },
     };
-}
-
-pub fn deinit(self: *Self) void {
-    self.stats.num_transactions.deinit();
-    self.stats.num_empty_consumers.deinit();
-    self.stats.num_total_producer_inventory.deinit();
-}
-
-fn clearSimulation(self: *Self) void {
-    self.stats.num_transactions.clearAndFree();
-    self.stats.num_empty_consumers.clearAndFree();
-    self.stats.num_total_producer_inventory.clearAndFree();
-    self.stats.num_transactions.append(0) catch unreachable;
-    self.stats.num_empty_consumers.append(0) catch unreachable;
-    self.stats.num_total_producer_inventory.append(0) catch unreachable;
-    self.stats.second = 0;
-    self.stats.max_stat_recorded = 0;
 }
