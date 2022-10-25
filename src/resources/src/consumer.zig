@@ -4,7 +4,11 @@ const array = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
+const wgpu = zgpu.wgpu;
 const Simulation = @import("simulation.zig");
+const Main = @import("resources.zig");
+const DemoState = Main.DemoState;
+const Wgpu = @import("wgpu.zig");
 
 const Self = @This();
 
@@ -21,7 +25,17 @@ producer_id: i32,
 const max_num_consumers = 10000;
 const num_vertices = 20;
 
-pub fn createConsumers(sim: Simulation) []Self {
+pub const Parameter = enum {
+    moving_rate,
+};
+
+const StagingBuffer = struct {
+    slice: ?[]const Self = null,
+    buffer: wgpu.Buffer = undefined,
+    num_consumers: u32 = 0,
+};
+
+pub fn create(sim: Simulation) []Self {
     //Unless array len is > max_num_consumers, we get unresponsive consumers
     var consumers: [max_num_consumers + 100]Self = undefined;
     
@@ -61,19 +75,153 @@ pub fn createConsumers(sim: Simulation) []Self {
     return consumers[0..i];
 }
 
-pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
-    const consumer_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true, .storage = true },
-        .size = sim.params.num_consumers * @sizeOf(Self),
-    });
+pub fn getAll(demo: *DemoState) []const Self {
+    const cb_info = demo.gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse unreachable;
+    const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Self));
 
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(consumer_buffer).?,
+    var buf: StagingBuffer = .{
+        .slice = null,
+        .buffer = demo.gctx.lookupResource(demo.buffers.data.consumer_mapped).?,
+        .num_consumers = num_consumers,
+    };
+    buf.buffer.mapAsync(
+        .{ .read = true },
+        0,
+        @sizeOf(Self) * num_consumers,
+        buffersMappedCallback,
+        @ptrCast(*anyopaque, &buf)
+    );
+    wait_loop: while (true) {
+        demo.gctx.device.tick();
+        if (buf.slice == null) {
+            continue :wait_loop;
+        }
+        break;
+    }
+    buf.buffer.unmap();
+
+    return buf.slice.?[0..num_consumers];
+
+}
+
+fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
+    const usb = @ptrCast(*StagingBuffer, @alignCast(@sizeOf(usize), userdata));
+    std.debug.assert(usb.slice == null);
+    if (status == .success) {
+        usb.slice = usb.buffer.getConstMappedRange(Self, 0, usb.num_consumers).?;
+    } else {
+        std.debug.print("[zgpu] Failed to map buffer (code: {any})\n", .{status});
+    }
+}
+
+pub fn setAll(demo: *DemoState, parameter: Parameter) void {
+    // Get current consumers data
+    const consumers = getAll(demo);
+
+    // Set new production rate to 0
+    var new_consumers: [max_num_consumers]Self = undefined;
+    const params = demo.sim.params;
+    for (consumers) |c, i| {
+        new_consumers[i] = c;
+        switch (parameter) {
+            .moving_rate => {
+                new_consumers[i].moving_rate = params.moving_rate;
+            },
+        }
+    }
+
+    // Write to consumers buffer again
+    demo.gctx.queue.writeBuffer(
+        demo.gctx.lookupResource(demo.buffers.data.consumer).?,
         0,
         Self,
-        createConsumers(sim)
+        new_consumers[0..demo.sim.params.num_consumers]
     );
-    return consumer_buffer;
+}
+
+pub fn add(demo: *DemoState) void {
+    const consumer_buffer = createBuffer(demo.gctx, demo.sim);
+
+    const old_consumers = getAll(demo);
+    const num_new_consumers = demo.sim.params.num_consumers - old_consumers.len;
+
+    var sim = demo.sim;
+    sim.params.num_consumers = @intCast(u32, num_new_consumers);
+    const new_consumers = create(sim);
+
+    demo.gctx.queue.writeBuffer(
+        demo.gctx.lookupResource(consumer_buffer).?,
+        0,
+        Self,
+        old_consumers[0..],
+    );
+    demo.gctx.queue.writeBuffer(
+        demo.gctx.lookupResource(consumer_buffer).?,
+        @sizeOf(Self) * old_consumers.len,
+        Self,
+        new_consumers[0..],
+    );
+
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
+        demo.gctx,
+        consumer_buffer,
+        demo.buffers.data.producer,
+        demo.buffers.data.stats
+    );
+
+    demo.buffers.data.consumer = consumer_buffer;
+    demo.buffers.data.consumer_mapped = createMappedBuffer(demo.gctx, demo.sim);
+}
+
+pub fn remove(demo: *DemoState) void {
+    const consumer_buffer = createBuffer(demo.gctx, demo.sim);
+    const old_consumers = getAll(demo);
+
+    demo.gctx.queue.writeBuffer(
+        demo.gctx.lookupResource(consumer_buffer).?,
+        0,
+        Self,
+        old_consumers[0..demo.sim.params.num_consumers],
+    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
+        demo.gctx,
+        consumer_buffer,
+        demo.buffers.data.producer,
+        demo.buffers.data.stats
+    );
+
+    demo.buffers.data.consumer = consumer_buffer;
+    demo.buffers.data.consumer_mapped = createMappedBuffer(demo.gctx, demo.sim);
+}
+
+
+// Buffer Setup
+pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
+    return gctx.createBuffer(.{
+        .usage = .{
+            .copy_dst = true,
+            .copy_src = true,
+            .vertex = true,
+            .storage = true
+        },
+        .size = sim.params.num_consumers * @sizeOf(Self),
+    });
+}
+
+pub fn generate(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, sim: Simulation) void {
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(buf).?,
+        0,
+        Self,
+        create(sim)
+    );
+}
+
+pub fn generateBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
+    const buf = createBuffer(gctx, sim);
+    generate(gctx, buf, sim);
+
+    return buf;
 }
 
 pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
@@ -131,4 +279,11 @@ pub fn createIndexData(comptime num_triangles: u32) [num_triangles * 3]u32 {
     }
     indices[vertices - 1] = 1;
     return indices;
+}
+
+pub fn createMappedBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
+    return gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .map_read = true },
+        .size = sim.params.num_consumers * @sizeOf(Self),
+    });
 }

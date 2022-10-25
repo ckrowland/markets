@@ -33,6 +33,7 @@ pub const DemoState = struct {
     buffers: struct {
        data: struct {
            consumer: zgpu.BufferHandle,
+           consumer_mapped: zgpu.BufferHandle,
            producer: zgpu.BufferHandle,
            producer_mapped: zgpu.BufferHandle,
            stats: zgpu.BufferHandle,
@@ -60,7 +61,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     var sim = Simulation.init();
 
     // Create Buffers
-    const consumer_buffer = Consumer.createBuffer(gctx, sim);
+    const consumer_buffer = Consumer.generateBuffer(gctx, sim);
     const producer_buffer = Producer.generateBuffer(gctx, sim);
     const stats_buffer = Statistics.createBuffer(gctx);
 
@@ -91,6 +92,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .buffers = .{
             .data = .{
                 .consumer = consumer_buffer,
+                .consumer_mapped = Consumer.createMappedBuffer(gctx, sim),
                 .producer = producer_buffer,
                 .producer_mapped = Producer.createMappedBuffer(gctx, sim),
                 .stats = stats_buffer,
@@ -195,6 +197,11 @@ fn draw(demo: *DemoState) void {
             const pm = gctx.lookupResource(demo.buffers.data.producer_mapped) orelse break :pass;
             encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
 
+
+            const c = gctx.lookupResource(demo.buffers.data.consumer) orelse break :pass;
+            const c_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
+            const cm = gctx.lookupResource(demo.buffers.data.consumer_mapped) orelse break :pass;
+            encoder.copyBufferToBuffer(c, 0, cm, 0, c_info.size);
         }
 
         pass: {
@@ -272,13 +279,16 @@ fn draw(demo: *DemoState) void {
     }
 }
 
-pub fn startSimulation(demo: *DemoState) void {
+pub fn restartSimulation(demo: *DemoState) void {
     demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim);
-    demo.buffers.data.consumer = Consumer.createBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.consumer = Consumer.generateBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.consumer_mapped = Consumer.createMappedBuffer(demo.gctx, demo.sim);
     demo.buffers.data.producer = Producer.generateBuffer(demo.gctx, demo.sim);
     demo.buffers.data.producer_mapped = Producer.createMappedBuffer(demo.gctx, demo.sim);
 
+    demo.stats.clear();
     Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
+
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
 

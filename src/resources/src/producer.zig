@@ -24,7 +24,7 @@ _padding: u32 = 0,
 pub const Parameter = enum {
     production_rate,
     giving_rate,
-    inventory,
+    supply_shock,
     max_inventory,
 };
 
@@ -37,7 +37,7 @@ const StagingBuffer = struct {
 };
 
 
-pub fn createProducers(sim: Simulation) []Self {
+pub fn create(sim: Simulation) []Self {
     var producers: [max_num_producers]Self = undefined;
 
     var i: usize = 0;
@@ -75,7 +75,7 @@ pub fn createProducers(sim: Simulation) []Self {
     return producers[0..i];
 }
 
-pub fn getProducers(demo: *DemoState) []const Self {
+pub fn getAll(demo: *DemoState) []const Self {
     const pb_info = demo.gctx.lookupResourceInfo(demo.buffers.data.producer) orelse unreachable;
     const num_producers = @intCast(u32, pb_info.size / @sizeOf(Self));
 
@@ -104,24 +104,24 @@ pub fn getProducers(demo: *DemoState) []const Self {
 
 }
 
-pub fn addProducers(demo: *DemoState) void {
-    const producers = createBuffer(demo.gctx, demo.sim);
+pub fn add(demo: *DemoState) void {
+    const producer_buffer = createBuffer(demo.gctx, demo.sim);
 
-    const old_producers = getProducers(demo);
+    const old_producers = getAll(demo);
     const num_new_producers = demo.sim.params.num_producers - old_producers.len;
 
     var sim = demo.sim;
     sim.params.num_producers = @intCast(u32, num_new_producers);
-    const new_producers = createProducers(sim);
+    const new_producers = create(sim);
 
     demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(producers).?,
+        demo.gctx.lookupResource(producer_buffer).?,
         0,
         Self,
         old_producers[0..],
     );
     demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(producers).?,
+        demo.gctx.lookupResource(producer_buffer).?,
         @sizeOf(Self) * old_producers.len,
         Self,
         new_producers[0..],
@@ -130,17 +130,17 @@ pub fn addProducers(demo: *DemoState) void {
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(
         demo.gctx,
         demo.buffers.data.consumer,
-        producers,
+        producer_buffer,
         demo.buffers.data.stats
     );
 
-    demo.buffers.data.producer = producers;
+    demo.buffers.data.producer = producer_buffer;
     demo.buffers.data.producer_mapped = createMappedBuffer(demo.gctx, demo.sim);
 }
 
-pub fn removeProducers(demo: *DemoState) void {
+pub fn remove(demo: *DemoState) void {
     const producer_buffer = createBuffer(demo.gctx, demo.sim);
-    const old_producers = getProducers(demo);
+    const old_producers = getAll(demo);
 
     demo.gctx.queue.writeBuffer(
         demo.gctx.lookupResource(producer_buffer).?,
@@ -159,9 +159,9 @@ pub fn removeProducers(demo: *DemoState) void {
     demo.buffers.data.producer_mapped = createMappedBuffer(demo.gctx, demo.sim);
 }
 
-pub fn setParameterAll(demo: *DemoState, parameter: Parameter) void {
+pub fn setAll(demo: *DemoState, parameter: Parameter) void {
     // Get current producers data
-    const producers = getProducers(demo);
+    const producers = getAll(demo);
 
     // Set new production rate to 0
     var new_producers: [max_num_producers]Self = undefined;
@@ -175,7 +175,7 @@ pub fn setParameterAll(demo: *DemoState, parameter: Parameter) void {
             .giving_rate => {
                 new_producers[i].giving_rate = params.giving_rate;
             },
-            .inventory => {
+            .supply_shock => {
                 new_producers[i].inventory = 0;
             },
             .max_inventory => {
@@ -215,18 +215,18 @@ pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHan
     });
 }
 
-pub fn generateProducers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, sim: Simulation) void {
+pub fn generate(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, sim: Simulation) void {
     gctx.queue.writeBuffer(
         gctx.lookupResource(buf).?,
         0,
         Self,
-        createProducers(sim),
+        create(sim),
     );
 }
 
 pub fn generateBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
     const buf = createBuffer(gctx, sim);
-    generateProducers(gctx, buf, sim);
+    generate(gctx, buf, sim);
 
     return buf;
 }
