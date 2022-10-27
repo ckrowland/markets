@@ -78,8 +78,8 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     return DemoState{
         .gctx = gctx,
         .render_pipelines = .{
-            .producer = Wgpu.createRenderPipeline(gctx, config.ppi),
             .consumer = Wgpu.createRenderPipeline(gctx, config.cpi),
+            .producer = Wgpu.createRenderPipeline(gctx, config.ppi),
         },
         .compute_pipelines = .{
             .producer = Wgpu.createComputePipeline(gctx, config.pcpi),
