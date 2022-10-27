@@ -19,7 +19,7 @@ const window_title = "Resource Simulation";
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     render_pipelines: struct {
-        consumer: zgpu.RenderPipelineHandle,
+        circle: zgpu.RenderPipelineHandle,
         producer: zgpu.RenderPipelineHandle,
     },
     compute_pipelines: struct {
@@ -78,7 +78,7 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
     return DemoState{
         .gctx = gctx,
         .render_pipelines = .{
-            .consumer = Wgpu.createRenderPipeline(gctx, config.cpi),
+            .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
             .producer = Wgpu.createRenderPipeline(gctx, config.ppi),
         },
         .compute_pipelines = .{
@@ -211,7 +211,7 @@ fn draw(demo: *DemoState) void {
             const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
             const cib_info = gctx.lookupResourceInfo(demo.buffers.index.consumer) orelse break :pass;
             const producer_rp = gctx.lookupResource(demo.render_pipelines.producer) orelse break :pass;
-            const consumer_rp = gctx.lookupResource(demo.render_pipelines.consumer) orelse break :pass;
+            const circle_rp = gctx.lookupResource(demo.render_pipelines.circle) orelse break :pass;
             const render_bind_group = gctx.lookupResource(demo.bind_groups.render) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
 
@@ -251,7 +251,7 @@ fn draw(demo: *DemoState) void {
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
-            pass.setPipeline(consumer_rp);
+            pass.setPipeline(circle_rp);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
         }
 

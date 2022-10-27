@@ -1,10 +1,9 @@
 # Simulations
-GPU Accelerated agent-based simulations.
+GPU accelerated visual simulations.
 
 ## Current Simulations
-![demo](gh_demo.gif)
-
 - Resource Distribution
+![demo](gh_demo.gif)
   - Simulate market dynamics of consumers and producers.
   - Consumers move to Producers, get resources, travel home and consume the resources.
   - Red means consumer is empty and looking for resources.
@@ -24,10 +23,11 @@ GPU Accelerated agent-based simulations.
   - To remove a line from the graph, click it's title in the legend.
 
 
-
 ## Install
-- `git` with [Git LFS](https://git-lfs.github.com/)
+- [Git](https://git-scm.com/)
+- [Git LFS](https://git-lfs.github.com/)
 - [Zig (master)](https://ziglang.org/download/)
+
 ## Run
 ```
 git clone https://github.com/ckrowland/simulations.git
@@ -35,3 +35,7 @@ cd simulations
 git submodule update --init --remote
 zig build resources-run
 ```
+
+## Libraries Used
+- [zig-gamedev](https://github.com/michal-z/zig-gamedev/)
+
