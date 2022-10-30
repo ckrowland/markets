@@ -7,6 +7,8 @@ const wgpu = zgpu.wgpu;
 const Statistics = @import("statistics.zig");
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
+const Circle = @import("circle.zig");
+const Wgpu = @import("wgpu.zig");
 
 pub fn update(demo: *DemoState) void {
     updateStats(demo);
@@ -59,13 +61,25 @@ fn updateStats(demo: *DemoState) void {
     const diff = current_time - previous_second;
     if (diff >= 1) {
         const gpu_stats = Statistics.getGPUStatistics(demo);
-        const vec_stats: @Vector(4, u32) = [_]u32{ gpu_stats[0], gpu_stats[1], gpu_stats[2], demo.stats.max_stat_recorded};
-        const max_stat = @reduce(.Max, vec_stats);
         demo.stats.second = current_time;
-        demo.stats.max_stat_recorded = max_stat;
         demo.stats.num_transactions.append(gpu_stats[0]) catch unreachable;
-        demo.stats.num_empty_consumers.append(gpu_stats[1]) catch unreachable;
-        demo.stats.num_total_producer_inventory.append(gpu_stats[2]) catch unreachable;
+
+        
+        const consumers = Consumer.getAll(demo);
+        var empty_consumers: u32 = 0;
+        for (consumers) |c| {
+           if (c.inventory == 0) {
+                empty_consumers += 1; 
+           }
+        }
+        demo.stats.num_empty_consumers.append(empty_consumers) catch unreachable;
+
+        const producers = Producer.getAll(demo);
+        var total_inventory: u32 = 0;
+        for (producers) |p| {
+            total_inventory += p.inventory;
+        }
+        demo.stats.num_total_producer_inventory.append(total_inventory) catch unreachable;
     }
 }
 
@@ -98,10 +112,10 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##np",
         u32,
-        .{ .v = &demo.sim.params.num_producers, .min = 1, .max = 100 },
+        .{ .v = &demo.params.num_producers, .min = 1, .max = 100 },
     )) {
         const old_producers = Producer.getAll(demo);
-        if (demo.sim.params.num_producers > old_producers.len){
+        if (demo.params.num_producers > old_producers.len){
             Producer.add(demo);
         } else {
             Producer.remove(demo);
@@ -112,7 +126,7 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##pr",
         u32,
-        .{ .v = &demo.sim.params.production_rate, .min = 1, .max = 1000 },
+        .{ .v = &demo.params.production_rate, .min = 1, .max = 1000 },
     )) {
         Producer.setAll(demo, Producer.Parameter.production_rate);
     }
@@ -121,7 +135,7 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##gr",
         u32,
-        .{ .v = &demo.sim.params.giving_rate, .min = 1, .max = 1000 },
+        .{ .v = &demo.params.giving_rate, .min = 1, .max = 1000 },
     )) {
         Producer.setAll(demo, Producer.Parameter.giving_rate);
     }
@@ -130,7 +144,7 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##mi",
         u32,
-        .{ .v = &demo.sim.params.max_inventory, .min = 1, .max = 10000 }
+        .{ .v = &demo.params.max_inventory, .min = 1, .max = 10000 }
     )) {
         Producer.setAll(demo, Producer.Parameter.max_inventory);
     }
@@ -141,11 +155,11 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##nc", 
         u32,
-        .{ .v = &demo.sim.params.num_consumers, .min = 1, .max = 10000 }
+        .{ .v = &demo.params.num_consumers, .min = 1, .max = 10000 }
     )) {
         const old_consumers = Consumer.getAll(demo);
 
-        if (demo.sim.params.num_consumers > old_consumers.len){
+        if (demo.params.num_consumers > old_consumers.len){
             Consumer.add(demo);
         } else {
             Consumer.remove(demo);
@@ -156,18 +170,18 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##mr",
         f32,
-        .{ .v = &demo.sim.params.moving_rate, .min = 1.0, .max = 20 }
+        .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 }
     )) {
         Consumer.setAll(demo, Consumer.Parameter.moving_rate);
     }
 
     zgui.text("Consumer Size", .{});
     if(zgui.sliderScalar("##cs", f32, .{
-        .v = &demo.sim.params.consumer_radius,
+        .v = &demo.params.consumer_radius,
         .min = 1,
         .max = 20
     })) {
-        demo.buffers.vertex.consumer = Consumer.createVertexBuffer(demo.gctx, demo.sim);
+        demo.buffers.vertex.circle = Circle.createVertexBuffer(demo.gctx, demo.params.consumer_radius);
     }
 
     if (zgui.button("Restart", .{})) {

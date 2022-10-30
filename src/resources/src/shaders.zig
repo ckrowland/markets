@@ -71,14 +71,12 @@ pub const cs =
 \\    queue: array<u32, 450>,
 \\  }
 \\  struct Stats {
-\\    num_transactions: u32,
-\\    num_empty_consumers: u32,
-\\    num_total_producer_inventory: u32,
+\\    transactions: u32,
 \\  }
 \\
 \\  @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
 \\  @group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
-\\  @group(0) @binding(2) var<storage, read_write> stats: vec3<i32>;
+\\  @group(0) @binding(2) var<storage, read_write> stats: Stats;
 \\  @compute @workgroup_size(64)
 \\  fn consumer_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 \\      let index : u32 = GlobalInvocationID.x;
@@ -97,14 +95,13 @@ pub const cs =
 \\          if (at_home) {
 \\              consumers[index].position = c.home;
 \\              let consumption_rate = 1u;
-\\              if (c.inventory > consumption_rate) {
+\\              if (c.inventory >= consumption_rate) {
 \\                  consumers[index].inventory -= consumption_rate;
 \\                  consumers[index].destination = c.home;
 \\                  consumers[index].step_size = vec4<f32>(0);
 \\                  return;
 \\              }
 \\              consumers[index].color = vec4(1.0, 0.0, 0.0, 0.0);
-\\              stats[1] += 1;
 \\              var closest_producer = vec4(10000.0, 10000.0, 0.0, 0.0);
 \\              var shortest_distance = 100000.0;
 \\              var array_len = i32(arrayLength(&producers));
@@ -171,18 +168,11 @@ pub const cs =
 \\              consumers[cid].step_size = step_sizes(c.position, c.home, c.moving_rate);
 \\              consumers[cid].inventory += giving_rate;
 \\              let old_inv = atomicSub(&producers[index].inventory, giving_rate);
-\\              stats[0] += 1;
+\\              stats.transactions += 1;
 \\              consumers[cid].color = vec4(0.0, 1.0, 0.0, 0.0);
 \\          }
 \\      }
 \\      atomicStore(&producers[index].len, 0);
-\\      var total_producer_inventory = 0;
-\\      let array_len = i32(arrayLength(&producers));
-\\      for(var i = 0; i < array_len; i++){
-\\          let inventory = atomicLoad(&producers[i].inventory);
-\\          total_producer_inventory += i32(inventory);
-\\      }
-\\      stats[2] = total_producer_inventory;
 \\}
 ;
 // zig fmt: on

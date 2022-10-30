@@ -8,7 +8,6 @@ const Self = @This();
 
 num_transactions: array(u32),
 second: f32 = 0,
-max_stat_recorded: u32 = 0,
 num_empty_consumers: array(u32),
 num_total_producer_inventory: array(u32),
 
@@ -17,7 +16,7 @@ const StagingBuffer = struct {
     buffer: wgpu.Buffer = undefined,
 };
 
-pub const zero = [3]u32{ 0, 0, 0, };
+pub const zero = [1]u32{ 0, };
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
@@ -41,7 +40,6 @@ pub fn clear(self: *Self) void {
     self.num_empty_consumers.append(0) catch unreachable;
     self.num_total_producer_inventory.append(0) catch unreachable;
     self.second = 0;
-    self.max_stat_recorded = 0;
 }
 
 

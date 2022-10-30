@@ -5,9 +5,10 @@ const Allocator = std.mem.Allocator;
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const Simulation = @import("simulation.zig");
 const Main = @import("resources.zig");
 const DemoState = Main.DemoState;
+const Parameters = Main.Parameters;
+const CoordinateSize = Main.CoordinateSize;
 const Wgpu = @import("wgpu.zig");
 
 const Self = @This();
@@ -35,18 +36,18 @@ const StagingBuffer = struct {
     num_consumers: u32 = 0,
 };
 
-pub fn create(sim: Simulation) []Self {
+pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
     //Unless array len is > max_num_consumers, we get unresponsive consumers
     var consumers: [max_num_consumers + 100]Self = undefined;
     
     var i: usize = 0;
-    while (i < sim.params.num_consumers) {
+    while (i < params.num_consumers) {
         const x = @intToFloat(
             f32,
             random.intRangeAtMost(
                 i32,
-                sim.coordinate_size.min_x,
-                sim.coordinate_size.max_x
+                coordinate_size.min_x,
+                coordinate_size.max_x
             )
         );
 
@@ -54,8 +55,8 @@ pub fn create(sim: Simulation) []Self {
             f32,
             random.intRangeAtMost(
                 i32,
-                sim.coordinate_size.min_y,
-                sim.coordinate_size.max_y
+                coordinate_size.min_y,
+                coordinate_size.max_y
             )
         );
 
@@ -65,9 +66,9 @@ pub fn create(sim: Simulation) []Self {
             .destination =  [4]f32{ x, y, 0, 0 },
             .step_size =    [4]f32{ 0, 0, 0, 0 },
             .color =        [4]f32{ 0, 1, 0, 0 },
-            .moving_rate =  sim.params.moving_rate,
+            .moving_rate =  params.moving_rate,
             .inventory =    0,
-            .radius =       sim.params.consumer_radius,
+            .radius =       params.consumer_radius,
             .producer_id =  1000,
         };
         i += 1;
@@ -120,7 +121,7 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
 
     // Set new production rate to 0
     var new_consumers: [max_num_consumers]Self = undefined;
-    const params = demo.sim.params;
+    const params = demo.params;
     for (consumers) |c, i| {
         new_consumers[i] = c;
         switch (parameter) {
@@ -135,19 +136,23 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
         demo.gctx.lookupResource(demo.buffers.data.consumer).?,
         0,
         Self,
-        new_consumers[0..demo.sim.params.num_consumers]
+        new_consumers[0..demo.params.num_consumers]
     );
 }
 
 pub fn add(demo: *DemoState) void {
-    const consumer_buffer = createBuffer(demo.gctx, demo.sim);
+    const consumer_buffer = Wgpu.createBuffer(
+        demo.gctx,
+        Self,
+        demo.params.num_consumers
+    );
 
     const old_consumers = getAll(demo);
-    const num_new_consumers = demo.sim.params.num_consumers - old_consumers.len;
+    const num_new_consumers = demo.params.num_consumers - old_consumers.len;
 
-    var sim = demo.sim;
-    sim.params.num_consumers = @intCast(u32, num_new_consumers);
-    const new_consumers = create(sim);
+    var params = demo.params;
+    params.num_consumers = @intCast(u32, num_new_consumers);
+    const new_consumers = create(params, demo.coordinate_size);
 
     demo.gctx.queue.writeBuffer(
         demo.gctx.lookupResource(consumer_buffer).?,
@@ -170,18 +175,26 @@ pub fn add(demo: *DemoState) void {
     );
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = createMappedBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(
+        demo.gctx,
+        Self,
+        demo.params.num_consumers
+    );
 }
 
 pub fn remove(demo: *DemoState) void {
-    const consumer_buffer = createBuffer(demo.gctx, demo.sim);
+    const consumer_buffer = Wgpu.createBuffer(
+        demo.gctx,
+        Self,
+        demo.params.num_consumers
+    );
     const old_consumers = getAll(demo);
 
     demo.gctx.queue.writeBuffer(
         demo.gctx.lookupResource(consumer_buffer).?,
         0,
         Self,
-        old_consumers[0..demo.sim.params.num_consumers],
+        old_consumers[0..demo.params.num_consumers],
     );
     demo.bind_groups.compute = Wgpu.createComputeBindGroup(
         demo.gctx,
@@ -191,99 +204,37 @@ pub fn remove(demo: *DemoState) void {
     );
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = createMappedBuffer(demo.gctx, demo.sim);
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(
+        demo.gctx,
+        Self,
+        demo.params.num_consumers
+    );
 }
 
 
 // Buffer Setup
-pub fn createBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
-    return gctx.createBuffer(.{
-        .usage = .{
-            .copy_dst = true,
-            .copy_src = true,
-            .vertex = true,
-            .storage = true
-        },
-        .size = sim.params.num_consumers * @sizeOf(Self),
-    });
-}
-
-pub fn generate(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, sim: Simulation) void {
+pub fn generate(
+    gctx: *zgpu.GraphicsContext,
+    buf: zgpu.BufferHandle,
+    params: Parameters,
+    coordinate_size: CoordinateSize
+) void {
     gctx.queue.writeBuffer(
         gctx.lookupResource(buf).?,
         0,
         Self,
-        create(sim)
+        create(params, coordinate_size)
     );
 }
 
-pub fn generateBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
-    const buf = createBuffer(gctx, sim);
-    generate(gctx, buf, sim);
+pub fn generateBuffer(
+    gctx: *zgpu.GraphicsContext,
+    params: Parameters,
+    coordinate_size: CoordinateSize
+) zgpu.BufferHandle {
+
+    const buf = Wgpu.createBuffer(gctx, Self, params.num_consumers);
+    generate(gctx, buf, params, coordinate_size);
 
     return buf;
-}
-
-pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
-    const num_triangles = num_vertices - 1;
-    const consumer_index_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .index = true },
-        .size = num_triangles * 3 * @sizeOf(u32),
-    });
-    const consumer_index_data = createIndexData(num_triangles);
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(consumer_index_buffer).?,
-        0,
-        u32,
-        consumer_index_data[0..]
-    );
-    return consumer_index_buffer;
-}
-
-pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
-    const consumer_vertex_buffer = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .vertex = true },
-        .size = num_vertices * @sizeOf(f32) * 3,
-    });
-    var consumer_vertex_data: [num_vertices][3]f32 = undefined;
-    const num_sides = @as(f32, num_vertices - 1);
-    const angle = 2 * math.pi / num_sides;
-    const radius = sim.params.consumer_radius;
-    consumer_vertex_data[0] = [3]f32{ 0, 0, 0, };
-    var i: u32 = 1;
-    while (i < num_vertices) {
-        const current_angle = angle * @intToFloat(f32, i);
-        const x = @cos(current_angle) * radius;
-        const y = @sin(current_angle) * radius;
-        consumer_vertex_data[i] = [3]f32{ x, y, 0 };
-        i += 1;
-    }
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(consumer_vertex_buffer).?,
-        0,
-        [3]f32,
-        consumer_vertex_data[0..]
-    );
-    return consumer_vertex_buffer;
-}
-
-pub fn createIndexData(comptime num_triangles: u32) [num_triangles * 3]u32 {
-    const vertices = num_triangles * 3;
-    var indices: [vertices]u32 = undefined;
-    var i: usize = 0;
-    while (i < num_triangles) {
-        indices[i * 3] = 0;
-        indices[i * 3 + 1] = @intCast(u32, i) + 1;
-        indices[i * 3 + 2] = @intCast(u32, i) + 2;
-        i += 1;
-    }
-    indices[vertices - 1] = 1;
-    return indices;
-}
-
-pub fn createMappedBuffer(gctx: *zgpu.GraphicsContext, sim: Simulation) zgpu.BufferHandle {
-    return gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .map_read = true },
-        .size = sim.params.num_consumers * @sizeOf(Self),
-    });
 }

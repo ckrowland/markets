@@ -6,11 +6,9 @@ const wgpu = zgpu.wgpu;
 const main = @import("resources.zig");
 const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
-const Simulation = @import("simulation.zig");
 const Statistics = @import("statistics.zig");
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
-const CoordinateSize = Simulation.CoordinateSize;
 
 pub const RenderPipelineInfo = struct {
     pub const Attribute = struct {
@@ -29,6 +27,34 @@ pub const ComputePipelineInfo = struct {
     entry_point: [:0]const u8,
 };
 
+
+// Blank Buffers
+pub fn createBuffer(
+    gctx: *Gctx,
+    comptime T: type,
+    num: u32
+) zgpu.BufferHandle {
+    return gctx.createBuffer(.{
+        .usage = .{
+            .copy_dst = true,
+            .copy_src = true,
+            .vertex = true,
+            .storage = true
+        },
+        .size = num * @sizeOf(T),
+    });
+}
+
+pub fn createMappedBuffer(
+    gctx: *Gctx,
+    comptime T: type,
+    num: u32
+) zgpu.BufferHandle {
+    return gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .map_read = true },
+        .size = num * @sizeOf(T),
+    });
+}
 
 // Bind Group Layouts
 pub fn createUniformBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
