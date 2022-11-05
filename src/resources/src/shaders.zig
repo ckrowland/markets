@@ -33,7 +33,7 @@ pub const producer_vs =
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
 \\      let num = f32(inventory) / f32(max_inventory);
-\\      let scale = max(num, 0.4);
+\\      let scale = min(max(num, 0.4), 1.0);
 \\      var x = position[0] + (scale * vertex_position[0]);
 \\      var y = position[1] + (scale * vertex_position[1]);
 \\      output.position_clip = vec4(x, y, 0.0, 1.0) * object_to_clip;
@@ -156,6 +156,8 @@ pub const cs =
 \\          let diff = max_inventory - inventory;
 \\          production_rate = min(diff, production_rate);
 \\          let old_val = atomicAdd(&producers[index].inventory, production_rate);
+\\      } else if (inventory < max_inventory) {
+\\          atomicStore(&producers[index].inventory, max_inventory);
 \\      }
 \\
 \\      let idx = atomicLoad(&producers[index].len);

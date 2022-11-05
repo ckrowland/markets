@@ -144,7 +144,7 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar(
         "##mi",
         u32,
-        .{ .v = &demo.params.max_inventory, .min = 1, .max = 10000 }
+        .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 }
     )) {
         Producer.setAll(demo, Producer.Parameter.max_inventory);
     }
