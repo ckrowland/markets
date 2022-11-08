@@ -193,7 +193,7 @@ pub fn createRenderPipeline(
         .depth_stencil = &wgpu.DepthStencilState{
             .format = .depth32_float,
             .depth_write_enabled = true,
-            .depth_compare = .less,
+            .depth_compare = .less_equal,
         },
         .fragment = &wgpu.FragmentState{
             .module = fs_module,
