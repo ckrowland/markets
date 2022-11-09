@@ -281,16 +281,16 @@ fn draw(demo: *DemoState) void {
             mem.slice[0] = zm.transpose(cam_world_to_clip);
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
-            pass.setPipeline(square_rp);
-            pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
-            pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
-            pass.draw(6, num_producers, 0, 0);
-
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
             pass.drawIndexed(57, num_consumers, 0, 0, 0);
+
+            pass.setPipeline(square_rp);
+            pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
+            pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
+            pass.draw(6, num_producers, 0, 0);
         }
 
         {
