@@ -193,4 +193,12 @@ fn parameters(demo: *DemoState) void {
     if (zgui.button("Supply Shock", .{})) {
         Producer.setAll(demo, Producer.Parameter.supply_shock);
     }
+
+    zgui.sameLine(.{});
+    zgui.textDisabled("(?)", .{});
+    if (zgui.isItemHovered(.{})) {
+        _ = zgui.beginTooltip();
+        zgui.textUnformatted("Set all producer inventory to 0");
+        zgui.endTooltip();
+    }
 }
