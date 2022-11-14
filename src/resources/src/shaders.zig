@@ -9,10 +9,14 @@ pub const vs =
 \\      @location(0) vertex_position: vec3<f32>,
 \\      @location(1) position: vec4<f32>,
 \\      @location(2) color: vec4<f32>,
+\\      @location(3) inventory: u32,
+\\      @location(4) demand_rate: u32,
 \\  ) -> VertexOut {
 \\      var output: VertexOut;
-\\      var x = position[0] + vertex_position[0];
-\\      var y = position[1] + vertex_position[1];
+\\      let num = f32(inventory) / f32(demand_rate);
+\\      let scale = min(max(num, 0.4), 1.0);
+\\      var x = position[0] + (vertex_position[0] * scale);
+\\      var y = position[1] + (vertex_position[1] * scale);
 \\      output.position_clip = vec4(x, y, 0.0, 1.0) * object_to_clip;
 \\      output.color = color.xyz;
 \\      return output;
@@ -56,6 +60,7 @@ pub const cs =
 \\    step_size: vec4<f32>,
 \\    color: vec4<f32>,
 \\    moving_rate: f32,
+\\    demand_rate: u32,
 \\    inventory: u32,
 \\    radius: f32,
 \\    producer_id: i32,
@@ -64,7 +69,6 @@ pub const cs =
 \\    position: vec4<f32>,
 \\    color: vec4<f32>,
 \\    production_rate: u32,
-\\    giving_rate: u32,
 \\    inventory: atomic<u32>,
 \\    max_inventory: u32,
 \\    len: atomic<u32>,
@@ -108,7 +112,7 @@ pub const cs =
 \\              for(var i = 0; i < array_len; i++){
 \\                  let dist = distance(c.home, producers[i].position);
 \\                  let inventory = atomicLoad(&producers[i].inventory);
-\\                  if (dist < shortest_distance && inventory > consumption_rate) {
+\\                  if (dist < shortest_distance && inventory > c.demand_rate) {
 \\                      shortest_distance = dist;
 \\                      consumers[index].destination = producers[i].position;
 \\                      consumers[index].step_size = step_sizes(c.position, producers[i].position, c.moving_rate);
@@ -151,7 +155,6 @@ pub const cs =
 \\      let max_inventory = producers[index].max_inventory;
 \\      let inventory = atomicLoad(&producers[index].inventory);
 \\      var production_rate = producers[index].production_rate;
-\\      let giving_rate = producers[index].giving_rate;
 \\      if (max_inventory > inventory) {
 \\          let diff = max_inventory - inventory;
 \\          production_rate = min(diff, production_rate);
@@ -165,11 +168,11 @@ pub const cs =
 \\          let cid = producers[index].queue[i] - 1;
 \\          let c = consumers[cid];
 \\          let inventory = atomicLoad(&producers[index].inventory);
-\\          if (inventory >= giving_rate) {
+\\          if (inventory >= c.demand_rate) {
 \\              consumers[cid].destination = c.home;
 \\              consumers[cid].step_size = step_sizes(c.position, c.home, c.moving_rate);
-\\              consumers[cid].inventory += giving_rate;
-\\              let old_inv = atomicSub(&producers[index].inventory, giving_rate);
+\\              consumers[cid].inventory += c.demand_rate;
+\\              let old_inv = atomicSub(&producers[index].inventory, c.demand_rate);
 \\              stats.transactions += 1;
 \\              consumers[cid].color = vec4(0.0, 1.0, 0.0, 0.0);
 \\          }

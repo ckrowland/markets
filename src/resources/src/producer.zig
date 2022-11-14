@@ -15,16 +15,14 @@ const Self = @This();
 position: [4]f32,
 color: [4]f32,
 production_rate: u32,
-giving_rate: u32,
 inventory: u32,
 max_inventory: u32,
 len: u32,
 queue: [450]u32,
-_padding: u32 = 0,
+_padding: u64 = 0,
 
 pub const Parameter = enum {
     production_rate,
-    giving_rate,
     supply_shock,
     max_inventory,
 };
@@ -65,7 +63,6 @@ pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
             .position = [4]f32{ x, y, 0, 0 },
             .color = [4]f32{ 1, 1, 1, 0 },
             .production_rate = params.production_rate,
-            .giving_rate = params.giving_rate,
             .inventory = params.max_inventory,
             .max_inventory = params.max_inventory,
             .len = 0,
@@ -180,9 +177,6 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
         switch (parameter) {
             .production_rate => {
                 new_producers[i].production_rate = params.production_rate;
-            },
-            .giving_rate => {
-                new_producers[i].giving_rate = params.giving_rate;
             },
             .supply_shock => {
                 new_producers[i].inventory = 0;

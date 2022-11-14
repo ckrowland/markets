@@ -131,14 +131,24 @@ fn parameters(demo: *DemoState) void {
         Producer.setAll(demo, Producer.Parameter.production_rate);
     }
 
-    zgui.text("Giving Rate", .{});
-    if(zgui.sliderScalar(
-        "##gr",
-        u32,
-        .{ .v = &demo.params.giving_rate, .min = 1, .max = 1000 },
-    )) {
-        Producer.setAll(demo, Producer.Parameter.giving_rate);
+
+    zgui.text("Demand Rate", .{});
+    zgui.sameLine(.{});
+    zgui.textDisabled("(?)", .{});
+    if (zgui.isItemHovered(.{})) {
+        _ = zgui.beginTooltip();
+        zgui.textUnformatted("How much consumers demand from producers on a single trip.");
+        zgui.endTooltip();
     }
+
+    if(zgui.sliderScalar(
+        "##dr",
+        u32,
+        .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
+    )) {
+        Consumer.setAll(demo, Consumer.Parameter.demand_rate);
+    }
+
 
     zgui.text("Max Producer Inventory", .{});
     if(zgui.sliderScalar(
@@ -179,7 +189,7 @@ fn parameters(demo: *DemoState) void {
     if(zgui.sliderScalar("##cs", f32, .{
         .v = &demo.params.consumer_radius,
         .min = 1,
-        .max = 20
+        .max = 40
     })) {
         demo.buffers.vertex.circle = Circle.createVertexBuffer(demo.gctx, demo.params.consumer_radius);
     }
@@ -198,7 +208,7 @@ fn parameters(demo: *DemoState) void {
     zgui.textDisabled("(?)", .{});
     if (zgui.isItemHovered(.{})) {
         _ = zgui.beginTooltip();
-        zgui.textUnformatted("Set all producer inventory to 0");
+        zgui.textUnformatted("Set all producer inventory to 0.");
         zgui.endTooltip();
     }
 }

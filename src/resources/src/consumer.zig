@@ -19,15 +19,18 @@ destination: [4]f32,
 step_size: [4]f32,
 color: [4]f32,
 moving_rate: f32,
+demand_rate: u32,
 inventory: u32,
 radius: f32,
 producer_id: i32,
+_padding: u64,
 
 const max_num_consumers = 10000;
 const num_vertices = 20;
 
 pub const Parameter = enum {
     moving_rate,
+    demand_rate,
 };
 
 const StagingBuffer = struct {
@@ -67,9 +70,11 @@ pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
             .step_size =    [4]f32{ 0, 0, 0, 0 },
             .color =        [4]f32{ 0, 1, 0, 0 },
             .moving_rate =  params.moving_rate,
+            .demand_rate =  params.demand_rate,
             .inventory =    0,
             .radius =       params.consumer_radius,
             .producer_id =  1000,
+            ._padding =     0,
         };
         i += 1;
     }
@@ -127,6 +132,9 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
         switch (parameter) {
             .moving_rate => {
                 new_consumers[i].moving_rate = params.moving_rate;
+            },
+            .demand_rate => {
+                new_consumers[i].demand_rate = params.demand_rate;
             },
         }
     }

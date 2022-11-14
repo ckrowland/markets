@@ -16,6 +16,14 @@ pub const cpi = .{
             .name = "color",
             .type = [4]f32,
         },
+        .{
+            .name = "inventory",
+            .type = u32,
+        },
+        .{
+            .name = "demand_rate",
+            .type = u32,
+        },
     },
 };
 
