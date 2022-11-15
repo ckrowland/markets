@@ -3,7 +3,7 @@ GPU accelerated visual simulations.
 
 ### Resource Distribution
 
-![demo](gh_demo.gif)
+demo
 
 - Simulate market dynamics of consumers and producers.
 - Consumers move to Producers, get resources, travel home and consume the resources.
