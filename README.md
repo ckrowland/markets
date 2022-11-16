@@ -3,7 +3,7 @@ GPU accelerated visual simulations.
 
 ### Resource Distribution
 
-demo
+[demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
 
 - Simulate market dynamics of consumers and producers.
 - Consumers move to Producers, get resources, travel home and consume the resources.
@@ -13,9 +13,9 @@ demo
   - Number of Consumers
   - Number of Producers
   - Consumers moving rate
-  - Consumers consumption rate
+  - Consumers demand rate
+  - Consumers size
   - Producers production rate
-  - Producers giving rate
   - Producers maximum inventory
 - Data Gathered:
   - Transactions per second
