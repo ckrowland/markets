@@ -19,10 +19,10 @@ const window_title = "Resource Simulation";
 
 pub const Parameters = struct {
     num_producers: u32 = 10,
-    production_rate: u32 = 100,
-    demand_rate: u32 = 10,
+    production_rate: u32 = 300,
+    demand_rate: u32 = 100,
     max_inventory: u32 = 10000,
-    num_consumers: u32 = 10000,
+    num_consumers: u32 = 5000,
     moving_rate: f32 = 5.0,
     producer_width: f32 = 40.0,
     consumer_radius: f32 = 20.0,
