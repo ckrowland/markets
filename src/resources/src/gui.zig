@@ -8,6 +8,7 @@ const Statistics = @import("statistics.zig");
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
 const Circle = @import("circle.zig");
+const Square = @import("square.zig");
 const Wgpu = @import("wgpu.zig");
 
 pub fn update(demo: *DemoState) void {
@@ -159,6 +160,14 @@ fn parameters(demo: *DemoState) void {
         Producer.setAll(demo, Producer.Parameter.max_inventory);
     }
 
+    zgui.text("Producer Size", .{});
+    if(zgui.sliderScalar("##pw", f32, .{
+        .v = &demo.params.producer_width,
+        .min = 10,
+        .max = 70
+    })) {
+        demo.buffers.vertex.square = Square.createVertexBuffer(demo.gctx, demo.params.producer_width);
+    }
     zgui.dummy(.{.w = 1.0, .h = 40.0});
 
     zgui.text("Number of Consumers", .{});
