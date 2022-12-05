@@ -4,14 +4,13 @@ const assert = std.debug.assert;
 //--------------------------------------------------------------------------------------------------
 pub const f32_min: f32 = 1.17549435082228750796873653722225e-38;
 pub const f32_max: f32 = 3.40282346638528859811704183484517e+38;
-
+//--------------------------------------------------------------------------------------------------
 pub const DrawIdx = u16;
-pub const DrawVert = struct {
+pub const DrawVert = extern struct {
     pos: [2]f32,
     uv: [2]f32,
     color: u32,
 };
-
 //--------------------------------------------------------------------------------------------------
 pub fn init(allocator: std.mem.Allocator) void {
     if (zguiGetCurrentContext() == null) {
@@ -51,11 +50,10 @@ export fn zguiMemAlloc(size: usize, _: ?*anyopaque) callconv(.C) ?*anyopaque {
     mem_mutex.lock();
     defer mem_mutex.unlock();
 
-    const mem = mem_allocator.?.allocBytes(
+    const mem = mem_allocator.?.alignedAlloc(
+        u8,
         mem_alignment,
         size,
-        0,
-        @returnAddress(),
     ) catch @panic("zgui: out of memory");
 
     mem_allocations.?.put(@ptrToInt(mem.ptr), size) catch @panic("zgui: out of memory");
@@ -69,10 +67,7 @@ export fn zguiMemFree(maybe_ptr: ?*anyopaque, _: ?*anyopaque) callconv(.C) void 
         defer mem_mutex.unlock();
 
         const size = mem_allocations.?.fetchRemove(@ptrToInt(ptr)).?.value;
-        const mem = @ptrCast(
-            [*]align(mem_alignment) u8,
-            @alignCast(mem_alignment, ptr),
-        )[0..size];
+        const mem = @ptrCast([*]align(mem_alignment) u8, @alignCast(mem_alignment, ptr))[0..size];
         mem_allocator.?.free(mem);
     }
 }
@@ -169,14 +164,21 @@ pub const io = struct {
     pub const getWantCaptureKeyboard = zguiIoGetWantCaptureKeyboard;
     extern fn zguiIoGetWantCaptureKeyboard() bool;
 
-    pub fn setIniFilename(filename: [:0]const u8) void {
+    pub fn setIniFilename(filename: ?[*:0]const u8) void {
         zguiIoSetIniFilename(filename);
     }
-    extern fn zguiIoSetIniFilename(filename: [*:0]const u8) void;
+    extern fn zguiIoSetIniFilename(filename: ?[*:0]const u8) void;
 
     /// `pub fn setDisplaySize(width: f32, height: f32) void`
     pub const setDisplaySize = zguiIoSetDisplaySize;
     extern fn zguiIoSetDisplaySize(width: f32, height: f32) void;
+
+    pub fn getDisplaySize() [2]f32 {
+        var size: [2]f32 = undefined;
+        zguiIoGetDisplaySize(&size);
+        return size;
+    }
+    extern fn zguiIoGetDisplaySize(size: *[2]f32) void;
 
     /// `pub fn setDisplayFramebufferScale(sx: f32, sy: f32) void`
     pub const setDisplayFramebufferScale = zguiIoSetDisplayFramebufferScale;
@@ -190,14 +192,35 @@ pub const io = struct {
     /// `pub fnsetDeltaTime(delta_time: f32) void`
     pub const setDeltaTime = zguiIoSetDeltaTime;
     extern fn zguiIoSetDeltaTime(delta_time: f32) void;
+
+    pub const addFocusEvent = zguiIoAddFocusEvent;
+    extern fn zguiIoAddFocusEvent(focused: bool) void;
+
+    pub const addMousePositionEvent = zguiIoAddMousePositionEvent;
+    extern fn zguiIoAddMousePositionEvent(x: f32, y: f32) void;
+
+    pub const addMouseButtonEvent = zguiIoAddMouseButtonEvent;
+    extern fn zguiIoAddMouseButtonEvent(button: MouseButton, down: bool) void;
+
+    pub const addMouseWheelEvent = zguiIoAddMouseWheelEvent;
+    extern fn zguiIoAddMouseWheelEvent(x: f32, y: f32) void;
+
+    pub const addKeyEvent = zguiIoAddKeyEvent;
+    extern fn zguiIoAddKeyEvent(key: Key, down: bool) void;
+
+    pub const setKeyEventNativeData = zguiIoSetKeyEventNativeData;
+    extern fn zguiIoSetKeyEventNativeData(key: Key, keycode: i32, scancode: i32) void;
+
+    pub const addCharacterEvent = zguiIoAddCharacterEvent;
+    extern fn zguiIoAddCharacterEvent(char: i32) void;
 };
 //--------------------------------------------------------------------------------------------------
 const Context = *opaque {};
 pub const DrawData = *extern struct {
     valid: bool,
-    cmd_lists_count: c_int,
-    total_idx_count: c_int,
-    total_vtx_count: c_int,
+    cmd_lists_count: i32,
+    total_idx_count: i32,
+    total_vtx_count: i32,
     cmd_lists: [*]DrawList,
     display_pos: [2]f32,
     display_size: [2]f32,
@@ -207,7 +230,182 @@ pub const Font = *opaque {};
 pub const Ident = u32;
 pub const TextureIdent = *anyopaque;
 pub const Wchar = u16;
-pub const Key = i32;
+pub const Key = enum(u32) {
+    // keyboard
+    none = 0,
+    tab = 512, // == imguikey_namedkey_begin
+    left_arrow,
+    right_arrow,
+    up_arrow,
+    down_arrow,
+    page_up,
+    page_down,
+    home,
+    end,
+    insert,
+    delete,
+    back_space,
+    space,
+    enter,
+    escape,
+    left_ctrl,
+    left_shift,
+    left_alt,
+    left_super,
+    right_ctrl,
+    right_shift,
+    right_alt,
+    right_super,
+    menu,
+    zero,
+    one,
+    two,
+    three,
+    four,
+    five,
+    six,
+    severn,
+    eight,
+    nine,
+    a,
+    b,
+    c,
+    d,
+    e,
+    f,
+    g,
+    h,
+    i,
+    j,
+    k,
+    l,
+    m,
+    n,
+    o,
+    p,
+    q,
+    r,
+    s,
+    t,
+    u,
+    v,
+    w,
+    x,
+    y,
+    z,
+    f1,
+    f2,
+    f3,
+    f4,
+    f5,
+    f6,
+    f7,
+    f8,
+    f9,
+    f10,
+    f11,
+    f12,
+    apostrophe,
+    comma,
+    minus,
+    period,
+    slash,
+    semicolon,
+    equal,
+    left_bracket,
+    back_slash,
+    right_bracket,
+    grave_accent,
+    caps_lock,
+    scroll_lock,
+    num_lock,
+    print_screen,
+    pause,
+    keypad_0,
+    keypad_1,
+    keypad_2,
+    keypad_3,
+    keypad_4,
+    keypad_5,
+    keypad_6,
+    keypad_7,
+    keypad_8,
+    keypad_9,
+    keypad_decimal,
+    keypad_divide,
+    keypad_multiply,
+    keypad_subtract,
+    keypad_add,
+    keypad_enter,
+    keypad_equal,
+
+    gamepad_start,
+    gamepad_back,
+    gamepad_faceup,
+    gamepad_facedown,
+    gamepad_faceleft,
+    gamepad_faceright,
+    gamepad_dpadup,
+    gamepad_dpaddown,
+    gamepad_dpadleft,
+    gamepad_dpadright,
+    gamepad_l1,
+    gamepad_r1,
+    gamepad_l2,
+    gamepad_r2,
+    gamepad_l3,
+    gamepad_r3,
+    gamepad_lstickup,
+    gamepad_lstickdown,
+    gamepad_lstickleft,
+    gamepad_lstickright,
+    gamepad_rstickup,
+    gamepad_rstickdown,
+    gamepad_rstickleft,
+    gamepad_rstickright,
+
+    mod_ctrl,
+    mod_shift,
+    mod_alt,
+    mod_super,
+
+    pub const named_key_begin = 512;
+    pub const named_key_end = std.enums.directEnumArrayLen(@This(), named_key_begin);
+    pub const named_key_count = named_key_end - named_key_begin;
+    pub const keys_data_size = named_key_count;
+    pub const keys_data_offset = named_key_begin;
+};
+
+const KeyModifiers = packed struct {
+    ctrl: bool = false,
+    shift: bool = false,
+    alt: bool = false,
+    super: bool = false,
+};
+
+const NavInput = enum {
+    activate,
+    cancel,
+    input,
+    menu,
+    dpad_left,
+    dpad_right,
+    dpad_up,
+    dpad_down,
+    lstick_left,
+    lstick_right,
+    lsick_up,
+    lstick_down,
+    focus_prev,
+    focus_next,
+    tweak_slow,
+    tweak_fast,
+
+    key_left,
+    key_right,
+    key_up,
+    key_down,
+};
 //--------------------------------------------------------------------------------------------------
 pub const WindowFlags = packed struct(u32) {
     no_title_bar: bool = false,
@@ -497,6 +695,24 @@ pub fn getContentRegionAvail() [2]f32 {
     return size;
 }
 
+pub fn getContentRegionMax() [2]f32 {
+    var size: [2]f32 = undefined;
+    zguiGetContentRegionMax(&size);
+    return size;
+}
+
+pub fn getWindowContentRegionMin() [2]f32 {
+    var size: [2]f32 = undefined;
+    zguiGetWindowContentRegionMin(&size);
+    return size;
+}
+
+pub fn getWindowContentRegionMax() [2]f32 {
+    var size: [2]f32 = undefined;
+    zguiGetWindowContentRegionMax(&size);
+    return size;
+}
+
 /// `pub fn getWindowWidth() f32`
 pub const getWindowWidth = zguiGetWindowWidth;
 /// `pub fn getWindowHeight() f32`
@@ -506,6 +722,9 @@ extern fn zguiGetWindowSize(size: *[2]f32) void;
 extern fn zguiGetWindowWidth() f32;
 extern fn zguiGetWindowHeight() f32;
 extern fn zguiGetContentRegionAvail(size: *[2]f32) void;
+extern fn zguiGetContentRegionMax(size: *[2]f32) void;
+extern fn zguiGetWindowContentRegionMin(size: *[2]f32) void;
+extern fn zguiGetWindowContentRegionMax(size: *[2]f32) void;
 //--------------------------------------------------------------------------------------------------
 //
 // Style
@@ -1042,29 +1261,28 @@ const ImageButton = struct {
     h: f32,
     uv0: [2]f32 = .{ 0.0, 0.0 },
     uv1: [2]f32 = .{ 1.0, 1.0 },
-    frame_padding: i32 = -1,
     bg_col: [4]f32 = .{ 0.0, 0.0, 0.0, 0.0 },
     tint_col: [4]f32 = .{ 1.0, 1.0, 1.0, 1.0 },
 };
-pub fn imageButton(user_texture_id: TextureIdent, args: ImageButton) bool {
+pub fn imageButton(str_id: [:0]const u8, user_texture_id: TextureIdent, args: ImageButton) bool {
     return zguiImageButton(
+        str_id,
         user_texture_id,
         args.w,
         args.h,
         &args.uv0,
         &args.uv1,
-        args.frame_padding,
         &args.bg_col,
         &args.tint_col,
     );
 }
 extern fn zguiImageButton(
+    str_id: [*:0]const u8,
     user_texture_id: TextureIdent,
     w: f32,
     h: f32,
     uv0: *const [2]f32,
     uv1: *const [2]f32,
-    frame_padding: i32,
     bg_col: *const [4]f32,
     tint_col: *const [4]f32,
 ) bool;
@@ -2525,6 +2743,34 @@ pub const beginTooltip = zguiBeginTooltip;
 pub const endTooltip = zguiEndTooltip;
 extern fn zguiBeginTooltip() void;
 extern fn zguiEndTooltip() void;
+
+pub const PopupFlags = packed struct(u32) {
+    mouse_button_left: bool = false,
+    mouse_button_right: bool = false,
+    mouse_button_middle: bool = false,
+    mouse_button_mask_: bool = false,
+    mouse_button_default_: bool = false,
+    no_open_over_existing_popup: bool = false,
+    no_open_over_items: bool = false,
+    any_popup_id: bool = false,
+    any_popup_level: bool = false,
+    any_popup: bool = false,
+    _padding: u22 = 0,
+};
+pub fn beginPopupModal(name: [:0]const u8, args: Begin) bool {
+    return zguiBeginPopupModal(name, args.popen, args.flags);
+}
+pub fn openPopup(str_id: [:0]const u8, flags: PopupFlags) void {
+    zguiOpenPopup(str_id, flags);
+}
+/// `pub fn endPopup() void`
+pub const endPopup = zguiEndPopup;
+/// `pub fn closeCurrentPopup() void`
+pub const closeCurrentPopup = zguiCloseCurrentPopup;
+extern fn zguiBeginPopupModal(name: [*:0]const u8, popen: ?*bool, flags: WindowFlags) bool;
+extern fn zguiEndPopup() void;
+extern fn zguiOpenPopup(str_id: [*:0]const u8, flags: PopupFlags) void;
+extern fn zguiCloseCurrentPopup() void;
 //--------------------------------------------------------------------------------------------------
 //
 // Tabs
@@ -2587,6 +2833,20 @@ extern fn zguiSetTabItemClosed(tab_or_docked_window_label: [*:0]const u8) void;
 //
 //--------------------------------------------------------------------------------------------------
 pub const Viewport = *opaque {
+    pub fn getPos(viewport: Viewport) [2]f32 {
+        var pos: [2]f32 = undefined;
+        zguiViewport_GetPos(viewport, &pos);
+        return pos;
+    }
+    extern fn zguiViewport_GetPos(viewport: Viewport, pos: *[2]f32) void;
+
+    pub fn getSize(viewport: Viewport) [2]f32 {
+        var pos: [2]f32 = undefined;
+        zguiViewport_GetSize(viewport, &pos);
+        return pos;
+    }
+    extern fn zguiViewport_GetSize(viewport: Viewport, size: *[2]f32) void;
+
     pub fn getWorkPos(viewport: Viewport) [2]f32 {
         var pos: [2]f32 = undefined;
         zguiViewport_GetWorkPos(viewport, &pos);
@@ -2600,6 +2860,24 @@ pub const Viewport = *opaque {
         return pos;
     }
     extern fn zguiViewport_GetWorkSize(viewport: Viewport, size: *[2]f32) void;
+
+    pub fn getCenter(viewport: Viewport) [2]f32 {
+        const pos = viewport.getPos();
+        const size = viewport.getSize();
+        return .{
+            pos[0] + size[0] * 0.5,
+            pos[1] + size[1] * 0.5,
+        };
+    }
+
+    pub fn getWorkCenter(viewport: Viewport) [2]f32 {
+        const pos = viewport.getWorkPos();
+        const size = viewport.getWorkSize();
+        return .{
+            pos[0] + size[0] * 0.5,
+            pos[1] + size[1] * 0.5,
+        };
+    }
 };
 pub const getMainViewport = zguiGetMainViewport;
 extern fn zguiGetMainViewport() Viewport;
@@ -2665,11 +2943,11 @@ pub const DrawFlags = packed struct(u32) {
 pub const DrawCmd = extern struct {
     clip_rect: [4]f32,
     texture_id: TextureIdent,
-    vtx_offset: c_uint,
-    idx_offset: c_uint,
-    elem_count: c_uint,
+    vtx_offset: u32,
+    idx_offset: u32,
+    elem_count: u32,
     user_callback: ?*anyopaque,
-    user_callback_data: *anyopaque,
+    user_callback_data: ?*anyopaque,
 };
 
 pub const getWindowDrawList = zguiGetWindowDrawList;
@@ -2682,17 +2960,17 @@ extern fn zguiGetForegroundDrawList() DrawList;
 
 pub const DrawList = *opaque {
     pub const getVertexBufferLength = zguiDrawList_GetVertexBufferLength;
-    extern fn zguiDrawList_GetVertexBufferLength(draw_list: DrawList) c_int;
+    extern fn zguiDrawList_GetVertexBufferLength(draw_list: DrawList) i32;
     pub const getVertexBufferData = zguiDrawList_GetVertexBufferData;
     extern fn zguiDrawList_GetVertexBufferData(draw_list: DrawList) [*]const DrawVert;
 
     pub const getIndexBufferLength = zguiDrawList_GetIndexBufferLength;
-    extern fn zguiDrawList_GetIndexBufferLength(draw_list: DrawList) c_int;
+    extern fn zguiDrawList_GetIndexBufferLength(draw_list: DrawList) i32;
     pub const getIndexBufferData = zguiDrawList_GetIndexBufferData;
     extern fn zguiDrawList_GetIndexBufferData(draw_list: DrawList) [*]const DrawIdx;
 
     pub const getCmdBufferLength = zguiDrawList_GetCmdBufferLength;
-    extern fn zguiDrawList_GetCmdBufferLength(draw_list: DrawList) c_int;
+    extern fn zguiDrawList_GetCmdBufferLength(draw_list: DrawList) i32;
     pub const getCmdBufferData = zguiDrawList_GetCmdBufferData;
     extern fn zguiDrawList_GetCmdBufferData(draw_list: DrawList) [*]const DrawCmd;
 

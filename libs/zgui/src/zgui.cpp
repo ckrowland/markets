@@ -892,21 +892,21 @@ ZGUI_API void zguiImage(
 }
 
 ZGUI_API bool zguiImageButton(
+    const char* str_id,
     ImTextureID user_texture_id,
     float w,
     float h,
     const float uv0[2],
     const float uv1[2],
-    int frame_padding,
     const float bg_col[4],
     const float tint_col[4]
 ) {
     return ImGui::ImageButton(
+        str_id,
         user_texture_id,
         { w, h },
         { uv0[0], uv0[1] },
         { uv1[0], uv1[1] },
-        frame_padding,
         { bg_col[0], bg_col[1], bg_col[2], bg_col[3] },
         { tint_col[0], tint_col[1], tint_col[2], tint_col[3] }
     );
@@ -1194,12 +1194,46 @@ ZGUI_API void zguiIoSetDisplaySize(float width, float height) {
     ImGui::GetIO().DisplaySize = { width, height };
 }
 
+ZGUI_API void zguiIoGetDisplaySize(float size[2]) {
+    const ImVec2 ds = ImGui::GetIO().DisplaySize;
+    size[0] = ds[0];
+    size[1] = ds[1];
+}
+
 ZGUI_API void zguiIoSetDisplayFramebufferScale(float sx, float sy) {
     ImGui::GetIO().DisplayFramebufferScale = { sx, sy };
 }
 
 ZGUI_API void zguiIoSetDeltaTime(float delta_time) {
     ImGui::GetIO().DeltaTime = delta_time;
+}
+
+ZGUI_API void zguiIoAddFocusEvent(bool focused) {
+    ImGui::GetIO().AddFocusEvent(focused);
+}
+
+ZGUI_API void zguiIoAddMousePositionEvent(float x, float y) {
+    ImGui::GetIO().AddMousePosEvent(x, y);
+}
+
+ZGUI_API void zguiIoAddMouseButtonEvent(ImGuiMouseButton button, bool down) {
+    ImGui::GetIO().AddMouseButtonEvent(button, down);
+}
+
+ZGUI_API void zguiIoAddMouseWheelEvent(float x, float y) {
+    ImGui::GetIO().AddMouseWheelEvent(x, y);
+}
+
+ZGUI_API void zguiIoAddKeyEvent(ImGuiKey key, bool down) {
+    ImGui::GetIO().AddKeyEvent(key, down);
+}
+
+ZGUI_API void zguiIoSetKeyEventNativeData(ImGuiKey key, int keycode, int scancode) {
+    ImGui::GetIO().SetKeyEventNativeData(key, keycode, scancode);
+}
+
+ZGUI_API void zguiIoAddCharacterEvent(int c) {
+    ImGui::GetIO().AddInputCharacter(c);
 }
 
 
@@ -1261,6 +1295,24 @@ ZGUI_API void zguiGetContentRegionAvail(float pos[2]) {
     pos[1] = p.y;
 }
 
+ZGUI_API void zguiGetContentRegionMax(float pos[2]) {
+    const ImVec2 p = ImGui::GetContentRegionMax();
+    pos[0] = p.x;
+    pos[1] = p.y;
+}
+
+ZGUI_API void zguiGetWindowContentRegionMin(float pos[2]) {
+    const ImVec2 p = ImGui::GetWindowContentRegionMin();
+    pos[0] = p.x;
+    pos[1] = p.y;
+}
+
+ZGUI_API void zguiGetWindowContentRegionMax(float pos[2]) {
+    const ImVec2 p = ImGui::GetWindowContentRegionMax();
+    pos[0] = p.x;
+    pos[1] = p.y;
+}
+
 ZGUI_API void zguiPushTextWrapPos(float wrap_pos_x) {
     ImGui::PushTextWrapPos(wrap_pos_x);
 }
@@ -1307,7 +1359,7 @@ ZGUI_API bool zguiBeginMenu(const char* label, bool enabled) {
 
 ZGUI_API void zguiEndMenu(void) {
     ImGui::EndMenu();
-} 
+}
 
 ZGUI_API bool zguiMenuItem(const char* label, const char* shortcut, bool selected, bool enabled) {
     return ImGui::MenuItem(label, shortcut, selected, enabled);
@@ -1319,6 +1371,22 @@ ZGUI_API void zguiBeginTooltip(void) {
 
 ZGUI_API void zguiEndTooltip(void) {
     ImGui::EndTooltip();
+}
+
+ZGUI_API bool zguiBeginPopupModal(const char* name, bool* p_open, ImGuiWindowFlags flags) {
+    return ImGui::BeginPopupModal(name, p_open, flags);
+}
+
+ZGUI_API void zguiEndPopup(void) {
+    ImGui::EndPopup();
+}
+
+ZGUI_API void zguiOpenPopup(const char* str_id, ImGuiPopupFlags popup_flags) {
+    ImGui::OpenPopup(str_id, popup_flags);
+}
+
+ZGUI_API void zguiCloseCurrentPopup(void) {
+    ImGui::CloseCurrentPopup();
 }
 //--------------------------------------------------------------------------------------------------
 //
@@ -1745,6 +1813,18 @@ ZGUI_API void zguiDrawList_PathRect(
 //--------------------------------------------------------------------------------------------------
 ZGUI_API ImGuiViewport* zguiGetMainViewport(void) {
     return ImGui::GetMainViewport();
+}
+
+ZGUI_API void zguiViewport_GetPos(ImGuiViewport* viewport, float p[2]) {
+    const ImVec2 pos = viewport->Pos;
+    p[0] = pos.x;
+    p[1] = pos.y;
+}
+
+ZGUI_API void zguiViewport_GetSize(ImGuiViewport* viewport, float p[2]) {
+    const ImVec2 sz = viewport->Size;
+    p[0] = sz.x;
+    p[1] = sz.y;
 }
 
 ZGUI_API void zguiViewport_GetWorkPos(ImGuiViewport* viewport, float p[2]) {

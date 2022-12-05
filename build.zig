@@ -1,13 +1,8 @@
 const builtin = @import("builtin");
 const std = @import("std");
-
-// (Note to myself, users don't need to do this)
-// To update submodules do:
-//
-// 1. Edit .gitmodules (update Dawn branch)
-// 2. git submodule update --remote --recursive
-// 3. git add .
-// 4. git commit -m "update submodules"
+const zmath = @import("libs/zmath/build.zig");
+const resources = @import("src/resources/build.zig");
+const signals = @import("src/signals/build.zig");
 
 pub fn build(b: *std.build.Builder) void {
     var options = Options{
@@ -31,6 +26,7 @@ pub fn build(b: *std.build.Builder) void {
     //
     if (!builtin.is_test) {
         installDemo(b, resources.build(b, options), "resources");
+        installDemo(b, signals.build(b, options), "signals");
     }
 
     //
@@ -57,9 +53,6 @@ pub fn build(b: *std.build.Builder) void {
     }
 }
 
-const zmath = @import("libs/zmath/build.zig");
-
-const resources = @import("src/resources/build.zig");
 
 pub const Options = struct {
     build_mode: std.builtin.Mode,
