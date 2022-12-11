@@ -4,6 +4,10 @@ const DemoState = @import("main.zig").DemoState;
 const Point = struct {
     x: f32,
     y: f32,
+
+    pub fn print(self: Point) void {
+        std.debug.print("({any}, {any})\n", .{ self.x, self.y });
+    }
 };
 
 pub const Wave = struct {

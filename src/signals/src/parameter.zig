@@ -20,7 +20,7 @@ pub const Shift = Args(f32){
 pub const NumPointsPerCycle = Args(u32){
     .label = "Number points per cycle",
     .id = "##nppc",
-    .min = 10,
+    .min = 4,
     .max = 200,
 };
 

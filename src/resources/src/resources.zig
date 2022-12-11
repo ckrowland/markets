@@ -51,22 +51,22 @@ pub const DemoState = struct {
         compute: zgpu.BindGroupHandle,
     },
     buffers: struct {
-       data: struct {
-           consumer: zgpu.BufferHandle,
-           consumer_mapped: zgpu.BufferHandle,
-           producer: zgpu.BufferHandle,
-           producer_mapped: zgpu.BufferHandle,
-           stats: zgpu.BufferHandle,
-           stats_mapped: zgpu.BufferHandle,
-       },
-       index: struct {
-           circle: zgpu.BufferHandle,
-       },
-       vertex: struct {
-           circle: zgpu.BufferHandle,
-           square: zgpu.BufferHandle,
-       },
-    }, 
+        data: struct {
+            consumer: zgpu.BufferHandle,
+            consumer_mapped: zgpu.BufferHandle,
+            producer: zgpu.BufferHandle,
+            producer_mapped: zgpu.BufferHandle,
+            stats: zgpu.BufferHandle,
+            stats_mapped: zgpu.BufferHandle,
+        },
+        index: struct {
+            circle: zgpu.BufferHandle,
+        },
+        vertex: struct {
+            circle: zgpu.BufferHandle,
+            square: zgpu.BufferHandle,
+        },
+    },
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
     params: Parameters,
@@ -75,31 +75,18 @@ pub const DemoState = struct {
     allocator: std.mem.Allocator,
 };
 
-fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
+fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window);
 
     const params = Parameters{};
     const coordinate_size = CoordinateSize{};
 
     // Create Buffers
-    const consumer_buffer = Consumer.generateBuffer(
-        gctx,
-        params,
-        coordinate_size
-    );
-    const producer_buffer = Producer.generateBuffer(
-        gctx,
-        params,
-        coordinate_size
-    );
+    const consumer_buffer = Consumer.generateBuffer(gctx, params, coordinate_size);
+    const producer_buffer = Producer.generateBuffer(gctx, params, coordinate_size);
     const stats_buffer = Statistics.createBuffer(gctx);
 
-    const compute_bind_group = Wgpu.createComputeBindGroup(
-        gctx,
-        consumer_buffer,
-        producer_buffer,
-        stats_buffer
-    );
+    const compute_bind_group = Wgpu.createComputeBindGroup(gctx, consumer_buffer, producer_buffer, stats_buffer);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -121,17 +108,9 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .buffers = .{
             .data = .{
                 .consumer = consumer_buffer,
-                .consumer_mapped = Wgpu.createMappedBuffer(
-                    gctx,
-                    Consumer,
-                    params.num_consumers
-                ),
+                .consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, params.num_consumers),
                 .producer = producer_buffer,
-                .producer_mapped = Wgpu.createMappedBuffer(
-                    gctx,
-                    Producer,
-                    params.num_consumers
-                ),
+                .producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, params.num_consumers),
                 .stats = stats_buffer,
                 .stats_mapped = Statistics.createMappedBuffer(gctx),
             },
@@ -166,7 +145,7 @@ fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
 
     const cam_world_to_view = zm.lookAtLh(
-        //eye position 
+        //eye position
         zm.f32x4(0.0, 0.0, -3000.0, 0.0),
 
         //focus position
@@ -229,12 +208,10 @@ fn draw(demo: *DemoState) void {
             const sm = gctx.lookupResource(demo.buffers.data.stats_mapped) orelse break :pass;
             encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
 
-
             const p = gctx.lookupResource(demo.buffers.data.producer) orelse break :pass;
             const p_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
             const pm = gctx.lookupResource(demo.buffers.data.producer_mapped) orelse break :pass;
             encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
-
 
             const c = gctx.lookupResource(demo.buffers.data.consumer) orelse break :pass;
             const c_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
@@ -318,26 +295,13 @@ fn draw(demo: *DemoState) void {
 }
 
 pub fn restartSimulation(demo: *DemoState) void {
-    demo.buffers.data.consumer = Consumer.generateBuffer(
-        demo.gctx,
-        demo.params,
-        demo.coordinate_size
-    );
-    demo.buffers.data.producer = Producer.generateBuffer(
-        demo.gctx,
-        demo.params,
-        demo.coordinate_size
-    );
+    demo.buffers.data.consumer = Consumer.generateBuffer(demo.gctx, demo.params, demo.coordinate_size);
+    demo.buffers.data.producer = Producer.generateBuffer(demo.gctx, demo.params, demo.coordinate_size);
 
     demo.stats.clear();
     Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
 
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
-        demo.gctx,
-        demo.buffers.data.consumer,
-        demo.buffers.data.producer,
-        demo.buffers.data.stats
-    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
 
 fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
@@ -364,10 +328,13 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    zglfw.defaultWindowHints();
-    zglfw.windowHint(.cocoa_retina_framebuffer, 1);
-    zglfw.windowHint(.client_api, 0);
-    const window = try zglfw.createWindow(1600, 1000, window_title, null, null);
+    zglfw.Window.Hint.reset();
+    zglfw.Window.Hint.set(.cocoa_retina_framebuffer, 1);
+    zglfw.Window.Hint.set(.client_api, 0);
+    const window = zglfw.Window.create(1600, 1000, window_title, null, null) catch {
+        std.log.err("Failed to create demo window.", .{});
+        return;
+    };
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
 

@@ -28,12 +28,7 @@ pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     }
     indices[num_vertices - 1] = 1;
 
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(consumer_index_buffer).?,
-        0,
-        u32,
-        indices[0..]
-    );
+    gctx.queue.writeBuffer(gctx.lookupResource(consumer_index_buffer).?, 0, u32, indices[0..]);
     return consumer_index_buffer;
 }
 
@@ -45,7 +40,11 @@ pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32) zgpu.BufferH
     var consumer_vertex_data: [num_points][3]f32 = undefined;
     const num_sides = @as(f32, num_points - 1);
     const angle = 2 * math.pi / num_sides;
-    consumer_vertex_data[0] = [3]f32{ 0, 0, 0, };
+    consumer_vertex_data[0] = [3]f32{
+        0,
+        0,
+        0,
+    };
     var i: u32 = 1;
     while (i < num_points) {
         const current_angle = angle * @intToFloat(f32, i);
@@ -54,11 +53,6 @@ pub fn createVertexBuffer(gctx: *zgpu.GraphicsContext, radius: f32) zgpu.BufferH
         consumer_vertex_data[i] = [3]f32{ x, y, 0 };
         i += 1;
     }
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(consumer_vertex_buffer).?,
-        0,
-        [3]f32,
-        consumer_vertex_data[0..]
-    );
+    gctx.queue.writeBuffer(gctx.lookupResource(consumer_vertex_buffer).?, 0, [3]f32, consumer_vertex_data[0..]);
     return consumer_vertex_buffer;
 }
