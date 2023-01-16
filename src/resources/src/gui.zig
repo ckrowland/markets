@@ -24,12 +24,8 @@ pub fn update(demo: *DemoState) void {
     const margin: f32 = 40;
     const params_width: f32 = window_width / 5;
     const stats_height: f32 = window_height / 5 + 30;
-    zgui.setNextWindowPos(.{ .x = margin,
-                            .y = margin,
-                            .cond = zgui.Condition.always });
-    zgui.setNextWindowSize(.{ .w = params_width,
-                            .h = window_height - stats_height - (margin * 3),
-                            .cond = zgui.Condition.always });
+    zgui.setNextWindowPos(.{ .x = margin, .y = margin, .cond = zgui.Condition.always });
+    zgui.setNextWindowSize(.{ .w = params_width, .h = window_height - stats_height - (margin * 3), .cond = zgui.Condition.always });
     const zgui_window_flags = .{
         .flags = zgui.WindowFlags.no_decoration,
     };
@@ -41,12 +37,8 @@ pub fn update(demo: *DemoState) void {
     }
     zgui.end();
 
-    zgui.setNextWindowPos(.{ .x = margin,
-                            .y = window_height - stats_height - margin,
-                            .cond = zgui.Condition.always });
-    zgui.setNextWindowSize(.{ .w = window_width - (2 * margin),
-                            .h = stats_height,
-                            .cond = zgui.Condition.always });
+    zgui.setNextWindowPos(.{ .x = margin, .y = window_height - stats_height - margin, .cond = zgui.Condition.always });
+    zgui.setNextWindowSize(.{ .w = window_width - (2 * margin), .h = stats_height, .cond = zgui.Condition.always });
 
     if (zgui.begin("Data", zgui_window_flags)) {
         zgui.pushIntId(2);
@@ -65,13 +57,12 @@ fn updateStats(demo: *DemoState) void {
         demo.stats.second = current_time;
         demo.stats.num_transactions.append(gpu_stats[0]) catch unreachable;
 
-        
         const consumers = Consumer.getAll(demo);
         var empty_consumers: u32 = 0;
         for (consumers) |c| {
-           if (c.inventory == 0) {
-                empty_consumers += 1; 
-           }
+            if (c.inventory == 0) {
+                empty_consumers += 1;
+            }
         }
         demo.stats.num_empty_consumers.append(empty_consumers) catch unreachable;
 
@@ -94,29 +85,29 @@ fn plots(demo: *DemoState) void {
     const plot_height = window_size[1] - margin;
     const plot_flags = .{ .w = plot_width, .h = plot_height, .flags = .{} };
 
-    if (zgui.plot.beginPlot("", plot_flags)){
-        zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true }});
-        zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true }});
+    if (zgui.plot.beginPlot("", plot_flags)) {
+        zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
+        zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
         zgui.plot.plotLineValues("Transactions", u32, .{ .v = nt[0..] });
         zgui.plot.plotLineValues("Empty Consumers", u32, .{ .v = nec[0..] });
-        zgui.plot.plotLineValues("Total Producer Inventory", u32, .{ .v = tpi[0..]});
+        zgui.plot.plotLineValues("Total Producer Inventory", u32, .{ .v = tpi[0..] });
         zgui.plot.endPlot();
     }
 }
 
 fn parameters(demo: *DemoState) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-    zgui.bulletText("{d:.1} fps", .{ demo.gctx.stats.fps });
+    zgui.bulletText("{d:.1} fps", .{demo.gctx.stats.fps});
     zgui.spacing();
     zgui.text("Number Of Producers", .{});
-    if(zgui.sliderScalar(
+    if (zgui.sliderScalar(
         "##np",
         u32,
         .{ .v = &demo.params.num_producers, .min = 1, .max = 100 },
     )) {
         const old_producers = Producer.getAll(demo);
-        if (demo.params.num_producers > old_producers.len){
+        if (demo.params.num_producers > old_producers.len) {
             Producer.add(demo);
         } else {
             Producer.remove(demo);
@@ -124,14 +115,13 @@ fn parameters(demo: *DemoState) void {
     }
 
     zgui.text("Production Rate", .{});
-    if(zgui.sliderScalar(
+    if (zgui.sliderScalar(
         "##pr",
         u32,
         .{ .v = &demo.params.production_rate, .min = 1, .max = 1000 },
     )) {
         Producer.setAll(demo, Producer.Parameter.production_rate);
     }
-
 
     zgui.text("Demand Rate", .{});
     zgui.sameLine(.{});
@@ -142,7 +132,7 @@ fn parameters(demo: *DemoState) void {
         zgui.endTooltip();
     }
 
-    if(zgui.sliderScalar(
+    if (zgui.sliderScalar(
         "##dr",
         u32,
         .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
@@ -150,35 +140,22 @@ fn parameters(demo: *DemoState) void {
         Consumer.setAll(demo, Consumer.Parameter.demand_rate);
     }
 
-
     zgui.text("Max Producer Inventory", .{});
-    if(zgui.sliderScalar(
-        "##mi",
-        u32,
-        .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 }
-    )) {
+    if (zgui.sliderScalar("##mi", u32, .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 })) {
         Producer.setAll(demo, Producer.Parameter.max_inventory);
     }
 
     zgui.text("Producer Size", .{});
-    if(zgui.sliderScalar("##pw", f32, .{
-        .v = &demo.params.producer_width,
-        .min = 10,
-        .max = 70
-    })) {
+    if (zgui.sliderScalar("##pw", f32, .{ .v = &demo.params.producer_width, .min = 10, .max = 70 })) {
         demo.buffers.vertex.square = Square.createVertexBuffer(demo.gctx, demo.params.producer_width);
     }
-    zgui.dummy(.{.w = 1.0, .h = 40.0});
+    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
     zgui.text("Number of Consumers", .{});
-    if(zgui.sliderScalar(
-        "##nc", 
-        u32,
-        .{ .v = &demo.params.num_consumers, .min = 1, .max = 10000 }
-    )) {
+    if (zgui.sliderScalar("##nc", u32, .{ .v = &demo.params.num_consumers, .min = 1, .max = 10000 })) {
         const old_consumers = Consumer.getAll(demo);
 
-        if (demo.params.num_consumers > old_consumers.len){
+        if (demo.params.num_consumers > old_consumers.len) {
             Consumer.add(demo);
         } else {
             Consumer.remove(demo);
@@ -186,20 +163,12 @@ fn parameters(demo: *DemoState) void {
     }
 
     zgui.text("Moving Rate", .{});
-    if(zgui.sliderScalar(
-        "##mr",
-        f32,
-        .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 }
-    )) {
+    if (zgui.sliderScalar("##mr", f32, .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 })) {
         Consumer.setAll(demo, Consumer.Parameter.moving_rate);
     }
 
     zgui.text("Consumer Size", .{});
-    if(zgui.sliderScalar("##cs", f32, .{
-        .v = &demo.params.consumer_radius,
-        .min = 1,
-        .max = 40
-    })) {
+    if (zgui.sliderScalar("##cs", f32, .{ .v = &demo.params.consumer_radius, .min = 1, .max = 40 })) {
         demo.buffers.vertex.circle = Circle.createVertexBuffer(demo.gctx, demo.params.consumer_radius);
     }
 
@@ -207,7 +176,7 @@ fn parameters(demo: *DemoState) void {
         main.restartSimulation(demo);
     }
 
-    zgui.dummy(.{.w = 1.0, .h = 40.0});
+    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
     if (zgui.button("Supply Shock", .{})) {
         Producer.setAll(demo, Producer.Parameter.supply_shock);

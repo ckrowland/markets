@@ -1,18 +1,21 @@
 const zgui = @import("zgui");
 
-const axisFlags = .{
-    .auto_fit = true,
-};
-
-pub fn setup() void {
-    setupAxes();
+pub fn setup(max_x: f32) void {
+    setupAxes(max_x);
     setupMarkers();
 }
 
-fn setupAxes() void {
-    const setupAxis = .{ .label = "", .flags = axisFlags };
+fn setupAxes(max_x: f32) void {
+    const setupAxis = .{ .label = "", .flags = .{}};
     zgui.plot.setupAxis(.x1, setupAxis);
     zgui.plot.setupAxis(.y1, setupAxis);
+
+    const largest_axis = @floatCast(f64, max_x);
+    zgui.plot.setupAxisLimits(.x1, .{
+        .min = 0,
+        .max = largest_axis,
+        .cond = .always,
+    });
 }
 
 fn setupMarkers() void {

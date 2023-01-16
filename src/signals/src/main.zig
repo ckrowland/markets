@@ -1,31 +1,41 @@
 const std = @import("std");
-const math = std.math;
 const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
-const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
+const math = std.math;
+const wgpu = zgpu.wgpu;
 const Window = @import("windows.zig");
 const Plot = @import("plot.zig");
 const Parameter = @import("parameter.zig");
 const Waves = @import("wave.zig");
 
+const window_title = "FFT Demo";
+
 pub const Parameters = struct {
-    shift: f32 = 0,
+    shift: u32 = 0,
     num_points_per_cycle: u32 = 10,
     num_cycles: u32 = 1,
+};
+
+pub const Signal = struct {
+    params: Parameters = Parameters{},
+    wave: Waves.Wave = undefined,
 };
 
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
-    params: Parameters,
+    input_one: Signal,
+    input_two: Signal,
+    output: Signal,
     allocator: std.mem.Allocator,
 };
 
-fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
+fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window);
+    const params = Parameters{};
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -35,55 +45,34 @@ fn init(allocator: std.mem.Allocator, window: zglfw.Window) !DemoState {
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
-        .params = Parameters{},
+        .input_one = Signal{
+            .params = params,
+            .wave = Waves.Wave.initAndGenerate(allocator, params),
+        },
+        .input_two = Signal{
+            .params = params,
+            .wave = Waves.Wave.initAndGenerate(allocator, params),
+        },
+        .output = Signal{
+            .params = params,
+            .wave = Waves.Wave.init(allocator),
+        },
     };
 }
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
+    demo.input_one.wave.deinit();
+    demo.input_two.wave.deinit();
+    demo.output.wave.deinit();
     demo.* = undefined;
 }
 
 fn update(demo: *DemoState) void {
     zgui.backend.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
 
-    if (Window.beginGuiWindow(demo, Window.Parameters)) {
-        defer zgui.end();
-        Parameter.setup();
-        Parameter.displayFPS(demo);
-        Parameter.slider(
-            f32,
-            &demo.params.shift,
-            Parameter.Shift,
-        );
-        Parameter.slider(
-            u32,
-            &demo.params.num_points_per_cycle,
-            Parameter.NumPointsPerCycle,
-        );
-        Parameter.slider(
-            u32,
-            &demo.params.num_cycles,
-            Parameter.NumCycles,
-        );
-    }
-
-    if (Window.beginGuiWindow(demo, Window.Plots)) {
-        defer zgui.end();
-
-        if (zgui.plot.beginPlot("##first", .{})) {
-            defer zgui.plot.endPlot();
-            Plot.setup();
-
-            var sin_wave = Waves.Wave.createSinWave(demo);
-            defer sin_wave.deinit();
-
-            zgui.plot.plotLine("Sin", f32, .{
-                .xv = sin_wave.xv.items,
-                .yv = sin_wave.yv.items,
-            });
-        }
-    }
+    Window.parameters(demo);
+    Window.plots(demo);
 }
 
 fn draw(demo: *DemoState) void {
@@ -143,10 +132,13 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    zglfw.defaultWindowHints();
-    zglfw.windowHint(.cocoa_retina_framebuffer, 1);
-    zglfw.windowHint(.client_api, 0);
-    const window = try zglfw.createWindow(1600, 1000, "Signal Sandbox", null, null);
+    //zglfw.Window.Hint.reset();
+    //zglfw.Window.Hint.set(.cocoa_retina_framebuffer, 1);
+    //zglfw.Window.Hint.set(.client_api, 0);
+    const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
+        std.log.err("Failed to create demo window.", .{});
+        return;
+    };
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
 

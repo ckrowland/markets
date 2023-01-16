@@ -328,10 +328,10 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    zglfw.Window.Hint.reset();
-    zglfw.Window.Hint.set(.cocoa_retina_framebuffer, 1);
-    zglfw.Window.Hint.set(.client_api, 0);
-    const window = zglfw.Window.create(1600, 1000, window_title, null, null) catch {
+    //zglfw.Hint.reset();
+    //zglfw.Hint.set(.cocoa_retina_framebuffer, 1);
+    //zglfw.Hint.set(.client_api, 0);
+    const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
         std.log.err("Failed to create demo window.", .{});
         return;
     };
@@ -370,6 +370,9 @@ pub fn main() !void {
 
     while (!window.shouldClose()) {
         zglfw.pollEvents();
+        if (!window.getAttribute(.focused)) {
+            continue;
+        }
         update(&demo);
         draw(&demo);
     }

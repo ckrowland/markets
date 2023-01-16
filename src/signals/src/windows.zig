@@ -1,6 +1,10 @@
 const std = @import("std");
 const zgui = @import("zgui");
 const main = @import("main.zig");
+const Parameter = @import("parameter.zig");
+const Plot = @import("plot.zig");
+const Waves = @import("wave.zig");
+const DemoState = main.DemoState;
 
 pub const Args = struct {
     x: f32,
@@ -38,6 +42,74 @@ pub const Plots = Args{
     },
     .label = "##plots",
 };
+
+pub fn parameters(demo: *DemoState) void {
+    setNextWindow(demo, Parameters);
+    if (zgui.begin(Parameters.label, .{
+        .popen = null,
+        .flags = Parameters.flags,
+    })) {
+        defer zgui.end();
+        Parameter.setup();
+        Parameter.displayFPS(demo);
+        Parameter.waveInput(demo);
+    }
+}
+
+pub fn plots(demo: *DemoState) void {
+    setNextWindow(demo, Plots);
+    if (zgui.begin(Plots.label, .{
+        .popen = null,
+        .flags = Plots.flags,
+    })) {
+        defer zgui.end();
+
+        demo.input_one.wave.clearWave();
+        demo.input_two.wave.clearWave();
+        demo.output.wave.clearWave();
+
+        demo.input_one.wave.createSinWave(demo.input_one.params);
+        demo.input_two.wave.createSinWave(demo.input_two.params);
+        const max_x = @max(
+            demo.input_one.wave.getLastPointX(),
+            demo.input_two.wave.getLastPointX()
+        );
+        demo.output.wave.multiplyWaves(
+            &demo.input_one.wave,
+            &demo.input_two.wave
+        );
+
+        if (zgui.plot.beginPlot("##first", .{})) {
+            defer zgui.plot.endPlot();
+
+            Plot.setup(max_x);
+            zgui.plot.plotLine("Sin", f32, .{
+                .xv = demo.input_one.wave.xv.items,
+                .yv = demo.input_one.wave.yv.items,
+            });
+        }
+
+        if (zgui.plot.beginPlot("##second", .{})) {
+            defer zgui.plot.endPlot();
+
+            Plot.setup(max_x);
+            zgui.plot.plotLine("Sin", f32, .{
+                .xv = demo.input_two.wave.xv.items,
+                .yv = demo.input_two.wave.yv.items,
+            });
+        }
+
+        if (zgui.plot.beginPlot("##third", .{})) {
+            defer zgui.plot.endPlot();
+
+            Plot.setup(max_x);
+            zgui.plot.plotLine("Sin", f32, .{
+                .xv = demo.output.wave.xv.items,
+                .yv = demo.output.wave.yv.items,
+            });
+        }
+    }
+}
 
 fn setNextWindow(demo: *main.DemoState, args: Args) void {
     std.debug.assert(0.0 <= args.x and args.x <= 1.0);
@@ -79,9 +151,4 @@ fn setNextWindow(demo: *main.DemoState, args: Args) void {
         .w = w,
         .h = h,
     });
-}
-
-pub fn beginGuiWindow(demo: *main.DemoState, args: Args) bool {
-    setNextWindow(demo, args);
-    return zgui.begin(args.label, .{ .popen = null, .flags = args.flags });
 }
