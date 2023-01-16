@@ -12,7 +12,9 @@ const Square = @import("square.zig");
 const Wgpu = @import("wgpu.zig");
 
 pub fn update(demo: *DemoState) void {
-    updateStats(demo);
+    if (demo.running) {
+        updateStats(demo);
+    }
 
     const width = demo.gctx.swapchain_descriptor.width;
     const height = demo.gctx.swapchain_descriptor.height;
@@ -172,7 +174,16 @@ fn parameters(demo: *DemoState) void {
         demo.buffers.vertex.circle = Circle.createVertexBuffer(demo.gctx, demo.params.consumer_radius);
     }
 
+    if (zgui.button("Start", .{})) {
+        demo.running = true;
+    }
+    zgui.sameLine(.{});
+    if (zgui.button("Stop", .{})) {
+        demo.running = false;
+    }
+    zgui.sameLine(.{});
     if (zgui.button("Restart", .{})) {
+        demo.running = true;
         main.restartSimulation(demo);
     }
 

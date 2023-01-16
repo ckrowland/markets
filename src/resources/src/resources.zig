@@ -38,6 +38,7 @@ pub const CoordinateSize = struct {
 
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
+    running: bool,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
         square: zgpu.RenderPipelineHandle,
@@ -93,6 +94,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     return DemoState{
         .gctx = gctx,
+        .running = false,
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
             .square = Wgpu.createRenderPipeline(gctx, config.ppi),
@@ -177,28 +179,30 @@ fn draw(demo: *DemoState) void {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
 
-        pass: {
-            const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
-            const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
-            const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
-            const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
-            const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
+        if (demo.running) {
+            pass: {
+                const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse break :pass;
+                const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse break :pass;
+                const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
+                const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
+                const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
 
-            const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Consumer));
-            const num_producers = @intCast(u32, pb_info.size / @sizeOf(Producer));
+                const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Consumer));
+                const num_producers = @intCast(u32, pb_info.size / @sizeOf(Producer));
 
-            const pass = encoder.beginComputePass(null);
-            defer {
-                pass.end();
-                pass.release();
+                const pass = encoder.beginComputePass(null);
+                defer {
+                    pass.end();
+                    pass.release();
+                }
+                pass.setBindGroup(0, bg, &.{});
+
+                pass.setPipeline(pcp);
+                pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1);
+
+                pass.setPipeline(ccp);
+                pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1);
             }
-            pass.setBindGroup(0, bg, &.{});
-
-            pass.setPipeline(pcp);
-            pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1);
-
-            pass.setPipeline(ccp);
-            pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1);
         }
 
         // Copy data to mapped buffers so we can retrieve it

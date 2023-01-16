@@ -42,39 +42,25 @@ const StagingBuffer = struct {
 pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
     //Unless array len is > max_num_consumers, we get unresponsive consumers
     var consumers: [max_num_consumers + 100]Self = undefined;
-    
+
     var i: usize = 0;
     while (i < params.num_consumers) {
-        const x = @intToFloat(
-            f32,
-            random.intRangeAtMost(
-                i32,
-                coordinate_size.min_x,
-                coordinate_size.max_x
-            )
-        );
+        const x = @intToFloat(f32, random.intRangeAtMost(i32, coordinate_size.min_x, coordinate_size.max_x));
 
-        const y = @intToFloat(
-            f32,
-            random.intRangeAtMost(
-                i32,
-                coordinate_size.min_y,
-                coordinate_size.max_y
-            )
-        );
+        const y = @intToFloat(f32, random.intRangeAtMost(i32, coordinate_size.min_y, coordinate_size.max_y));
 
         consumers[i] = Self{
-            .position =     [4]f32{ x, y, 0, 0 },
-            .home =         [4]f32{ x, y, 0, 0 },
-            .destination =  [4]f32{ x, y, 0, 0 },
-            .step_size =    [4]f32{ 0, 0, 0, 0 },
-            .color =        [4]f32{ 0, 1, 0, 0 },
-            .moving_rate =  params.moving_rate,
-            .demand_rate =  params.demand_rate,
-            .inventory =    0,
-            .radius =       params.consumer_radius,
-            .producer_id =  1000,
-            ._padding =     0,
+            .position = [4]f32{ x, y, 0, 0 },
+            .home = [4]f32{ x, y, 0, 0 },
+            .destination = [4]f32{ x, y, 0, 0 },
+            .step_size = [4]f32{ 0, 0, 0, 0 },
+            .color = [4]f32{ 1, 0, 0, 0 },
+            .moving_rate = params.moving_rate,
+            .demand_rate = params.demand_rate,
+            .inventory = 0,
+            .radius = params.consumer_radius,
+            .producer_id = 1000,
+            ._padding = 0,
         };
         i += 1;
     }
@@ -90,13 +76,7 @@ pub fn getAll(demo: *DemoState) []const Self {
         .buffer = demo.gctx.lookupResource(demo.buffers.data.consumer_mapped).?,
         .num_consumers = num_consumers,
     };
-    buf.buffer.mapAsync(
-        .{ .read = true },
-        0,
-        @sizeOf(Self) * num_consumers,
-        buffersMappedCallback,
-        @ptrCast(*anyopaque, &buf)
-    );
+    buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(Self) * num_consumers, buffersMappedCallback, @ptrCast(*anyopaque, &buf));
     wait_loop: while (true) {
         demo.gctx.device.tick();
         if (buf.slice == null) {
@@ -107,7 +87,6 @@ pub fn getAll(demo: *DemoState) []const Self {
     buf.buffer.unmap();
 
     return buf.slice.?[0..num_consumers];
-
 }
 
 fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
@@ -140,20 +119,11 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
     }
 
     // Write to consumers buffer again
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(demo.buffers.data.consumer).?,
-        0,
-        Self,
-        new_consumers[0..demo.params.num_consumers]
-    );
+    demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.buffers.data.consumer).?, 0, Self, new_consumers[0..demo.params.num_consumers]);
 }
 
 pub fn add(demo: *DemoState) void {
-    const consumer_buffer = Wgpu.createBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_consumers
-    );
+    const consumer_buffer = Wgpu.createBuffer(demo.gctx, Self, demo.params.num_consumers);
 
     const old_consumers = getAll(demo);
     const num_new_consumers = demo.params.num_consumers - old_consumers.len;
@@ -175,27 +145,14 @@ pub fn add(demo: *DemoState) void {
         new_consumers[0..],
     );
 
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
-        demo.gctx,
-        consumer_buffer,
-        demo.buffers.data.producer,
-        demo.buffers.data.stats
-    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_consumers
-    );
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(demo.gctx, Self, demo.params.num_consumers);
 }
 
 pub fn remove(demo: *DemoState) void {
-    const consumer_buffer = Wgpu.createBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_consumers
-    );
+    const consumer_buffer = Wgpu.createBuffer(demo.gctx, Self, demo.params.num_consumers);
     const old_consumers = getAll(demo);
 
     demo.gctx.queue.writeBuffer(
@@ -204,43 +161,18 @@ pub fn remove(demo: *DemoState) void {
         Self,
         old_consumers[0..demo.params.num_consumers],
     );
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
-        demo.gctx,
-        consumer_buffer,
-        demo.buffers.data.producer,
-        demo.buffers.data.stats
-    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_consumers
-    );
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(demo.gctx, Self, demo.params.num_consumers);
 }
-
 
 // Buffer Setup
-pub fn generate(
-    gctx: *zgpu.GraphicsContext,
-    buf: zgpu.BufferHandle,
-    params: Parameters,
-    coordinate_size: CoordinateSize
-) void {
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
-        0,
-        Self,
-        create(params, coordinate_size)
-    );
+pub fn generate(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters, coordinate_size: CoordinateSize) void {
+    gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, Self, create(params, coordinate_size));
 }
 
-pub fn generateBuffer(
-    gctx: *zgpu.GraphicsContext,
-    params: Parameters,
-    coordinate_size: CoordinateSize
-) zgpu.BufferHandle {
-
+pub fn generateBuffer(gctx: *zgpu.GraphicsContext, params: Parameters, coordinate_size: CoordinateSize) zgpu.BufferHandle {
     const buf = Wgpu.createBuffer(gctx, Self, params.num_consumers);
     generate(gctx, buf, params, coordinate_size);
 
