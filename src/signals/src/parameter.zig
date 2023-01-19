@@ -21,6 +21,12 @@ pub fn displayFPS(demo: *DemoState) void {
 }
 
 pub fn waveInput(demo: *DemoState) void {
+    const nppc = demo.input_one.params.num_points_per_cycle;
+    const num_points_one = demo.input_one.wave.xv.items.len;
+    const num_points_two = demo.input_two.wave.xv.items.len;
+    const max_num_points = @max(num_points_one, num_points_two);
+    const max_shift_possible = @intCast(u32, max_num_points - nppc);
+
     zgui.text("Number points per cycle", .{});
     if (zgui.sliderScalar("##nppc", u32, .{
         .v = &demo.input_one.params.num_points_per_cycle,
@@ -30,12 +36,6 @@ pub fn waveInput(demo: *DemoState) void {
         const np = demo.input_one.params.num_points_per_cycle;
         demo.input_two.params.num_points_per_cycle = np;
     }
-
-    const nppc = demo.input_one.params.num_points_per_cycle;
-    const num_points_one = demo.input_one.wave.xv.items.len;
-    const num_points_two = demo.input_two.wave.xv.items.len;
-    const max_num_points = @max(num_points_one, num_points_two);
-    const max_shift_possible = @intCast(u32, max_num_points - nppc);
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
     zgui.text("Number of cycles", .{});

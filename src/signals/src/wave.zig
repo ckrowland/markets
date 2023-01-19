@@ -88,7 +88,8 @@ pub const Wave = struct {
                 break;
             }
             const second_x = second.xv.items[second_idx];
-            if (first_x == second_x) {
+            const diff = @fabs(first_x - second_x);
+            if (diff < 0.001) {
                 const first_y = first.yv.items[first_idx];
                 const second_y = second.yv.items[second_idx];
                 self.xv.append(first_x) catch unreachable;
