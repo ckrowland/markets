@@ -12,6 +12,15 @@ const Waves = @import("wave.zig");
 
 const window_title = "FFT Demo";
 
+const Self = @This();
+
+depth_texture: zgpu.TextureHandle,
+depth_texture_view: zgpu.TextureViewHandle,
+input_one: Signal,
+input_two: Signal,
+output: Signal,
+allocator: std.mem.Allocator,
+
 pub const Parameters = struct {
     shift: u32 = 0,
     num_points_per_cycle: u32 = 10,
@@ -23,25 +32,13 @@ pub const Signal = struct {
     wave: Waves.Wave = undefined,
 };
 
-pub const DemoState = struct {
-    gctx: *zgpu.GraphicsContext,
-    depth_texture: zgpu.TextureHandle,
-    depth_texture_view: zgpu.TextureViewHandle,
-    input_one: Signal,
-    input_two: Signal,
-    output: Signal,
-    allocator: std.mem.Allocator,
-};
-
-fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(allocator, window);
+pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const params = Parameters{};
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
-    return DemoState{
-        .gctx = gctx,
+    return Self{
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
@@ -60,24 +57,19 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 }
 
-fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
-    demo.gctx.destroy(allocator);
+pub fn deinit(demo: *Self) void {
     demo.input_one.wave.deinit();
     demo.input_two.wave.deinit();
     demo.output.wave.deinit();
     demo.* = undefined;
 }
 
-fn update(demo: *DemoState) void {
-    zgui.backend.newFrame(demo.gctx.swapchain_descriptor.width, demo.gctx.swapchain_descriptor.height);
-
-    Window.parameters(demo);
-    Window.plots(demo);
+pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    Window.parameters(demo, gctx);
+    Window.plots(demo, gctx);
 }
 
-fn draw(demo: *DemoState) void {
-    const gctx = demo.gctx;
-
+pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
 
@@ -126,56 +118,4 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     });
     const view = gctx.createTextureView(texture, .{});
     return .{ .texture = texture, .view = view };
-}
-
-pub fn main() !void {
-    try zglfw.init();
-    defer zglfw.terminate();
-
-    //zglfw.Window.Hint.reset();
-    //zglfw.Window.Hint.set(.cocoa_retina_framebuffer, 1);
-    //zglfw.Window.Hint.set(.client_api, 0);
-    const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
-        std.log.err("Failed to create demo window.", .{});
-        return;
-    };
-    defer window.destroy();
-    window.setSizeLimits(400, 400, -1, -1);
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-
-    var demo = try init(allocator, window);
-    defer deinit(allocator, &demo);
-
-    const scale_factor = scale_factor: {
-        const scale = window.getContentScale();
-        break :scale_factor math.max(scale[0], scale[1]);
-    };
-
-    zgui.init(allocator);
-    defer zgui.deinit();
-
-    zgui.plot.init();
-    defer zgui.plot.deinit();
-
-    const content_dir = @import("build_options").content_dir;
-    _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", 19.0 * scale_factor);
-
-    zgui.backend.init(
-        window,
-        demo.gctx.device,
-        @enumToInt(zgpu.GraphicsContext.swapchain_format),
-    );
-    defer zgui.backend.deinit();
-
-    zgui.getStyle().scaleAllSizes(scale_factor);
-
-    while (!window.shouldClose()) {
-        zglfw.pollEvents();
-        update(&demo);
-        draw(&demo);
-    }
 }

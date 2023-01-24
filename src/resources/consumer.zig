@@ -5,10 +5,9 @@ const Allocator = std.mem.Allocator;
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const Main = @import("resources.zig");
-const DemoState = Main.DemoState;
-const Parameters = Main.Parameters;
-const CoordinateSize = Main.CoordinateSize;
+const DemoState = @import("main.zig");
+const Parameters = DemoState.Parameters;
+const CoordinateSize = DemoState.CoordinateSize;
 const Wgpu = @import("wgpu.zig");
 
 const Self = @This();
@@ -67,18 +66,18 @@ pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
     return consumers[0..i];
 }
 
-pub fn getAll(demo: *DemoState) []const Self {
-    const cb_info = demo.gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse unreachable;
+pub fn getAll(demo: *DemoState, gctx: *zgpu.GraphicsContext) []const Self {
+    const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer) orelse unreachable;
     const num_consumers = @intCast(u32, cb_info.size / @sizeOf(Self));
 
     var buf: StagingBuffer = .{
         .slice = null,
-        .buffer = demo.gctx.lookupResource(demo.buffers.data.consumer_mapped).?,
+        .buffer = gctx.lookupResource(demo.buffers.data.consumer_mapped).?,
         .num_consumers = num_consumers,
     };
     buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(Self) * num_consumers, buffersMappedCallback, @ptrCast(*anyopaque, &buf));
     wait_loop: while (true) {
-        demo.gctx.device.tick();
+        gctx.device.tick();
         if (buf.slice == null) {
             continue :wait_loop;
         }
@@ -99,9 +98,9 @@ fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaqu
     }
 }
 
-pub fn setAll(demo: *DemoState, parameter: Parameter) void {
+pub fn setAll(demo: *DemoState, gctx: *zgpu.GraphicsContext, parameter: Parameter) void {
     // Get current consumers data
-    const consumers = getAll(demo);
+    const consumers = getAll(demo, gctx);
 
     // Set new production rate to 0
     var new_consumers: [max_num_consumers]Self = undefined;
@@ -119,52 +118,52 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
     }
 
     // Write to consumers buffer again
-    demo.gctx.queue.writeBuffer(demo.gctx.lookupResource(demo.buffers.data.consumer).?, 0, Self, new_consumers[0..demo.params.num_consumers]);
+    gctx.queue.writeBuffer(gctx.lookupResource(demo.buffers.data.consumer).?, 0, Self, new_consumers[0..demo.params.num_consumers]);
 }
 
-pub fn add(demo: *DemoState) void {
-    const consumer_buffer = Wgpu.createBuffer(demo.gctx, Self, demo.params.num_consumers);
+pub fn add(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const consumer_buffer = Wgpu.createBuffer(gctx, Self, demo.params.num_consumers);
 
-    const old_consumers = getAll(demo);
+    const old_consumers = getAll(demo, gctx);
     const num_new_consumers = demo.params.num_consumers - old_consumers.len;
 
     var params = demo.params;
     params.num_consumers = @intCast(u32, num_new_consumers);
     const new_consumers = create(params, demo.coordinate_size);
 
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(consumer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(consumer_buffer).?,
         0,
         Self,
         old_consumers[0..],
     );
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(consumer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(consumer_buffer).?,
         @sizeOf(Self) * old_consumers.len,
         Self,
         new_consumers[0..],
     );
 
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(demo.gctx, Self, demo.params.num_consumers);
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(gctx, Self, demo.params.num_consumers);
 }
 
-pub fn remove(demo: *DemoState) void {
-    const consumer_buffer = Wgpu.createBuffer(demo.gctx, Self, demo.params.num_consumers);
-    const old_consumers = getAll(demo);
+pub fn remove(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const consumer_buffer = Wgpu.createBuffer(gctx, Self, demo.params.num_consumers);
+    const old_consumers = getAll(demo, gctx);
 
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(consumer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(consumer_buffer).?,
         0,
         Self,
         old_consumers[0..demo.params.num_consumers],
     );
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(gctx, consumer_buffer, demo.buffers.data.producer, demo.buffers.data.stats);
 
     demo.buffers.data.consumer = consumer_buffer;
-    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(demo.gctx, Self, demo.params.num_consumers);
+    demo.buffers.data.consumer_mapped = Wgpu.createMappedBuffer(gctx, Self, demo.params.num_consumers);
 }
 
 // Buffer Setup

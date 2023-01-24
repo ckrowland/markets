@@ -1,8 +1,11 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const zglfw = @import("libs/zglfw/build.zig");
+const zgpu = @import("libs/zgpu/build.zig");
+const zgui = @import("libs/zgui/build.zig");
 const zmath = @import("libs/zmath/build.zig");
-const resources = @import("src/resources/build.zig");
-const signals = @import("src/signals/build.zig");
+const zpool = @import("libs/zpool/build.zig");
+const content_dir = "content/";
 
 pub fn build(b: *std.build.Builder) void {
     var options = Options{
@@ -21,38 +24,18 @@ pub fn build(b: *std.build.Builder) void {
         ensureSubmodules(b.allocator) catch |err| @panic(@errorName(err));
     }
 
-    //
-    // Cross-platform demos
-    //
-    if (!builtin.is_test) {
-        installDemo(b, resources.build(b, options), "resources");
-        installDemo(b, signals.build(b, options), "signals");
-    }
+    const install = b.step("demos", "Build demos");
 
-    //
-    // Tests
-    //
-    const test_step = b.step("test", "Run all tests");
+    var exe = createExe(b, options);
+    install.dependOn(&b.addInstallArtifact(exe).step);
 
-    const zpool_tests = @import("libs/zpool/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zpool_tests.step);
-    const zgpu_tests = @import("libs/zgpu/build.zig").buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zgpu_tests.step);
-    const zmath_tests = zmath.buildTests(b, options.build_mode, options.target);
-    test_step.dependOn(&zmath_tests.step);
+    const run_step = b.step("demos-run", "Run demos");
+    const run_cmd = exe.run();
+    run_cmd.step.dependOn(install);
+    run_step.dependOn(&run_cmd.step);
 
-    //
-    // Benchmarks
-    //
-    if (!builtin.is_test) {
-        const benchmark_step = b.step("benchmark", "Run all benchmarks");
-        {
-            const run_cmd = zmath.buildBenchmarks(b, options.target).run();
-            benchmark_step.dependOn(&run_cmd.step);
-        }
-    }
+    b.getInstallStep().dependOn(install);
 }
-
 
 pub const Options = struct {
     build_mode: std.builtin.Mode,
@@ -95,4 +78,39 @@ fn ensureSubmodules(allocator: std.mem.Allocator) !void {
 
 inline fn thisDir() []const u8 {
     return comptime std.fs.path.dirname(@src().file) orelse ".";
+}
+
+fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
+    const exe = b.addExecutable("Visual Simulations", thisDir() ++ "/src/main.zig");
+
+    const exe_options = b.addOptions();
+    exe.addOptions("build_options", exe_options);
+    exe_options.addOption([]const u8, "content_dir", thisDir() ++ "/" ++ content_dir);
+
+    const install_content_step = b.addInstallDirectory(.{
+        .source_dir = thisDir() ++ "/" ++ content_dir,
+        .install_dir = .{ .custom = "" },
+        .install_subdir = "bin/" ++ content_dir,
+    });
+    exe.step.dependOn(&install_content_step.step);
+
+    exe.setBuildMode(options.build_mode);
+    exe.setTarget(options.target);
+
+    const zgui_options = zgui.BuildOptionsStep.init(b, .{ .backend = .glfw_wgpu });
+    const zgui_pkg = zgui.getPkg(&.{zgui_options.getPkg()});
+
+    const zgpu_options = zgpu.BuildOptionsStep.init(b, .{});
+    const zgpu_pkg = zgpu.getPkg(&.{ zgpu_options.getPkg(), zpool.pkg, zglfw.pkg });
+
+    exe.addPackage(zgpu_pkg);
+    exe.addPackage(zmath.pkg);
+    exe.addPackage(zglfw.pkg);
+    exe.addPackage(zgui_pkg);
+
+    zgpu.link(exe, zgpu_options);
+    zglfw.link(exe);
+    zgui.link(exe, zgui_options);
+
+    return exe;
 }

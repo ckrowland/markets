@@ -2,7 +2,7 @@ const std = @import("std");
 const array = std.ArrayList;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const DemoState = @import("resources.zig").DemoState;
+const DemoState = @import("main.zig");
 
 const Self = @This();
 
@@ -16,13 +16,15 @@ const StagingBuffer = struct {
     buffer: wgpu.Buffer = undefined,
 };
 
-pub const zero = [1]u32{ 0, };
+pub const zero = [1]u32{
+    0,
+};
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .num_transactions = array(u32).init(allocator),
         .num_empty_consumers = array(u32).init(allocator),
-        .num_total_producer_inventory = array(u32).init(allocator), 
+        .num_total_producer_inventory = array(u32).init(allocator),
     };
 }
 
@@ -41,7 +43,6 @@ pub fn clear(self: *Self) void {
     self.num_total_producer_inventory.append(0) catch unreachable;
     self.second = 0;
 }
-
 
 pub fn clearStatsBuffer(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
     const stats_data = [_]u32{0} ** 100;
@@ -64,27 +65,21 @@ pub fn createMappedBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     });
 }
 
-pub fn getGPUStatistics(demo: *DemoState) [zero.len]u32 {
+pub fn getGPUStatistics(demo: *DemoState, gctx: *zgpu.GraphicsContext) [zero.len]u32 {
     var buf: StagingBuffer = .{
         .slice = null,
-        .buffer = demo.gctx.lookupResource(demo.buffers.data.stats_mapped).?,
+        .buffer = gctx.lookupResource(demo.buffers.data.stats_mapped).?,
     };
-    buf.buffer.mapAsync(
-        .{ .read = true },
-        0,
-        @sizeOf(u32) * zero.len,
-        buffersMappedCallback,
-        @ptrCast(*anyopaque, &buf)
-    );
+    buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(u32) * zero.len, buffersMappedCallback, @ptrCast(*anyopaque, &buf));
     wait_loop: while (true) {
-        demo.gctx.device.tick();
+        gctx.device.tick();
         if (buf.slice == null) {
             continue :wait_loop;
         }
         break;
     }
     buf.buffer.unmap();
-    clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
+    clearStatsBuffer(gctx, demo.buffers.data.stats);
     return buf.slice.?[0..zero.len].*;
 }
 

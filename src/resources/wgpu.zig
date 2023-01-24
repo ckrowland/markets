@@ -3,7 +3,7 @@ const zgpu = @import("zgpu");
 const zm = @import("zmath");
 const Gctx = zgpu.GraphicsContext;
 const wgpu = zgpu.wgpu;
-const main = @import("resources.zig");
+const main = @import("main.zig");
 const GPUStats = main.GPUStats;
 const DemoState = main.DemoState;
 const Statistics = @import("statistics.zig");
@@ -27,29 +27,15 @@ pub const ComputePipelineInfo = struct {
     entry_point: [:0]const u8,
 };
 
-
 // Blank Buffers
-pub fn createBuffer(
-    gctx: *Gctx,
-    comptime T: type,
-    num: u32
-) zgpu.BufferHandle {
+pub fn createBuffer(gctx: *Gctx, comptime T: type, num: u32) zgpu.BufferHandle {
     return gctx.createBuffer(.{
-        .usage = .{
-            .copy_dst = true,
-            .copy_src = true,
-            .vertex = true,
-            .storage = true
-        },
+        .usage = .{ .copy_dst = true, .copy_src = true, .vertex = true, .storage = true },
         .size = num * @sizeOf(T),
     });
 }
 
-pub fn createMappedBuffer(
-    gctx: *Gctx,
-    comptime T: type,
-    num: u32
-) zgpu.BufferHandle {
+pub fn createMappedBuffer(gctx: *Gctx, comptime T: type, num: u32) zgpu.BufferHandle {
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .map_read = true },
         .size = num * @sizeOf(T),
@@ -71,29 +57,17 @@ pub fn createComputeBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
     });
 }
 
-
 // Bind Groups
 pub fn createUniformBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
     const bind_group_layout = createUniformBindGroupLayout(gctx);
     defer gctx.releaseResource(bind_group_layout);
 
     return gctx.createBindGroup(bind_group_layout, &.{
-        .{
-            .binding = 0,
-            .buffer_handle = gctx.uniforms.buffer,
-            .offset = 0,
-            .size = @sizeOf(zm.Mat)
-        },
+        .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = @sizeOf(zm.Mat) },
     });
 }
 
-pub fn createComputeBindGroup(
-    gctx: *zgpu.GraphicsContext,
-    consumer_buffer: zgpu.BufferHandle,
-    producer_buffer: zgpu.BufferHandle,
-    stats_buffer: zgpu.BufferHandle
-) zgpu.BindGroupHandle {
-
+pub fn createComputeBindGroup(gctx: *zgpu.GraphicsContext, consumer_buffer: zgpu.BufferHandle, producer_buffer: zgpu.BufferHandle, stats_buffer: zgpu.BufferHandle) zgpu.BindGroupHandle {
     const compute_bgl = createComputeBindGroupLayout(gctx);
     defer gctx.releaseResource(compute_bgl);
 
@@ -128,7 +102,7 @@ fn getWgpuType(comptime T: type) !wgpu.VertexFormat {
         u32 => .uint32,
         f32 => .float32,
         [4]f32 => .float32x4,
-        else => error.NoValidWgpuType, 
+        else => error.NoValidWgpuType,
     };
 }
 
@@ -158,7 +132,7 @@ pub fn createRenderPipeline(
                 .format = getWgpuType(attr.type) catch unreachable,
                 .offset = @offsetOf(args.inst_type, attr.name),
                 .shader_location = i + 1,
-            }; 
+            };
         }
         break :init arr;
     };
@@ -230,4 +204,3 @@ pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, cpi: ComputePipelineIn
 
     return gctx.createComputePipeline(compute_pl, pipeline_descriptor);
 }
-

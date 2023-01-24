@@ -5,10 +5,9 @@ const Allocator = std.mem.Allocator;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const Wgpu = @import("wgpu.zig");
-const Main = @import("resources.zig");
-const Parameters = Main.Parameters;
-const CoordinateSize = Main.CoordinateSize;
-const DemoState = Main.DemoState;
+const DemoState = @import("main.zig");
+const Parameters = DemoState.Parameters;
+const CoordinateSize = DemoState.CoordinateSize;
 
 const Self = @This();
 
@@ -35,29 +34,14 @@ const StagingBuffer = struct {
     num_producers: u32 = 0,
 };
 
-
 pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
     var producers: [max_num_producers]Self = undefined;
 
     var i: usize = 0;
     while (i < params.num_producers) {
-        const x = @intToFloat(
-            f32, 
-            random.intRangeAtMost(
-                i32,
-                coordinate_size.min_x,
-                coordinate_size.max_x
-            )
-        );
+        const x = @intToFloat(f32, random.intRangeAtMost(i32, coordinate_size.min_x, coordinate_size.max_x));
 
-        const y = @intToFloat(
-            f32,
-            random.intRangeAtMost(
-                i32,
-                coordinate_size.min_y,
-                coordinate_size.max_y
-            )
-        );
+        const y = @intToFloat(f32, random.intRangeAtMost(i32, coordinate_size.min_y, coordinate_size.max_y));
 
         producers[i] = Self{
             .position = [4]f32{ x, y, 0, 0 },
@@ -73,24 +57,18 @@ pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
     return producers[0..i];
 }
 
-pub fn getAll(demo: *DemoState) []const Self {
-    const pb_info = demo.gctx.lookupResourceInfo(demo.buffers.data.producer) orelse unreachable;
+pub fn getAll(demo: *DemoState, gctx: *zgpu.GraphicsContext) []const Self {
+    const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer) orelse unreachable;
     const num_producers = @intCast(u32, pb_info.size / @sizeOf(Self));
 
     var buf: StagingBuffer = .{
         .slice = null,
-        .buffer = demo.gctx.lookupResource(demo.buffers.data.producer_mapped).?,
+        .buffer = gctx.lookupResource(demo.buffers.data.producer_mapped).?,
         .num_producers = num_producers,
     };
-    buf.buffer.mapAsync(
-        .{ .read = true },
-        0,
-        @sizeOf(Self) * num_producers,
-        buffersMappedCallback,
-        @ptrCast(*anyopaque, &buf)
-    );
+    buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(Self) * num_producers, buffersMappedCallback, @ptrCast(*anyopaque, &buf));
     wait_loop: while (true) {
-        demo.gctx.device.tick();
+        gctx.device.tick();
         if (buf.slice == null) {
             continue :wait_loop;
         }
@@ -99,75 +77,56 @@ pub fn getAll(demo: *DemoState) []const Self {
     buf.buffer.unmap();
 
     return buf.slice.?[0..num_producers];
-
 }
 
-pub fn add(demo: *DemoState) void {
-    const producer_buffer = createBuffer(demo.gctx, demo.params.num_producers);
+pub fn add(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const producer_buffer = createBuffer(gctx, demo.params.num_producers);
 
-    const old_producers = getAll(demo);
+    const old_producers = getAll(demo, gctx);
     const num_new_producers = demo.params.num_producers - old_producers.len;
 
     var params = demo.params;
     params.num_producers = @intCast(u32, num_new_producers);
     const new_producers = create(params, demo.coordinate_size);
 
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(producer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(producer_buffer).?,
         0,
         Self,
         old_producers[0..],
     );
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(producer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(producer_buffer).?,
         @sizeOf(Self) * old_producers.len,
         Self,
         new_producers[0..],
     );
 
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
-        demo.gctx,
-        demo.buffers.data.consumer,
-        producer_buffer,
-        demo.buffers.data.stats
-    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(gctx, demo.buffers.data.consumer, producer_buffer, demo.buffers.data.stats);
 
     demo.buffers.data.producer = producer_buffer;
-    demo.buffers.data.producer_mapped = Wgpu.createMappedBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_producers
-    );
+    demo.buffers.data.producer_mapped = Wgpu.createMappedBuffer(gctx, Self, demo.params.num_producers);
 }
 
-pub fn remove(demo: *DemoState) void {
-    const producer_buffer = createBuffer(demo.gctx, demo.params.num_producers);
-    const old_producers = getAll(demo);
+pub fn remove(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const producer_buffer = createBuffer(gctx, demo.params.num_producers);
+    const old_producers = getAll(demo, gctx);
 
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(producer_buffer).?,
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(producer_buffer).?,
         0,
         Self,
         old_producers[0..demo.params.num_producers],
     );
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(
-        demo.gctx,
-        demo.buffers.data.consumer,
-        producer_buffer,
-        demo.buffers.data.stats
-    );
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(gctx, demo.buffers.data.consumer, producer_buffer, demo.buffers.data.stats);
 
     demo.buffers.data.producer = producer_buffer;
-    demo.buffers.data.producer_mapped = Wgpu.createMappedBuffer(
-        demo.gctx,
-        Self,
-        demo.params.num_producers
-    );
+    demo.buffers.data.producer_mapped = Wgpu.createMappedBuffer(gctx, Self, demo.params.num_producers);
 }
 
-pub fn setAll(demo: *DemoState, parameter: Parameter) void {
+pub fn setAll(demo: *DemoState, gctx: *zgpu.GraphicsContext, parameter: Parameter) void {
     // Get current producers data
-    const producers = getAll(demo);
+    const producers = getAll(demo, gctx);
 
     // Set new production rate to 0
     var new_producers: [max_num_producers]Self = undefined;
@@ -188,12 +147,7 @@ pub fn setAll(demo: *DemoState, parameter: Parameter) void {
     }
 
     // Write to producers buffer again
-    demo.gctx.queue.writeBuffer(
-        demo.gctx.lookupResource(demo.buffers.data.producer).?,
-        0,
-        Self,
-        new_producers[0..demo.params.num_producers]
-    );
+    gctx.queue.writeBuffer(gctx.lookupResource(demo.buffers.data.producer).?, 0, Self, new_producers[0..demo.params.num_producers]);
 }
 
 fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
@@ -208,22 +162,12 @@ fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaqu
 
 pub fn createBuffer(gctx: *zgpu.GraphicsContext, num_producers: u32) zgpu.BufferHandle {
     return gctx.createBuffer(.{
-        .usage = .{
-            .copy_dst = true,
-            .copy_src = true,
-            .vertex = true,
-            .storage = true
-        },
+        .usage = .{ .copy_dst = true, .copy_src = true, .vertex = true, .storage = true },
         .size = num_producers * @sizeOf(Self),
     });
 }
 
-pub fn generate(
-    gctx: *zgpu.GraphicsContext,
-    buf: zgpu.BufferHandle,
-    params: Parameters,
-    coordinate_size: CoordinateSize
-) void {
+pub fn generate(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters, coordinate_size: CoordinateSize) void {
     gctx.queue.writeBuffer(
         gctx.lookupResource(buf).?,
         0,
@@ -232,11 +176,7 @@ pub fn generate(
     );
 }
 
-pub fn generateBuffer(
-    gctx: *zgpu.GraphicsContext,
-    params: Parameters,
-    coordinate_size: CoordinateSize
-) zgpu.BufferHandle {
+pub fn generateBuffer(gctx: *zgpu.GraphicsContext, params: Parameters, coordinate_size: CoordinateSize) zgpu.BufferHandle {
     const buf = createBuffer(gctx, params.num_producers);
     generate(gctx, buf, params, coordinate_size);
 

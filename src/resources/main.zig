@@ -15,7 +15,45 @@ const Circle = @import("circle.zig");
 const Square = @import("square.zig");
 
 const content_dir = @import("build_options").content_dir;
-const window_title = "Resource Simulation";
+
+const Self = @This();
+
+running: bool,
+render_pipelines: struct {
+    circle: zgpu.RenderPipelineHandle,
+    square: zgpu.RenderPipelineHandle,
+},
+compute_pipelines: struct {
+    consumer: zgpu.ComputePipelineHandle,
+    producer: zgpu.ComputePipelineHandle,
+},
+bind_groups: struct {
+    render: zgpu.BindGroupHandle,
+    compute: zgpu.BindGroupHandle,
+},
+buffers: struct {
+    data: struct {
+        consumer: zgpu.BufferHandle,
+        consumer_mapped: zgpu.BufferHandle,
+        producer: zgpu.BufferHandle,
+        producer_mapped: zgpu.BufferHandle,
+        stats: zgpu.BufferHandle,
+        stats_mapped: zgpu.BufferHandle,
+    },
+    index: struct {
+        circle: zgpu.BufferHandle,
+    },
+    vertex: struct {
+        circle: zgpu.BufferHandle,
+        square: zgpu.BufferHandle,
+    },
+},
+depth_texture: zgpu.TextureHandle,
+depth_texture_view: zgpu.TextureViewHandle,
+params: Parameters,
+coordinate_size: CoordinateSize,
+stats: Statistics,
+allocator: std.mem.Allocator,
 
 pub const Parameters = struct {
     num_producers: u32 = 10,
@@ -36,49 +74,7 @@ pub const CoordinateSize = struct {
     max_y: i32 = 1200,
 };
 
-pub const DemoState = struct {
-    gctx: *zgpu.GraphicsContext,
-    running: bool,
-    render_pipelines: struct {
-        circle: zgpu.RenderPipelineHandle,
-        square: zgpu.RenderPipelineHandle,
-    },
-    compute_pipelines: struct {
-        consumer: zgpu.ComputePipelineHandle,
-        producer: zgpu.ComputePipelineHandle,
-    },
-    bind_groups: struct {
-        render: zgpu.BindGroupHandle,
-        compute: zgpu.BindGroupHandle,
-    },
-    buffers: struct {
-        data: struct {
-            consumer: zgpu.BufferHandle,
-            consumer_mapped: zgpu.BufferHandle,
-            producer: zgpu.BufferHandle,
-            producer_mapped: zgpu.BufferHandle,
-            stats: zgpu.BufferHandle,
-            stats_mapped: zgpu.BufferHandle,
-        },
-        index: struct {
-            circle: zgpu.BufferHandle,
-        },
-        vertex: struct {
-            circle: zgpu.BufferHandle,
-            square: zgpu.BufferHandle,
-        },
-    },
-    depth_texture: zgpu.TextureHandle,
-    depth_texture_view: zgpu.TextureViewHandle,
-    params: Parameters,
-    coordinate_size: CoordinateSize,
-    stats: Statistics,
-    allocator: std.mem.Allocator,
-};
-
-fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(allocator, window);
-
+pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const params = Parameters{};
     const coordinate_size = CoordinateSize{};
 
@@ -92,8 +88,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
 
-    return DemoState{
-        .gctx = gctx,
+    return Self{
         .running = false,
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
@@ -133,19 +128,16 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 }
 
-fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
-    demo.gctx.destroy(allocator);
+pub fn deinit(demo: *Self) void {
     demo.stats.deinit();
     demo.* = undefined;
 }
 
-fn update(demo: *DemoState) void {
-    gui.update(demo);
+pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    gui.update(demo, gctx);
 }
 
-fn draw(demo: *DemoState) void {
-    const gctx = demo.gctx;
-
+pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const cam_world_to_view = zm.lookAtLh(
         //eye position
         zm.f32x4(0.0, 0.0, -3000.0, 0.0),
@@ -298,17 +290,17 @@ fn draw(demo: *DemoState) void {
     }
 }
 
-pub fn restartSimulation(demo: *DemoState) void {
-    demo.buffers.data.consumer = Consumer.generateBuffer(demo.gctx, demo.params, demo.coordinate_size);
-    demo.buffers.data.producer = Producer.generateBuffer(demo.gctx, demo.params, demo.coordinate_size);
+pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    demo.buffers.data.consumer = Consumer.generateBuffer(gctx, demo.params, demo.coordinate_size);
+    demo.buffers.data.producer = Producer.generateBuffer(gctx, demo.params, demo.coordinate_size);
 
     demo.stats.clear();
-    Statistics.clearStatsBuffer(demo.gctx, demo.buffers.data.stats);
+    Statistics.clearStatsBuffer(gctx, demo.buffers.data.stats);
 
-    demo.bind_groups.compute = Wgpu.createComputeBindGroup(demo.gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
+    demo.bind_groups.compute = Wgpu.createComputeBindGroup(gctx, demo.buffers.data.consumer, demo.buffers.data.producer, demo.buffers.data.stats);
 }
 
-fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     texture: zgpu.TextureHandle,
     view: zgpu.TextureViewHandle,
 } {
@@ -326,58 +318,4 @@ fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
     });
     const view = gctx.createTextureView(texture, .{});
     return .{ .texture = texture, .view = view };
-}
-
-pub fn main() !void {
-    try zglfw.init();
-    defer zglfw.terminate();
-
-    //zglfw.Hint.reset();
-    //zglfw.Hint.set(.cocoa_retina_framebuffer, 1);
-    //zglfw.Hint.set(.client_api, 0);
-    const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
-        std.log.err("Failed to create demo window.", .{});
-        return;
-    };
-    defer window.destroy();
-    window.setSizeLimits(400, 400, -1, -1);
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = gpa.allocator();
-
-    var demo = try init(allocator, window);
-    defer deinit(allocator, &demo);
-
-    const scale_factor = scale_factor: {
-        const scale = window.getContentScale();
-        break :scale_factor math.max(scale[0], scale[1]);
-    };
-
-    zgui.init(allocator);
-    defer zgui.deinit();
-
-    zgui.plot.init();
-    defer zgui.plot.deinit();
-
-    _ = zgui.io.addFontFromFile(content_dir ++ "Roboto-Medium.ttf", 19.0 * scale_factor);
-
-    zgui.backend.init(
-        window,
-        demo.gctx.device,
-        @enumToInt(zgpu.GraphicsContext.swapchain_format),
-    );
-    defer zgui.backend.deinit();
-
-    zgui.getStyle().scaleAllSizes(scale_factor);
-
-    while (!window.shouldClose()) {
-        zglfw.pollEvents();
-        if (!window.getAttribute(.focused)) {
-            continue;
-        }
-        update(&demo);
-        draw(&demo);
-    }
 }

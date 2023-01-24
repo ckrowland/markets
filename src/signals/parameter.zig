@@ -1,7 +1,6 @@
 const std = @import("std");
 const zgui = @import("zgui");
-const main = @import("main.zig");
-const DemoState = main.DemoState;
+const Signals = @import("main.zig");
 
 fn Args(comptime T: type) type {
     return struct {
@@ -12,15 +11,7 @@ fn Args(comptime T: type) type {
     };
 }
 
-pub fn setup() void {
-    zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-}
-
-pub fn displayFPS(demo: *DemoState) void {
-    zgui.bulletText("{d:.1} fps", .{demo.gctx.stats.fps});
-}
-
-pub fn waveInput(demo: *DemoState) void {
+pub fn waveInput(demo: *Signals) void {
     const nppc = demo.input_one.params.num_points_per_cycle;
     const num_points_one = demo.input_one.wave.xv.items.len;
     const num_points_two = demo.input_two.wave.xv.items.len;
