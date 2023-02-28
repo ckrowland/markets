@@ -8,11 +8,13 @@ Then in your `build.zig` add:
 ```zig
 const zglfw = @import("libs/zglfw/build.zig");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     ...
-    exe.addPackage(zglfw.pkg);
+    const zglfw_pkg = zglfw.Package.build(b, target, optimize, .{});
 
-    zglfw.link(exe);
+    exe.addModule("zglfw", zglfw_pkg.zglfw);
+
+    zglfw_pkg.link(exe);
 }
 ```
 Now in your code you may import and use `zglfw`:

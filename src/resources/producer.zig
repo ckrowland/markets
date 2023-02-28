@@ -131,7 +131,7 @@ pub fn setAll(demo: *DemoState, gctx: *zgpu.GraphicsContext, parameter: Paramete
     // Set new production rate to 0
     var new_producers: [max_num_producers]Self = undefined;
     const params = demo.params;
-    for (producers) |p, i| {
+    for (producers, 0..) |p, i| {
         new_producers[i] = p;
         switch (parameter) {
             .production_rate => {

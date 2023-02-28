@@ -127,7 +127,7 @@ pub fn createRenderPipeline(
 
     const instance_attributes = init: {
         var arr: [args.inst_attrs.len]wgpu.VertexAttribute = undefined;
-        inline for (args.inst_attrs) |attr, i| {
+        inline for (args.inst_attrs, 0..) |attr, i| {
             arr[i] = .{
                 .format = getWgpuType(attr.type) catch unreachable,
                 .offset = @offsetOf(args.inst_type, attr.name),

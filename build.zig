@@ -9,7 +9,7 @@ const content_dir = "content/";
 
 pub fn build(b: *std.build.Builder) void {
     var options = Options{
-        .build_mode = b.standardReleaseOptions(),
+        .optimize = b.standardOptimizeOption(.{}),
         .target = b.standardTargetOptions(.{}),
     };
 
@@ -38,7 +38,7 @@ pub fn build(b: *std.build.Builder) void {
 }
 
 pub const Options = struct {
-    build_mode: std.builtin.Mode,
+    optimize: std.builtin.Mode,
     target: std.zig.CrossTarget,
 
     ztracy_enable: bool = false,
@@ -81,7 +81,12 @@ inline fn thisDir() []const u8 {
 }
 
 fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
-    const exe = b.addExecutable("Visual Simulations", thisDir() ++ "/src/main.zig");
+    const exe = b.addExecutable(.{
+        .name = "Visual Simulations",
+        .root_source_file = .{ .path = thisDir() ++ "/src/main.zig" },
+        .target = options.target,
+        .optimize = options.optimize,
+    });
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
@@ -94,23 +99,25 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     });
     exe.step.dependOn(&install_content_step.step);
 
-    exe.setBuildMode(options.build_mode);
-    exe.setTarget(options.target);
+    const zglfw_pkg = zglfw.Package.build(b, options.target, options.optimize, .{});
 
-    const zgui_options = zgui.BuildOptionsStep.init(b, .{ .backend = .glfw_wgpu });
-    const zgui_pkg = zgui.getPkg(&.{zgui_options.getPkg()});
+    const zpool_pkg = zpool.Package.build(b, .{});
+    const zgpu_pkg = zgpu.Package.build(b, .{
+        .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
+    });
+    const zgui_pkg = zgui.Package.build(b, options.target, options.optimize, .{
+        .options = .{ .backend = .glfw_wgpu },
+    });
+    const zmath_pkg = zmath.Package.build(b, .{});
 
-    const zgpu_options = zgpu.BuildOptionsStep.init(b, .{});
-    const zgpu_pkg = zgpu.getPkg(&.{ zgpu_options.getPkg(), zpool.pkg, zglfw.pkg });
+    exe.addModule("zgpu", zgpu_pkg.zgpu);
+    exe.addModule("zglfw", zglfw_pkg.zglfw);
+    exe.addModule("zgui", zgui_pkg.zgui);
+    exe.addModule("zmath", zmath_pkg.zmath);
 
-    exe.addPackage(zgpu_pkg);
-    exe.addPackage(zmath.pkg);
-    exe.addPackage(zglfw.pkg);
-    exe.addPackage(zgui_pkg);
-
-    zgpu.link(exe, zgpu_options);
-    zglfw.link(exe);
-    zgui.link(exe, zgui_options);
+    zglfw_pkg.link(exe);
+    zgpu_pkg.link(exe);
+    zgui_pkg.link(exe);
 
     return exe;
 }

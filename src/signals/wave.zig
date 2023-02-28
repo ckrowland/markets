@@ -83,7 +83,7 @@ pub const Wave = struct {
         second: *const Wave,
     ) void {
         var second_idx: u32 = 0;
-        for (first.xv.items) |first_x, first_idx| {
+        for (first.xv.items, 0..) |first_x, first_idx| {
             if (second_idx >= second.xv.items.len) {
                 break;
             }
