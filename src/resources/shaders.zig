@@ -72,7 +72,7 @@ pub const cs =
 \\    inventory: atomic<u32>,
 \\    max_inventory: u32,
 \\    len: atomic<u32>,
-\\    queue: array<u32, 450>,
+\\    queue: array<u32, 480>,
 \\  }
 \\  struct Stats {
 \\    transactions: u32,

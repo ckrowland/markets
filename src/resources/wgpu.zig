@@ -101,6 +101,8 @@ fn getWgpuType(comptime T: type) !wgpu.VertexFormat {
     return switch (T) {
         u32 => .uint32,
         f32 => .float32,
+        [2]f32 => .float32x2,
+        [3]f32 => .float32x3,
         [4]f32 => .float32x4,
         else => error.NoValidWgpuType,
     };

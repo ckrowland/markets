@@ -22,7 +22,9 @@ demand_rate: u32,
 inventory: u32,
 radius: f32,
 producer_id: i32,
-_padding: u64,
+_padding1: u32 = 0,
+_padding2: u32 = 0,
+_padding3: u32 = 0,
 
 const max_num_consumers = 10000;
 const num_vertices = 20;
@@ -59,7 +61,6 @@ pub fn create(params: Parameters, coordinate_size: CoordinateSize) []Self {
             .inventory = 0,
             .radius = params.consumer_radius,
             .producer_id = 1000,
-            ._padding = 0,
         };
         i += 1;
     }
