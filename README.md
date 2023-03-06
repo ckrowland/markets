@@ -23,13 +23,19 @@ GPU accelerated visual simulations.
   - Total Producer Inventory
 - To remove a line from the graph, click it's title in the legend.
 
+## Download
+[Releases](https://github.com/ckrowland/simulations/releases)
 
-## Install
+Available for MacOS Intel, MacOS M1 and Windows.
+
+## Install from Source
+
+### Download
 - [Git](https://git-scm.com/)
 - [Git LFS](https://git-lfs.github.com/)
 - [Zig (master)](https://ziglang.org/download/)
 
-## Run
+### Run
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
