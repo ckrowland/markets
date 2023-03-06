@@ -34,7 +34,7 @@ GPU accelerated visual simulations.
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
 git submodule update --init --remote
-zig build resources-run
+zig build demos-run
 ```
 
 ## Libraries Used

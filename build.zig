@@ -7,6 +7,18 @@ const zmath = @import("libs/zmath/build.zig");
 const zpool = @import("libs/zpool/build.zig");
 const content_dir = "content/";
 
+pub const Options = struct {
+    optimize: std.builtin.Mode,
+    target: std.zig.CrossTarget,
+
+    ztracy_enable: bool = false,
+    zpix_enable: bool = false,
+    zgpu_dawn_from_source: bool = false,
+
+    enable_dx_debug: bool = false,
+    enable_dx_gpu_debug: bool = false,
+};
+
 pub fn build(b: *std.build.Builder) void {
     var options = Options{
         .optimize = b.standardOptimizeOption(.{}),
@@ -30,34 +42,6 @@ pub fn build(b: *std.build.Builder) void {
     install.dependOn(&b.addInstallArtifact(exe).step);
 
     const run_step = b.step("demos-run", "Run demos");
-    const run_cmd = exe.run();
-    run_cmd.step.dependOn(install);
-    run_step.dependOn(&run_cmd.step);
-
-    b.getInstallStep().dependOn(install);
-}
-
-pub const Options = struct {
-    optimize: std.builtin.Mode,
-    target: std.zig.CrossTarget,
-
-    ztracy_enable: bool = false,
-    zpix_enable: bool = false,
-    zgpu_dawn_from_source: bool = false,
-
-    enable_dx_debug: bool = false,
-    enable_dx_gpu_debug: bool = false,
-};
-
-fn installDemo(b: *std.build.Builder, exe: *std.build.LibExeObjStep, comptime name: []const u8) void {
-    comptime var desc_name: [256]u8 = [_]u8{0} ** 256;
-    comptime _ = std.mem.replace(u8, name, "_", " ", desc_name[0..]);
-    comptime var desc_size = std.mem.indexOf(u8, &desc_name, "\x00").?;
-
-    const install = b.step(name, "Build '" ++ desc_name[0..desc_size] ++ "' demo");
-    install.dependOn(&b.addInstallArtifact(exe).step);
-
-    const run_step = b.step(name ++ "-run", "Run '" ++ desc_name[0..desc_size] ++ "' demo");
     const run_cmd = exe.run();
     run_cmd.step.dependOn(install);
     run_step.dependOn(&run_cmd.step);
