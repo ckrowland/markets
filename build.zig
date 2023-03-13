@@ -5,7 +5,7 @@ const zgpu = @import("libs/zgpu/build.zig");
 const zgui = @import("libs/zgui/build.zig");
 const zmath = @import("libs/zmath/build.zig");
 const zpool = @import("libs/zpool/build.zig");
-const content_dir = "content/";
+var content_dir: []const u8 = "./content/";
 
 pub const Options = struct {
     optimize: std.builtin.Mode,
@@ -20,9 +20,14 @@ pub const Options = struct {
 };
 
 pub fn build(b: *std.build.Builder) void {
+    const target = b.standardTargetOptions(.{});
+    if (target.os_tag == std.Target.Os.Tag.macos) {
+        content_dir = "../Resources/";
+    }
+
     var options = Options{
         .optimize = b.standardOptimizeOption(.{}),
-        .target = b.standardTargetOptions(.{}),
+        .target = target,
     };
 
     options.ztracy_enable = b.option(bool, "ztracy-enable", "Enable Tracy profiler") orelse false;
@@ -74,12 +79,12 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
 
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
-    exe_options.addOption([]const u8, "content_dir", thisDir() ++ "/" ++ content_dir);
+    exe_options.addOption([]const u8, "content_dir", content_dir);
 
     const install_content_step = b.addInstallDirectory(.{
-        .source_dir = thisDir() ++ "/" ++ content_dir,
+        .source_dir = thisDir() ++ "/content/",
         .install_dir = .{ .custom = "" },
-        .install_subdir = "bin/" ++ content_dir,
+        .install_subdir = "bin/content/",
     });
     exe.step.dependOn(&install_content_step.step);
 
