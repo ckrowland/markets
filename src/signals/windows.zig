@@ -40,11 +40,10 @@ pub fn plots(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
         demo.input_two.wave.clearWave();
         demo.output.wave.clearWave();
 
-        demo.input_one.wave.createSinWave(demo.input_one.params);
-        demo.input_two.wave.createSinWave(demo.input_two.params);
+        demo.input_one.wave.createWave(demo.input_one.params);
+        demo.input_two.wave.createWave(demo.input_two.params);
         const max_x = @max(demo.input_one.wave.getLastPointX(), demo.input_two.wave.getLastPointX());
         demo.output.wave.multiplyWaves(&demo.input_one.wave, &demo.input_two.wave);
-
         if (zgui.plot.beginPlot("##first", .{})) {
             defer zgui.plot.endPlot();
 
@@ -53,16 +52,16 @@ pub fn plots(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
                 .xv = demo.input_one.wave.xv.items,
                 .yv = demo.input_one.wave.yv.items,
             });
-        }
 
-        if (zgui.plot.beginPlot("##second", .{})) {
-            defer zgui.plot.endPlot();
-
-            Plot.setup(max_x);
+            // zgui.plot.pushStyleColor4f(.{
+                // .idx = zgui.plot.StyleCol.line,
+                // .c = .{ 1.0, 0.0, 0.0, 0.0 },
+            // });
             zgui.plot.plotLine("Sin", f32, .{
                 .xv = demo.input_two.wave.xv.items,
                 .yv = demo.input_two.wave.yv.items,
             });
+            // zgui.plot.popStyleColor(.{});
         }
 
         if (zgui.plot.beginPlot("##third", .{})) {

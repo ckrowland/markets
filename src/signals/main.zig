@@ -24,7 +24,13 @@ allocator: std.mem.Allocator,
 pub const Parameters = struct {
     shift: u32 = 0,
     num_points_per_cycle: u32 = 10,
-    num_cycles: u32 = 1,
+    num_cycles: u32 = 6,
+    waveType: waveType = .sin,
+
+    pub const waveType = enum(i32) {
+        sin,
+        cos,
+    };
 };
 
 pub const Signal = struct {
@@ -47,7 +53,9 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
             .wave = Waves.Wave.initAndGenerate(allocator, params),
         },
         .input_two = Signal{
-            .params = params,
+            .params = .{
+                .num_cycles = 1,
+            },
             .wave = Waves.Wave.initAndGenerate(allocator, params),
         },
         .output = Signal{

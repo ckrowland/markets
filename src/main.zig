@@ -70,9 +70,6 @@ pub fn main() !void {
     try zglfw.init();
     defer zglfw.terminate();
 
-    //zglfw.Hint.reset();
-    //zglfw.Hint.set(.cocoa_retina_framebuffer, 1);
-    //zglfw.Hint.set(.client_api, 0);
     const window = zglfw.Window.create(1600, 1000, window_title, null) catch {
         std.log.err("Failed to create demo window.", .{});
         return;

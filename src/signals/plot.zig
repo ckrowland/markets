@@ -8,7 +8,12 @@ pub fn setup(max_x: f32) void {
 fn setupAxes(max_x: f32) void {
     const setupAxis = .{ .label = "", .flags = .{}};
     zgui.plot.setupAxis(.x1, setupAxis);
-    zgui.plot.setupAxis(.y1, setupAxis);
+    zgui.plot.setupAxis(.y1, .{
+        .label = "",
+        .flags = .{
+            .auto_fit = true,
+        },
+    });
 
     const largest_axis = @floatCast(f64, max_x);
     zgui.plot.setupAxisLimits(.x1, .{
@@ -25,6 +30,6 @@ fn setupMarkers() void {
     });
     zgui.plot.pushStyleVar1f(.{
         .idx = zgui.plot.StyleVar.marker_size,
-        .v = 10.0,
+        .v = 5.0,
     });
 }

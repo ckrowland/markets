@@ -29,6 +29,11 @@ pub fn waveInput(demo: *Signals) void {
     }
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
+    zgui.text("Wave Type", .{});
+    _ = zgui.combo("Combo 1", .{
+        .current_item = @ptrCast(*i32, &demo.input_one.params.waveType),
+        .items_separated_by_zeros = "sin\x00cos\x00",
+    });
     zgui.text("Number of cycles", .{});
     _ = zgui.sliderScalar("##1noc", u32, .{
         .v = &demo.input_one.params.num_cycles,
@@ -42,7 +47,13 @@ pub fn waveInput(demo: *Signals) void {
         .max = max_shift_possible,
     });
 
+
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
+    zgui.text("Wave Type", .{});
+    _ = zgui.combo("Combo 2", .{
+        .current_item = @ptrCast(*i32, &demo.input_two.params.waveType),
+        .items_separated_by_zeros = "sin\x00cos\x00",
+    });
     zgui.text("Number of cycles", .{});
     _ = zgui.sliderScalar("##2noc", u32, .{
         .v = &demo.input_two.params.num_cycles,
