@@ -2296,6 +2296,10 @@ ZGUI_API void zguiPlot_PlotScatterValues(
         assert(false);
 }
 
+ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
+    ImPlot::ShowDemoWindow(p_open);
+}
+
 ZGUI_API void zguiPlot_EndPlot(void) {
     ImPlot::EndPlot();
 }
