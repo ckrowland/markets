@@ -91,7 +91,7 @@ pub fn commonParameters(demo: *main.DemoState) void {
 
     if (zgui.combo("Select Demo", .{
         .current_item = &demo.number,
-        .items_separated_by_zeros = "Resource Simulation\x00Fast Fourier Transform Sandbox\x00\x00",
+        .items_separated_by_zeros = "Resource Simulation\x00Fourier Transform\x00\x00",
     })) {
         if (demo.number != 0) {
             demo.resources.running = false;

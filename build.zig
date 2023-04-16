@@ -88,16 +88,16 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     });
     exe.step.dependOn(&install_content_step.step);
 
-    const zglfw_pkg = zglfw.Package.build(b, options.target, options.optimize, .{});
+    const zglfw_pkg = zglfw.package(b, options.target, options.optimize, .{});
 
-    const zpool_pkg = zpool.Package.build(b, .{});
-    const zgpu_pkg = zgpu.Package.build(b, .{
+    const zpool_pkg = zpool.package(b, options.target, options.optimize, .{});
+    const zgpu_pkg = zgpu.package(b, options.target, options.optimize, .{
         .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
     });
-    const zgui_pkg = zgui.Package.build(b, options.target, options.optimize, .{
+    const zgui_pkg = zgui.package(b, options.target, options.optimize, .{
         .options = .{ .backend = .glfw_wgpu },
     });
-    const zmath_pkg = zmath.Package.build(b, .{});
+    const zmath_pkg = zmath.package(b, options.target, options.optimize, .{});
 
     exe.addModule("zgpu", zgpu_pkg.zgpu);
     exe.addModule("zglfw", zglfw_pkg.zglfw);

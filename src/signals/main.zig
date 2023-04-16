@@ -5,10 +5,10 @@ const zgui = @import("zgui");
 const zm = @import("zmath");
 const math = std.math;
 const wgpu = zgpu.wgpu;
-const Window = @import("windows.zig");
 const Plot = @import("plot.zig");
 const Parameter = @import("parameter.zig");
 const Waves = @import("wave.zig");
+const Wave = Waves.Wave;
 
 const window_title = "FFT Demo";
 
@@ -16,30 +16,20 @@ const Self = @This();
 
 depth_texture: zgpu.TextureHandle,
 depth_texture_view: zgpu.TextureViewHandle,
-input_one: Signal,
-input_two: Signal,
-output: Signal,
+random: Wave,
+input: Wave,
+output: Wave,
 allocator: std.mem.Allocator,
 
-pub const Parameters = struct {
-    shift: u32 = 0,
-    num_points_per_cycle: u32 = 10,
-    num_cycles: u32 = 6,
-    waveType: waveType = .sin,
-
-    pub const waveType = enum(i32) {
-        sin,
-        cos,
-    };
-};
-
-pub const Signal = struct {
-    params: Parameters = Parameters{},
-    wave: Waves.Wave = undefined,
-};
-
 pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
-    const params = Parameters{};
+    var randomWave = Waves.Wave.init(allocator, 0, .cos);
+    randomWave.createWave();
+    
+    var inputWave = Waves.Wave.init(allocator, 1, .sin);
+    inputWave.createComparisonWave(&randomWave);
+    
+    var outputWave = Waves.Wave.init(allocator, 2, .result);
+    outputWave.multiplyWaves(&randomWave, &inputWave);
 
     // Create a depth texture and its 'view'.
     const depth = createDepthTexture(gctx);
@@ -48,33 +38,26 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
-        .input_one = Signal{
-            .params = params,
-            .wave = Waves.Wave.initAndGenerate(allocator, params),
-        },
-        .input_two = Signal{
-            .params = .{
-                .num_cycles = 1,
-            },
-            .wave = Waves.Wave.initAndGenerate(allocator, params),
-        },
-        .output = Signal{
-            .params = params,
-            .wave = Waves.Wave.init(allocator),
-        },
+        .random = randomWave,
+        .input = inputWave,
+        .output = outputWave,
     };
 }
 
 pub fn deinit(demo: *Self) void {
-    demo.input_one.wave.deinit();
-    demo.input_two.wave.deinit();
-    demo.output.wave.deinit();
+    demo.random.deinit();
+    demo.input.deinit();
+    demo.output.deinit();
     demo.* = undefined;
 }
 
 pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
-    Window.parameters(demo, gctx);
-    Window.plots(demo, gctx);
+    demo.input.createComparisonWave(&demo.random);
+    demo.output.multiplyWaves(&demo.random, &demo.input);
+    
+    Parameter.window(demo, gctx);
+    Plot.window(demo, gctx);
+    // zgui.plot.showDemoWindow(null);
 }
 
 pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {

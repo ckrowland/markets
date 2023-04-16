@@ -1,71 +1,63 @@
 const std = @import("std");
 const zgui = @import("zgui");
+const zgpu = @import("zgpu");
 const Signals = @import("main.zig");
+const Wave = @import("wave.zig").Wave;
+const Window = @import("../windows.zig");
+const GuiPositions = @import("guiPositions.zig");
 
-fn Args(comptime T: type) type {
-    return struct {
-        label: [:0]const u8,
-        id: [:0]const u8,
-        min: T,
-        max: T,
-    };
+pub fn window(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
+    Window.setNextWindow(gctx, GuiPositions.parameter);
+    
+    if (zgui.begin("Parameters", Window.window_flags)) {
+        defer zgui.end();
+        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+        zgui.text("Number random points", .{});
+        if (zgui.sliderScalar("##nppc", u32, .{
+            .v = &demo.random.pointsPerCycle,
+            .min = 4,
+            .max = 40,
+        })) {
+            const np = demo.random.pointsPerCycle;
+            demo.input.pointsPerCycle = np;
+            demo.random.createWave();
+            demo.input.createComparisonWave(&demo.random);
+        }
+        waveInput(&demo.input, "1");
+
+        const sum = demo.output.addWaveValues();
+        zgui.text("Summation of Output wave = {d:.2}", .{sum});
+        
+    }
 }
 
-pub fn waveInput(demo: *Signals) void {
-    const nppc = demo.input_one.params.num_points_per_cycle;
-    const num_points_one = demo.input_one.wave.xv.items.len;
-    const num_points_two = demo.input_two.wave.xv.items.len;
-    const max_num_points = @max(num_points_one, num_points_two);
-    const max_shift_possible = @intCast(u32, max_num_points - nppc);
-
-    zgui.text("Number points per cycle", .{});
-    if (zgui.sliderScalar("##nppc", u32, .{
-        .v = &demo.input_one.params.num_points_per_cycle,
-        .min = 4,
-        .max = 40,
-    })) {
-        const np = demo.input_one.params.num_points_per_cycle;
-        demo.input_two.params.num_points_per_cycle = np;
-    }
-
+fn waveInput(wave: *Wave, comptime id: []const u8) void {
+    const idStr = "##" ++ id;
+    const sinId = idStr ++ "sin";
+    const cosId = idStr ++ "cos";
+    const nocId = idStr ++ "noc";
+    
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
     zgui.text("Wave Type", .{});
-    _ = zgui.combo("Combo 1", .{
-        .current_item = @ptrCast(*i32, &demo.input_one.params.waveType),
-        .items_separated_by_zeros = "sin\x00cos\x00",
+
+    _ = zgui.radioButtonStatePtr(sinId, .{
+        .v = @ptrCast(*i32, &wave.waveType),
+        .v_button = 0,
     });
+    zgui.sameLine(.{});
+    zgui.text("Sin", .{});
+    zgui.sameLine(.{});
+    _ = zgui.radioButtonStatePtr(cosId, .{
+        .v = @ptrCast(*i32, &wave.waveType),
+        .v_button = 1,
+    });
+    zgui.sameLine(.{});
+    zgui.text("Cos", .{});
+
     zgui.text("Number of cycles", .{});
-    _ = zgui.sliderScalar("##1noc", u32, .{
-        .v = &demo.input_one.params.num_cycles,
+    _ = zgui.sliderScalar(nocId, u32, .{
+        .v = &wave.cycles,
         .min = 1,
         .max = 20,
     });
-    zgui.text("Shift", .{});
-    _ = zgui.sliderScalar("##1shift", u32, .{
-        .v = &demo.input_one.params.shift,
-        .min = 0,
-        .max = max_shift_possible,
-    });
-
-
-    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
-    zgui.text("Wave Type", .{});
-    _ = zgui.combo("Combo 2", .{
-        .current_item = @ptrCast(*i32, &demo.input_two.params.waveType),
-        .items_separated_by_zeros = "sin\x00cos\x00",
-    });
-    zgui.text("Number of cycles", .{});
-    _ = zgui.sliderScalar("##2noc", u32, .{
-        .v = &demo.input_two.params.num_cycles,
-        .min = 1,
-        .max = 20,
-    });
-    zgui.text("Shift", .{});
-    _ = zgui.sliderScalar("##2shift", u32, .{
-        .v = &demo.input_two.params.shift,
-        .min = 0,
-        .max = max_shift_possible,
-    });
-
-    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 }

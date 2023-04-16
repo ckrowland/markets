@@ -2,25 +2,34 @@ const std = @import("std");
 const main = @import("main.zig");
 const DemoState = main.DemoState;
 const InputParams = main.Parameters;
+const Signal = main.Signal;
+
+// Should I have different structs for random wave, sin/cos wave, result wave?
+// Then have a super struct of a fourier transform with a random, input and resulting
+// frequency graph struct?
 
 pub const Wave = struct {
+    id: u32,
+    pointsPerCycle: u32 = 10,
+    cycles: u32 = 6,
+    waveType: waveType = .sin,
     xv: std.ArrayList(f32),
     yv: std.ArrayList(f32),
 
-    pub fn init(allocator: std.mem.Allocator) Wave {
+    pub const waveType = enum(i32) {
+        sin,
+        cos,
+        random,
+        result,
+    };
+    
+    pub fn init(allocator: std.mem.Allocator, id: u32, wType: waveType) Wave {
         return Wave{
+            .id = id,
+            .waveType = wType,
             .xv = std.ArrayList(f32).init(allocator),
             .yv = std.ArrayList(f32).init(allocator),
         };
-    }
-
-    pub fn initAndGenerate(
-        allocator: std.mem.Allocator,
-        params: InputParams,
-    ) Wave {
-        var wave = Wave.init(allocator);
-        wave.createWave(params);
-        return wave;
     }
 
     pub fn deinit(self: Wave) void {
@@ -33,22 +42,52 @@ pub const Wave = struct {
         self.yv.clearRetainingCapacity();
     }
 
-    pub fn createWave(self: *Wave, params: InputParams) void {
+    pub fn calculateNumPoints(self: *Wave) u32 {
+        const firstCycle = self.pointsPerCycle;
+        const remainingCycles = (self.pointsPerCycle - 1) * (self.cycles - 1);
+        return firstCycle + remainingCycles;
+    }
+        
+
+    pub fn createWave(self: *Wave) void {
+        self.clearWave();
         var point: u32 = 0;
         var radians: f32 = 0;
-        const numCycles = @intToFloat(f32, params.num_cycles);
-        const nppc = @intToFloat(f32, params.num_points_per_cycle);
-        const num_points = @floatToInt(u32, nppc + ((nppc - 1) * (numCycles - 1)));
-        while (point < num_points) {
-            const current_point = @intToFloat(f32, point + params.shift);
-            const point_num = current_point / (nppc - 1);
+        const numPoints = self.calculateNumPoints();
+        const numIncrements = @intToFloat(f32, self.pointsPerCycle - 1);
+        while (point < numPoints) : (point += 1) {
+            const fPoint = @intToFloat(f32, point);
+            const point_num = fPoint / numIncrements;
             radians = point_num * std.math.tau;
             self.xv.append(radians) catch unreachable;
-            switch (params.waveType) {
+
+            switch (self.waveType) {
                 .sin => self.yv.append(@sin(radians)) catch unreachable,
                 .cos => self.yv.append(@cos(radians)) catch unreachable,
+                .random => {
+                    const r = std.crypto.random.float(f32) * 2 - 1;
+                    self.yv.append(r) catch unreachable;
+                },
+                .result => unreachable,
             }
-            point += 1;
+        }
+    }
+
+    pub fn createComparisonWave(self: *Wave, random: *Wave) void {
+        self.clearWave();
+        const endRadian = random.getLastPointX();
+        const fNumCycles = @intToFloat(f32, self.cycles);
+        
+        for (random.xv.items) |xv| {
+            const percentToEndRadian = xv / (endRadian / fNumCycles);
+            const twoPiRadian = percentToEndRadian * std.math.tau;
+            self.xv.append(xv) catch unreachable;
+            switch (self.waveType) {
+                .sin => self.yv.append(@sin(twoPiRadian)) catch unreachable,
+                .cos => self.yv.append(@cos(twoPiRadian)) catch unreachable,
+                .random => unreachable,
+                .result => unreachable,
+            }
         }
     }
 
@@ -79,6 +118,7 @@ pub const Wave = struct {
         one: *const Wave,
         two: *const Wave,
     ) void {
+        self.clearWave();
         const oneStart = one.xv.items[0];
         const twoStart = two.xv.items[0];
         var first = one;
@@ -102,5 +142,13 @@ pub const Wave = struct {
                 secondIdx += 1;
             }
         }
+    }
+
+    pub fn addWaveValues(self: *Wave) f32 {
+        var sum: f32 = 0;
+        for (self.yv.items) |value| {
+            sum += value;
+        }
+        return sum;
     }
 };

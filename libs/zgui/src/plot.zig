@@ -498,6 +498,95 @@ extern fn zguiPlot_PlotScatter(
     stride: i32,
 ) void;
 //----------------------------------------------------------------------------------------------
+pub const ShadedFlags = packed struct(u32) {
+    _padding: u32 = 0,
+};
+fn PlotShadedGen(comptime T: type) type {
+    return struct {
+        xv: []const T,
+        yv: []const T,
+        yref: f64 = 0.0,
+        flags: ShadedFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotShaded(label_id: [:0]const u8, comptime T: type, args: PlotShadedGen(T)) void {
+    assert(args.xv.len == args.yv.len);
+    zguiPlot_PlotShaded(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.xv.ptr,
+        args.yv.ptr,
+        @intCast(i32, args.xv.len),
+        args.yref,
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotShaded(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    xv: *const anyopaque,
+    yv: *const anyopaque,
+    count: i32,
+    yref: f64,
+    flags: ShadedFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
+pub const BarsFlags = packed struct(u32) {
+    _reserved0: bool = false,
+    _reserved1: bool = false,
+    _reserved2: bool = false,
+    _reserved3: bool = false,
+    _reserved4: bool = false,
+    _reserved5: bool = false,
+    _reserved6: bool = false,
+    _reserved7: bool = false,
+    _reserved8: bool = false,
+    _reserved9: bool = false,
+    horizontal: bool = false,
+    _padding: u21 = 0,
+};
+fn PlotBarsGen(comptime T: type) type {
+    return struct {
+        xv: []const T,
+        yv: []const T,
+        bar_size: f64 = 0.67,
+        flags: BarsFlags = .{},
+        offset: i32 = 0,
+        stride: i32 = @sizeOf(T),
+    };
+}
+pub fn plotBars(label_id: [:0]const u8, comptime T: type, args: PlotBarsGen(T)) void {
+    assert(args.xv.len == args.yv.len);
+    zguiPlot_PlotBars(
+        label_id,
+        gui.typeToDataTypeEnum(T),
+        args.xv.ptr,
+        args.yv.ptr,
+        @intCast(i32, args.xv.len),
+        args.bar_size,
+        args.flags,
+        args.offset,
+        args.stride,
+    );
+}
+extern fn zguiPlot_PlotBars(
+    label_id: [*:0]const u8,
+    data_type: gui.DataType,
+    xv: *const anyopaque,
+    yv: *const anyopaque,
+    count: i32,
+    bar_size: f64,
+    flags: BarsFlags,
+    offset: i32,
+    stride: i32,
+) void;
+//----------------------------------------------------------------------------------------------
 /// `pub fn showDemoWindow(popen: ?*bool) void`
 pub const showDemoWindow = zguiPlot_ShowDemoWindow;
 extern fn zguiPlot_ShowDemoWindow(popen: ?*bool) void;

@@ -1,7 +1,11 @@
 #include "./imgui/imgui.h"
 #include "./imgui/implot.h"
 
-#define ZGUI_API extern "C"
+#ifndef ZGUI_API
+#define ZGUI_API
+#endif
+
+extern "C" {
 
 /*
 #include <stdio.h>
@@ -172,6 +176,10 @@ ZGUI_API void zguiUnindent(float indent_w) {
 
 ZGUI_API void zguiSeparator(void) {
     ImGui::Separator();
+}
+
+ZGUI_API void zguiSeparatorText(const char* label) {
+    ImGui::SeparatorText(label);
 }
 
 ZGUI_API void zguiSameLine(float offset_from_start_x, float spacing) {
@@ -1427,8 +1435,12 @@ ZGUI_API bool zguiMenuItem(const char* label, const char* shortcut, bool selecte
     return ImGui::MenuItem(label, shortcut, selected, enabled);
 }
 
-ZGUI_API void zguiBeginTooltip(void) {
-    ImGui::BeginTooltip();
+ZGUI_API bool zguiMenuItemPtr(const char* label, const char* shortcut, bool* selected, bool enabled) {
+    return ImGui::MenuItem(label, shortcut, selected, enabled);
+}
+
+ZGUI_API bool zguiBeginTooltip(void) {
+    return ImGui::BeginTooltip();
 }
 
 ZGUI_API void zguiEndTooltip(void) {
@@ -2296,6 +2308,68 @@ ZGUI_API void zguiPlot_PlotScatterValues(
         assert(false);
 }
 
+ZGUI_API void zguiPlot_PlotShaded(
+    const char* label_id,
+    ImGuiDataType data_type,
+    const void* xv,
+    const void* yv,
+    int count,
+    double yref,
+    ImPlotShadedFlags flags,
+    int offset,
+    int stride
+) {
+    if (data_type == ImGuiDataType_S8)
+        ImPlot::PlotShaded(label_id, (const ImS8*)xv, (const ImS8*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U8)
+        ImPlot::PlotShaded(label_id, (const ImU8*)xv, (const ImU8*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_S16)
+        ImPlot::PlotShaded(label_id, (const ImS16*)xv, (const ImS16*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U16)
+        ImPlot::PlotShaded(label_id, (const ImU16*)xv, (const ImU16*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_S32)
+        ImPlot::PlotShaded(label_id, (const ImS32*)xv, (const ImS32*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U32)
+        ImPlot::PlotShaded(label_id, (const ImU32*)xv, (const ImU32*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_Float)
+        ImPlot::PlotShaded(label_id, (const float*)xv, (const float*)yv, count, yref, flags, offset, stride);
+    else if (data_type == ImGuiDataType_Double)
+        ImPlot::PlotShaded(label_id, (const double*)xv, (const double*)yv, count, yref, flags, offset, stride);
+    else
+        assert(false);
+}
+
+ZGUI_API void zguiPlot_PlotBars(
+    const char* label_id,
+    ImGuiDataType data_type,
+    const void* xs,
+    const void* ys,
+    int count,
+    double bar_size,
+    ImPlotBarsFlags flags,
+    int offset,
+    int stride
+) {
+    if (data_type == ImGuiDataType_S8)
+        ImPlot::PlotBars(label_id, (const ImS8*)xs, (const ImS8*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U8)
+        ImPlot::PlotBars(label_id, (const ImU8*)xs, (const ImU8*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_S16)
+        ImPlot::PlotBars(label_id, (const ImS16*)xs, (const ImS16*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U16)
+        ImPlot::PlotBars(label_id, (const ImU16*)xs, (const ImU16*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_S32)
+        ImPlot::PlotBars(label_id, (const ImS32*)xs, (const ImS32*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_U32)
+        ImPlot::PlotBars(label_id, (const ImU32*)xs, (const ImU32*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_Float)
+        ImPlot::PlotBars(label_id, (const float*)xs, (const float*)ys, count, bar_size, flags, offset, stride);
+    else if (data_type == ImGuiDataType_Double)
+        ImPlot::PlotBars(label_id, (const double*)xs, (const double*)ys, count, bar_size, flags, offset, stride);
+    else
+        assert(false);
+}
+
 ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
     ImPlot::ShowDemoWindow(p_open);
 }
@@ -2304,3 +2378,4 @@ ZGUI_API void zguiPlot_EndPlot(void) {
     ImPlot::EndPlot();
 }
 //--------------------------------------------------------------------------------------------------
+} /* extern "C" */
