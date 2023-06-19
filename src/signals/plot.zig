@@ -43,15 +43,15 @@ pub fn window(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
         if (zgui.plot.beginPlot("##frequencies", .{ .flags = plotFlags })) {
             defer zgui.plot.endPlot();
 
-            const maxX = demo.input.getLastPointX();
-            const numPoints = @intToFloat(f32, demo.input.xv.items.len);
-            const margin = 0.1;
-            const barSize = (maxX / numPoints) - margin;
-            zgui.plot.plotBars("Result", f32, .{
-                .xv = demo.output.xv.items,
-                .yv = demo.output.yv.items,
-                .bar_size = barSize
-            });
+            // const maxX = demo.input.getLastPointX();
+            // const numPoints = @intToFloat(f32, demo.input.xv.items.len);
+            // const margin = 0.1;
+            // const barSize = (maxX / numPoints) - margin;
+            // zgui.plot.plotBars("Result", f32, .{
+                // .xv = demo.output.xv.items,
+                // .yv = demo.output.yv.items,
+                // .bar_size = barSize
+            // });
         }
     }
 }

@@ -38,7 +38,7 @@ pub fn package(
     const zgui_options = step.createModule();
 
     const zgui = b.createModule(.{
-        .source_file = .{ .path = thisDir() ++ "/src/main.zig" },
+        .source_file = .{ .path = thisDir() ++ "/src/gui.zig" },
         .dependencies = &.{
             .{ .name = "zgui_options", .module = zgui_options },
         },
@@ -51,7 +51,7 @@ pub fn package(
             .optimize = optimize,
         });
 
-        lib.install();
+        b.installArtifact(lib);
         if (target.isWindows()) {
             lib.defineCMacro("IMGUI_API", "__declspec(dllexport)");
             lib.defineCMacro("IMPLOT_API", "__declspec(dllexport)");

@@ -1,11 +1,10 @@
-const Consumer = @import("consumer.zig");
-const Producer = @import("producer.zig");
-const wgsl = @import("shaders.zig");
-const Wgpu = @import("wgpu.zig");
+const Consumer = @import("../consumer.zig");
+const Producer = @import("../producer.zig");
+const Wgpu = @import("../wgpu.zig");
 
 pub const cpi = .{
-    .vs = wgsl.vs,
-    .fs = wgsl.fs,
+    .vs = @embedFile("../../shaders/vertex/consumer.wgsl"),
+    .fs = @embedFile("../../shaders/fragment/fragment.wgsl"),
     .inst_type = Consumer,
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
@@ -28,8 +27,8 @@ pub const cpi = .{
 };
 
 pub const ppi = .{
-    .vs = wgsl.producer_vs,
-    .fs = wgsl.fs,
+    .vs = @embedFile("../../shaders/vertex/producer.wgsl"),
+    .fs = @embedFile("../../shaders/fragment/fragment.wgsl"),
     .inst_type = Producer,
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
@@ -51,12 +50,16 @@ pub const ppi = .{
     },
 };
 
+const common = @embedFile("../../shaders/compute/common.wgsl");
 pub const ccpi = .{
-    .cs = wgsl.cs,
-    .entry_point = "consumer_main",
+    .cs = common ++ @embedFile("../../shaders/compute/consumer.wgsl"),
+    .entry_point = "main",
 };
-
 pub const pcpi = .{
-    .cs = wgsl.cs,
-    .entry_point = "producer_main",
+    .cs = common ++ @embedFile("../../shaders/compute/producer.wgsl"),
+    .entry_point = "main",
+};
+pub const cucpi = .{
+    .cs = common ++ @embedFile("../../shaders/compute/consumer.wgsl"),
+    .entry_point = "reset",
 };

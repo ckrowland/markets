@@ -1579,6 +1579,14 @@ ZGUI_API void zguiColorConvertHSVtoRGB(float h, float s, float v, float* out_r, 
 }
 //--------------------------------------------------------------------------------------------------
 //
+// Inputs Utilities: Keyboard
+//
+//--------------------------------------------------------------------------------------------------
+ZGUI_API bool zguiIsKeyDown(ImGuiKey key) {
+    return ImGui::IsKeyDown(key);
+}
+//--------------------------------------------------------------------------------------------------
+//
 // DrawList
 //
 //--------------------------------------------------------------------------------------------------
@@ -2335,37 +2343,6 @@ ZGUI_API void zguiPlot_PlotShaded(
         ImPlot::PlotShaded(label_id, (const float*)xv, (const float*)yv, count, yref, flags, offset, stride);
     else if (data_type == ImGuiDataType_Double)
         ImPlot::PlotShaded(label_id, (const double*)xv, (const double*)yv, count, yref, flags, offset, stride);
-    else
-        assert(false);
-}
-
-ZGUI_API void zguiPlot_PlotBars(
-    const char* label_id,
-    ImGuiDataType data_type,
-    const void* xs,
-    const void* ys,
-    int count,
-    double bar_size,
-    ImPlotBarsFlags flags,
-    int offset,
-    int stride
-) {
-    if (data_type == ImGuiDataType_S8)
-        ImPlot::PlotBars(label_id, (const ImS8*)xs, (const ImS8*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_U8)
-        ImPlot::PlotBars(label_id, (const ImU8*)xs, (const ImU8*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_S16)
-        ImPlot::PlotBars(label_id, (const ImS16*)xs, (const ImS16*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_U16)
-        ImPlot::PlotBars(label_id, (const ImU16*)xs, (const ImU16*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_S32)
-        ImPlot::PlotBars(label_id, (const ImS32*)xs, (const ImS32*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_U32)
-        ImPlot::PlotBars(label_id, (const ImU32*)xs, (const ImU32*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_Float)
-        ImPlot::PlotBars(label_id, (const float*)xs, (const float*)ys, count, bar_size, flags, offset, stride);
-    else if (data_type == ImGuiDataType_Double)
-        ImPlot::PlotBars(label_id, (const double*)xs, (const double*)ys, count, bar_size, flags, offset, stride);
     else
         assert(false);
 }

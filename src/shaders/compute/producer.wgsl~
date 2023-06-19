@@ -1,0 +1,17 @@
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+    let index : u32 = GlobalInvocationID.x;
+    if(GlobalInvocationID.x >= stats.num_producers) {
+      return;
+    }
+    let max_inventory = producers[index].max_inventory;
+    let inventory = atomicLoad(&producers[index].inventory);
+    var production_rate = producers[index].production_rate;
+    if (max_inventory > inventory) {
+        let diff = max_inventory - inventory;
+        production_rate = min(diff, production_rate);
+        atomicAdd(&producers[index].inventory, production_rate);
+    } else {
+        atomicStore(&producers[index].inventory, max_inventory);
+    }
+}

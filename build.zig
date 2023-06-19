@@ -5,18 +5,12 @@ const zgpu = @import("libs/zgpu/build.zig");
 const zgui = @import("libs/zgui/build.zig");
 const zmath = @import("libs/zmath/build.zig");
 const zpool = @import("libs/zpool/build.zig");
+const zstbi = @import("libs/zstbi/build.zig");
 var content_dir: []const u8 = "./content/";
 
 pub const Options = struct {
     optimize: std.builtin.Mode,
     target: std.zig.CrossTarget,
-
-    ztracy_enable: bool = false,
-    zpix_enable: bool = false,
-    zgpu_dawn_from_source: bool = false,
-
-    enable_dx_debug: bool = false,
-    enable_dx_gpu_debug: bool = false,
 };
 
 pub fn build(b: *std.build.Builder) void {
@@ -30,57 +24,53 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
     };
 
-    options.ztracy_enable = b.option(bool, "ztracy-enable", "Enable Tracy profiler") orelse false;
-    options.zgpu_dawn_from_source = b.option(
-        bool,
-        "zgpu-dawn-from-source",
-        "Build Dawn (wgpu implementation) from source",
-    ) orelse false;
-
-    if (options.zgpu_dawn_from_source) {
-        ensureSubmodules(b.allocator) catch |err| @panic(@errorName(err));
-    }
-
-    const install = b.step("demos", "Build demos");
+    const install_step = b.step("demos", "Build demos");
 
     var exe = createExe(b, options);
-    install.dependOn(&b.addInstallArtifact(exe).step);
-
+    install_step.dependOn(&b.addInstallArtifact(exe).step);
+    
     const run_step = b.step("demos-run", "Run demos");
-    const run_cmd = exe.run();
-    run_cmd.step.dependOn(install);
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(install_step);
     run_step.dependOn(&run_cmd.step);
 
-    b.getInstallStep().dependOn(install);
-}
-
-fn ensureSubmodules(allocator: std.mem.Allocator) !void {
-    if (std.process.getEnvVarOwned(allocator, "NO_ENSURE_SUBMODULES")) |no_ensure_submodules| {
-        if (std.mem.eql(u8, no_ensure_submodules, "true")) return;
-    } else |_| {}
-    var child = std.ChildProcess.init(&.{ "git", "submodule", "update", "--init", "--recursive" }, allocator);
-    child.cwd = thisDir();
-    child.stderr = std.io.getStdErr();
-    child.stdout = std.io.getStdOut();
-    _ = try child.spawnAndWait();
-}
-
-inline fn thisDir() []const u8 {
-    return comptime std.fs.path.dirname(@src().file) orelse ".";
+    b.getInstallStep().dependOn(install_step);
 }
 
 fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
+    const target = options.target;
+    const optimize = options.optimize;
+    
     const exe = b.addExecutable(.{
         .name = "Visual Simulations",
         .root_source_file = .{ .path = thisDir() ++ "/src/main.zig" },
-        .target = options.target,
-        .optimize = options.optimize,
+        .target = target,
+        .optimize = optimize,
     });
+    const zgui_pkg = zgui.package(b, target, optimize, .{
+        .options = .{ .backend = .glfw_wgpu },
+    });
+    zgui_pkg.link(exe);
 
+    const zglfw_pkg = zglfw.package(b, target, optimize, .{});
+    const zpool_pkg = zpool.package(b, target, optimize, .{});
+    const zgpu_pkg = zgpu.package(b, target, optimize, .{
+        .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
+    });
+    const zmath_pkg = zmath.package(b, target, optimize, .{
+        .options = .{ .enable_cross_platform_determinism = true },
+    });
+    const zstbi_pkg = zstbi.package(b, target, optimize, .{});
+    
+    zglfw_pkg.link(exe);
+    zgpu_pkg.link(exe);
+    zmath_pkg.link(exe);
+    zstbi_pkg.link(exe);
+    
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
     exe_options.addOption([]const u8, "content_dir", content_dir);
-
+    
     const install_content_step = b.addInstallDirectory(.{
         .source_dir = thisDir() ++ "/content/",
         .install_dir = .{ .custom = "" },
@@ -88,25 +78,9 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     });
     exe.step.dependOn(&install_content_step.step);
 
-    const zglfw_pkg = zglfw.package(b, options.target, options.optimize, .{});
-
-    const zpool_pkg = zpool.package(b, options.target, options.optimize, .{});
-    const zgpu_pkg = zgpu.package(b, options.target, options.optimize, .{
-        .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
-    });
-    const zgui_pkg = zgui.package(b, options.target, options.optimize, .{
-        .options = .{ .backend = .glfw_wgpu },
-    });
-    const zmath_pkg = zmath.package(b, options.target, options.optimize, .{});
-
-    exe.addModule("zgpu", zgpu_pkg.zgpu);
-    exe.addModule("zglfw", zglfw_pkg.zglfw);
-    exe.addModule("zgui", zgui_pkg.zgui);
-    exe.addModule("zmath", zmath_pkg.zmath);
-
-    zglfw_pkg.link(exe);
-    zgpu_pkg.link(exe);
-    zgui_pkg.link(exe);
-
     return exe;
+}
+
+inline fn thisDir() []const u8 {
+    return comptime std.fs.path.dirname(@src().file) orelse ".";
 }

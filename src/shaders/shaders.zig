@@ -56,6 +56,7 @@ pub const cs =
 \\  struct Consumer {
 \\    position: vec4<f32>,
 \\    home: vec4<f32>,
+\\    absolute_home: vec4<f32>,
 \\    destination: vec4<f32>,
 \\    step_size: vec4<f32>,
 \\    color: vec4<f32>,
@@ -67,6 +68,7 @@ pub const cs =
 \\  }
 \\  struct Producer {
 \\    position: vec4<f32>,
+\\    absolute_pos: vec4<f32>,
 \\    color: vec4<f32>,
 \\    production_rate: u32,
 \\    inventory: atomic<u32>,
