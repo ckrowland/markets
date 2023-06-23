@@ -21,7 +21,6 @@ pub const MouseButton = struct {
             .repeat, .press => {
                 self.state = true;
             },
-            else => unreachable,
         }
     }
 
