@@ -42,8 +42,8 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
     var consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
     var i: usize = 0;
     while (i < num) {
-        const x = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
-        const y = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
+        const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
+        const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
         const aspect_home = [4]f32{ x * params.aspect, y, 0, 0 };
 
         consumers[i] = Self{
@@ -68,7 +68,7 @@ pub const Args = struct {
     movingRate: f32 = 5.0,
     demandRate: u32 = 100,
     radius: f32 = 20.0,
-};    
+};
 pub fn create(args: Args) Self {
     return Self{
         .absolute_home = args.absolute_home,

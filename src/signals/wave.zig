@@ -22,7 +22,7 @@ pub const Wave = struct {
         random,
         result,
     };
-    
+
     pub fn init(allocator: std.mem.Allocator, id: u32, wType: waveType) Wave {
         return Wave{
             .id = id,
@@ -47,16 +47,15 @@ pub const Wave = struct {
         const remainingCycles = (self.pointsPerCycle - 1) * (self.cycles - 1);
         return firstCycle + remainingCycles;
     }
-        
 
     pub fn createWave(self: *Wave) void {
         self.clearWave();
         var point: u32 = 0;
         var radians: f32 = 0;
         const numPoints = self.calculateNumPoints();
-        const numIncrements = @intToFloat(f32, self.pointsPerCycle - 1);
+        const numIncrements = @floatFromInt(f32, self.pointsPerCycle - 1);
         while (point < numPoints) : (point += 1) {
-            const fPoint = @intToFloat(f32, point);
+            const fPoint = @floatFromInt(f32, point);
             const point_num = fPoint / numIncrements;
             radians = point_num * std.math.tau;
             self.xv.append(radians) catch unreachable;
@@ -76,8 +75,8 @@ pub const Wave = struct {
     pub fn createComparisonWave(self: *Wave, random: *Wave) void {
         self.clearWave();
         const endRadian = random.getLastPointX();
-        const fNumCycles = @intToFloat(f32, self.cycles);
-        
+        const fNumCycles = @floatFromInt(f32, self.cycles);
+
         for (random.xv.items) |xv| {
             const percentToEndRadian = xv / (endRadian / fNumCycles);
             const twoPiRadian = percentToEndRadian * std.math.tau;

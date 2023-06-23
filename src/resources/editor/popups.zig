@@ -33,7 +33,7 @@ pub fn addWindow(self: *Self, window: Window) void {
 
 pub fn display(self: Self) void {
     _ = self;
-}    
+}
 // pub fn producerParameters() void {
 //     if (zgui.begin("Test", Window.window_flags)) {
 //         zgui.pushIntId(3);
@@ -53,8 +53,8 @@ pub fn display(self: Self) void {
 //                 },
 //             });
 //         }
-        
+
 //         zgui.popId();
 //     }
 //     zgui.end();
-// }    
+// }

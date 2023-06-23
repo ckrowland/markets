@@ -48,14 +48,13 @@ pub fn window(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
             // const margin = 0.1;
             // const barSize = (maxX / numPoints) - margin;
             // zgui.plot.plotBars("Result", f32, .{
-                // .xv = demo.output.xv.items,
-                // .yv = demo.output.yv.items,
-                // .bar_size = barSize
+            // .xv = demo.output.xv.items,
+            // .yv = demo.output.yv.items,
+            // .bar_size = barSize
             // });
         }
     }
 }
-
 
 pub fn setup(demo: *Signals) void {
     const max_x = @max(demo.random.getLastPointX(), demo.input.getLastPointX());
@@ -64,21 +63,15 @@ pub fn setup(demo: *Signals) void {
 }
 
 fn setupAxes(max_x: f32) void {
-    zgui.plot.setupAxis(.x1, .{
-        .label = "",
-        .flags = .{
-            .no_tick_marks = true,
-            .no_tick_labels = true,
-            .auto_fit = true,
-        }
-    });
-    zgui.plot.setupAxis(.y1, .{
-        .label = "",
-        .flags = .{
-            .no_tick_marks = true,
-            .auto_fit = true,
-        }
-    });
+    zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{
+        .no_tick_marks = true,
+        .no_tick_labels = true,
+        .auto_fit = true,
+    } });
+    zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{
+        .no_tick_marks = true,
+        .auto_fit = true,
+    } });
 
     const largest_axis = @floatCast(f64, max_x);
     zgui.plot.setupAxisLimits(.x1, .{

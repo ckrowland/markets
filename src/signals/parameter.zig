@@ -8,7 +8,7 @@ const GuiPositions = @import("guiPositions.zig");
 
 pub fn window(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
     Window.setNextWindow(gctx, GuiPositions.parameter);
-    
+
     if (zgui.begin("Parameters", Window.window_flags)) {
         defer zgui.end();
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
@@ -27,7 +27,6 @@ pub fn window(demo: *Signals, gctx: *zgpu.GraphicsContext) void {
 
         const sum = demo.output.addWaveValues();
         zgui.text("Summation of Output wave = {d:.2}", .{sum});
-        
     }
 }
 
@@ -36,7 +35,7 @@ fn waveInput(wave: *Wave, comptime id: []const u8) void {
     const sinId = idStr ++ "sin";
     const cosId = idStr ++ "cos";
     const nocId = idStr ++ "noc";
-    
+
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
     zgui.text("Wave Type", .{});
 

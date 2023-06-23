@@ -47,8 +47,8 @@ pub fn setNextWindow(gctx: *zgpu.GraphicsContext, args: PercentArgs) void {
     std.debug.assert(0.0 <= args.w and args.w <= 1.0);
     std.debug.assert(0.0 <= args.h and args.h <= 1.0);
     std.debug.assert(0.0 <= args.margin and args.margin <= 1.0);
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
-    const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+    const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
     const margin_x = width * args.margin;
     const margin_y = height * args.margin;
     const margin_pixels = @min(margin_x, margin_y);
@@ -97,8 +97,8 @@ pub const windowPixelsArgs = struct {
 pub fn setNextWindowPixels(gctx: *zgpu.GraphicsContext, args: windowPixelsArgs) void {
     assertPercent(args.width_percent);
     assertPercent(args.height_percent);
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
-    const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+    const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
     var width_pixels = width * args.width_percent;
     var height_pixels = height * args.height_percent;
     zgui.setNextWindowPos(.{
@@ -146,7 +146,6 @@ pub fn commonParameters(demo: *main.DemoState) void {
         }
         demo.random.updateDepthTexture(demo.gctx);
         demo.editor.updateDepthTexture(demo.gctx);
-        
     }
     zgui.spacing();
 }

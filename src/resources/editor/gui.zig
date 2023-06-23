@@ -41,7 +41,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.end();
 
     // Popups.display();
-    
+
     if (demo.running) {
         gctx.queue.writeBuffer(
             gctx.lookupResource(demo.buffers.data.stats.data).?,
@@ -60,7 +60,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             });
         }
     }
-    
+
     _ = switch (demo.placing) {
         .none => {},
         .consumers => {
@@ -70,14 +70,18 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .producer => {
             hoverUpdate(gctx, demo);
             addingProducer(gctx, demo);
-        },            
+        },
     };
 }
 
 fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     gctx.queue.writeBuffer(
-    gctx.lookupResource(demo.buffers.data.hover).?, @offsetOf(Hover,
-    "position"), [4]f32, &.{Mouse.getWorldPosition(gctx)}, ); }
+        gctx.lookupResource(demo.buffers.data.hover).?,
+        @offsetOf(Hover, "position"),
+        [4]f32,
+        &.{Mouse.getWorldPosition(gctx)},
+    );
+}
 
 fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     if (demo.mouse.down() and Mouse.onGrid(gctx)) {
@@ -88,12 +92,10 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
             gctx.lookupResource(demo.buffers.data.consumer.data).?,
             @sizeOf(Consumer) * num_consumers,
             Consumer,
-            &.{
-                Consumer.create(.{
-                    .home = world_pos,
-                    .absolute_home = Camera.getGridPosition(gctx, world_pos),
-                })
-            },
+            &.{Consumer.create(.{
+                .home = world_pos,
+                .absolute_home = Camera.getGridPosition(gctx, world_pos),
+            })},
         );
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
     }
@@ -107,12 +109,10 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
             gctx.lookupResource(demo.buffers.data.producer.data).?,
             @sizeOf(Producer) * num_producers,
             Producer,
-            &.{
-                Producer.create(.{
-                    .position = world_pos,
-                    .absolute_position = Camera.getGridPosition(gctx, world_pos),
-                })
-            },
+            &.{Producer.create(.{
+                .position = world_pos,
+                .absolute_position = Camera.getGridPosition(gctx, world_pos),
+            })},
         );
         Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers + 1);
 
@@ -131,11 +131,7 @@ fn plots(demo: *DemoState) void {
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - margin;
 
-    if (zgui.plot.beginPlot("", .{
-        .w = plot_width,
-        .h = plot_height,
-        .flags = .{}
-    })) {
+    if (zgui.plot.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{} })) {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
@@ -172,7 +168,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         pressedColor,
         buttonSize,
     );
-    
+
     zgui.text("Number Of Producers", .{});
 
     zgui.text("Consumer Size", .{});
@@ -199,7 +195,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.sameLine(.{});
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
+        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){
             .get_buffer = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
