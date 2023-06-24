@@ -49,7 +49,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             .max_inventory = &demo.params.max_inventory,
         },
     });
-    
+
     if (demo.running) {
         Statistics.generateAndFillRandomColor(gctx, demo.buffers.data.stats.data);
         const current_time = @floatCast(f32, gctx.stats.time);
@@ -94,7 +94,7 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
             .home = world_pos,
             .absolute_home = Camera.getGridPosition(gctx, world_pos),
         });
-        var consumers = [1]Consumer{ consumer };
+        var consumers = [1]Consumer{consumer};
         Wgpu.appendBuffer(gctx, Consumer, .{
             .num_old_structs = num_consumers,
             .buf = demo.buffers.data.consumer.data,
@@ -112,7 +112,7 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
             .home = world_pos,
             .absolute_home = Camera.getGridPosition(gctx, world_pos),
         });
-        var producers = [1]Producer{ producer };
+        var producers = [1]Producer{producer};
         Wgpu.appendBuffer(gctx, Producer, .{
             .num_old_structs = num_producers,
             .buf = demo.buffers.data.producer.data,
@@ -198,7 +198,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.sameLine(.{});
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
+        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,

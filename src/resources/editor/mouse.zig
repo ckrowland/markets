@@ -12,7 +12,7 @@ pub const MouseButton = struct {
     previousState: bool = false,
     grid_pos: [2]f32 = .{ 0, 0 },
     cursor_pos: [2]f32 = .{ 0, 0 },
-    
+
     pub fn update(self: *MouseButton, gctx: *zgpu.GraphicsContext) void {
         self.previousState = self.state;
         const action = gctx.window.getMouseButton(self.button);
@@ -62,7 +62,7 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) zmath.F32x4 {
     const cursor_pos = gctx.window.getCursorPos();
     const cursor_pos_in_vp = [2]f64{ cursor_pos[0] - (xOffset / 2), cursor_pos[1] };
     const content_scale = gctx.window.getContentScale();
-    
+
     const rx = (cursor_pos_in_vp[0] * (2 * content_scale[0])) / viewport_size[0] - 1;
     const ry = 1 - (cursor_pos_in_vp[1] * (2 * content_scale[1])) / viewport_size[1];
     const x = @floatCast(f32, rx);

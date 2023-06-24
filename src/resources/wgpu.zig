@@ -83,7 +83,7 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
         0,
         @sizeOf(T) * buf.num_structs,
         GenCallback(T),
-        @ptrCast(*anyopaque, &buf)
+        @ptrCast(*anyopaque, &buf),
     );
     wait_loop: while (true) {
         gctx.device.tick();

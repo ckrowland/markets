@@ -127,25 +127,25 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         u32,
         .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
     )) {
-        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer){
+        Wgpu.setAll(gctx, Consumer, .{
             .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_consumers.new,
             .parameter = .{
                 .demand_rate = demo.params.demand_rate,
-            }
+            },
         });
     }
 
     zgui.text("Max Producer Inventory", .{});
     if (zgui.sliderScalar("##mi", u32, .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 })) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
+        Wgpu.setAll(gctx, Producer, .{
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
             .parameter = .{
                 .max_inventory = demo.params.max_inventory,
-            }
+            },
         });
     }
 
@@ -177,13 +177,13 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.text("Moving Rate", .{});
     if (zgui.sliderScalar("##mr", f32, .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 })) {
-        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer) {
+        Wgpu.setAll(gctx, Consumer, .{
             .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_consumers.new,
             .parameter = .{
                 .moving_rate = demo.params.moving_rate,
-            }
+            },
         });
     }
 
@@ -207,7 +207,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.sameLine(.{});
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
+        Wgpu.setAll(gctx, Producer, .{
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,

@@ -67,11 +67,11 @@ fn getPopupSize(gctx: *zgpu.GraphicsContext, pop_up: *Popup) [2]f32 {
         corners.bottom_left[1] - corners.top_left[1],
     };
 }
-        
+
 // Return true if mouse pos is hovering over agent or popup
 fn mouseOverPopup(gctx: *zgpu.GraphicsContext, mouse: Mouse.MouseButton, pop_up: *Popup) bool {
     const pixel_corners = getPixelCorners(gctx, pop_up);
-    
+
     const top_left = pixel_corners.top_left;
     const top_right = pixel_corners.top_right;
     const bottom_left = pixel_corners.bottom_left;
@@ -113,7 +113,7 @@ pub fn display(
             self.positions.items[i].open = false;
             self.positions.items[i].grid_hover_size = INITIAL_HOVER_SIZE;
         }
-    }        
+    }
 }
 
 fn setupPopupWindow(gctx: *zgpu.GraphicsContext, pop_up: *Popup) void {
@@ -156,7 +156,6 @@ fn productionRateButton(gctx: *zgpu.GraphicsContext, args: ProducerArgs) void {
     }
 }
 
-        
 fn maxInventoryButton(gctx: *zgpu.GraphicsContext, args: ProducerArgs) void {
     zgui.text("Max Inventory", .{});
     if (zgui.sliderScalar("##mi", u32, .{

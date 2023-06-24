@@ -58,7 +58,7 @@ pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
     const world_pos = zmath.loadArr4(getWorldPosition(gctx, grid_pos));
     const camera_pos = zmath.mul(world_pos, getObjectToClipMat(gctx));
     const rel_pos = [4]f32{ camera_pos[0] / -POS_Z, camera_pos[1] / -POS_Z, 0, 1 };
-    
+
     const viewport_size = getViewportPixelSize(gctx);
     const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
     const xOffset = width - viewport_size[0];
@@ -66,7 +66,7 @@ pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
 
     const cursor_in_vp_x = ((rel_pos[0] + 1) * viewport_size[0]) / (2 * content_scale[0]);
     const cursor_in_vp_y = ((-rel_pos[1] + 1) * viewport_size[1]) / (2 * content_scale[1]);
-    const screen_coords =  [2]f32{ cursor_in_vp_x + (xOffset / 2), cursor_in_vp_y };
+    const screen_coords = [2]f32{ cursor_in_vp_x + (xOffset / 2), cursor_in_vp_y };
     return .{ screen_coords[0] * content_scale[0], screen_coords[1] * content_scale[1] };
 }
 
