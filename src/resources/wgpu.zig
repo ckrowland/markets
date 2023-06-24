@@ -78,6 +78,7 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
     if (buf.num_structs == 0) {
         return error.EmptyBuffer;
     }
+
     buf.buffer.mapAsync(
         .{ .read = true },
         0,
@@ -113,21 +114,33 @@ pub fn getParameters(comptime T: type) type {
 }
     
 pub fn setArgs(comptime T: type) type {
-    return struct {
-        get_buffer: ObjectBuffer,
-        stats: ObjectBuffer,
-        num_agents: u32,
-        parameter: getParameters(T),
-    };
+    switch (T) {
+        Consumer => return struct {
+            agents: ObjectBuffer,
+            stats: ObjectBuffer,
+            num_agents: u32,
+            parameter: union(enum) {
+                moving_rate: f32,
+                demand_rate: u32,
+            },
+        },
+        Producer => return struct {
+            agents: ObjectBuffer,
+            stats: ObjectBuffer,
+            num_agents: u32,
+            parameter: union(enum) {
+                production_rate: u32,
+                inventory: i32,
+                max_inventory: u32,
+            },
+        },
+        else => unreachable,
+    }
 }
 
-pub fn setAll(
-    gctx: *zgpu.GraphicsContext,
-    comptime agent: type,
-    args: setArgs(agent),
-) void {
+pub fn setAll(gctx: *zgpu.GraphicsContext, comptime agent: type, args: setArgs(agent)) void {
     var agents = getAll(gctx, agent, .{
-        .structs = args.get_buffer,
+        .structs = args.agents,
         .num_structs = getNumStructs(gctx, agent, args.stats),
     }) catch return;
     for (agents, 0..) |_, i| {
@@ -149,7 +162,7 @@ pub fn setAll(
         }
     }
     gctx.queue.writeBuffer(
-        gctx.lookupResource(args.get_buffer.data).?,
+        gctx.lookupResource(args.agents.data).?,
         0,
         agent,
         agents,

@@ -1,5 +1,6 @@
 const std = @import("std");
 const array = std.ArrayList;
+const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const Wgpu = @import("wgpu.zig");
@@ -34,6 +35,14 @@ pub fn deinit(self: *Self) void {
     self.num_total_producer_inventory.deinit();
 }
 
+pub fn generateAndFillRandomColor(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(buf).?,
+        3 * @sizeOf(u32),
+        f32,
+        &.{ random.float(f32), random.float(f32), random.float(f32) },
+    );
+}
 pub const updateBuffers = struct {
     stats: Wgpu.ObjectBuffer,
     consumers: Wgpu.ObjectBuffer,

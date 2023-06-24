@@ -27,7 +27,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const random = try Random.init(allocator, gctx);
     const editor = try Editor.init(allocator, gctx);
     return DemoState{
-        .number = 0,
+        .number = 1,
         .gctx = gctx,
         .random = random,
         .editor = editor,

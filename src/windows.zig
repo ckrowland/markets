@@ -87,29 +87,6 @@ fn assertPercent(num: f32) void {
     std.debug.assert(0.0 <= num and num <= 1.0);
 }
 
-pub const windowPixelsArgs = struct {
-    x: f32,
-    y: f32,
-    width_percent: f32,
-    height_percent: f32,
-};
-// Given a pixel position within glfw window, set next zgui window appropriately
-pub fn setNextWindowPixels(gctx: *zgpu.GraphicsContext, args: windowPixelsArgs) void {
-    assertPercent(args.width_percent);
-    assertPercent(args.height_percent);
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
-    const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
-    var width_pixels = width * args.width_percent;
-    var height_pixels = height * args.height_percent;
-    zgui.setNextWindowPos(.{
-        .x = args.x,
-        .y = args.y,
-    });
-    zgui.setNextWindowSize(.{
-        .w = width_pixels,
-        .h = height_pixels,
-    });
-}
 
 pub fn commonGui(demo: *main.DemoState) void {
     setNextWindow(demo.gctx, PercentArgs{

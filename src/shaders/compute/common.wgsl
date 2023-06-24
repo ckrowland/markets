@@ -12,8 +12,8 @@ struct Consumer {
   producer_id: i32,
 }
 struct Producer {
-  absolute_position: vec4<f32>,
-  position: vec4<f32>,
+  absolute_home: vec4<f32>,
+  home: vec4<f32>,
   color: vec4<f32>,
   production_rate: u32,
   inventory: atomic<i32>,

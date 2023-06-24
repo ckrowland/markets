@@ -33,7 +33,7 @@ pub const ppi = .{
     .inst_type = Producer,
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
-            .name = "position",
+            .name = "home",
             .type = [4]f32,
         },
         .{
@@ -74,8 +74,4 @@ pub const ccpi = .{
 pub const pcpi = .{
     .cs = common ++ @embedFile("../../shaders/compute/producer.wgsl"),
     .entry_point = "main",
-};
-pub const cucpi = .{
-    .cs = common ++ @embedFile("../../shaders/compute/consumer.wgsl"),
-    .entry_point = "reset",
 };

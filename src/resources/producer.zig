@@ -12,8 +12,8 @@ const Camera = @import("../camera.zig");
 
 const Self = @This();
 
-absolute_position: [4]f32,
-position: [4]f32,
+absolute_home: [4]f32,
+home: [4]f32,
 color: [4]f32 = .{ 1, 1, 1, 0 },
 production_rate: u32 = 300,
 inventory: i32 = 0,
@@ -27,13 +27,13 @@ pub const Parameter = enum {
 };
 
 pub const Args = struct {
-    absolute_position: [4]f32,
-    position: [4]f32,
+    absolute_home: [4]f32,
+    home: [4]f32,
 };
 pub fn create(args: Args) Self {
     return Self{
-        .absolute_position = args.absolute_position,
-        .position = args.position,
+        .absolute_home = args.absolute_home,
+        .home = args.home,
     };
 }
 
@@ -55,8 +55,8 @@ pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {
         const x = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
         const y = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
         producers[i] = Self{
-            .absolute_position = [4]f32{ x, y, 0, 0 },
-            .position = [4]f32{ x * params.aspect, y, 0, 0 },
+            .absolute_home = [4]f32{ x, y, 0, 0 },
+            .home = [4]f32{ x * params.aspect, y, 0, 0 },
             .production_rate = params.production_rate,
             .inventory = @intCast(i32, params.max_inventory),
             .max_inventory = params.max_inventory,
@@ -79,7 +79,7 @@ pub fn updateCoords(gctx: *zgpu.GraphicsContext, args: updateCoordsArgs) void {
     var new_producers: [DemoState.MAX_NUM_PRODUCERS]Self = undefined;
     for (producers, 0..) |p, i| {
         new_producers[i] = p;
-        new_producers[i].position = Camera.getWorldPosition(gctx, p.absolute_position);
+        new_producers[i].home = Camera.getWorldPosition(gctx, p.absolute_home);
     }
     gctx.queue.writeBuffer(
         gctx.lookupResource(args.producers.data).?,

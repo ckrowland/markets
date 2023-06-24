@@ -12,17 +12,25 @@ pub const MAX_X: i32 = 1000;
 pub const MIN_X: i32 = -1000;
 pub const MAX_Y: i32 = 1000;
 pub const MIN_Y: i32 = -1000;
+pub const TOTAL_X: i32 = 2000;
+pub const TOTAL_Y: i32 = 2000;
 
 // Viewport size relative to total window size
 pub const VP_X_SIZE: f32 = 0.75;
 pub const VP_Y_SIZE: f32 = 0.75;
+
+pub fn getViewportPixelSize(gctx: *zgpu.GraphicsContext) [2]f32 {
+    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+    const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+    return .{ width * VP_X_SIZE, height * VP_Y_SIZE };
+}
 
 pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
     const sd = gctx.swapchain_descriptor;
     return @intToFloat(f32, sd.width) / @intToFloat(f32, sd.height);
 }
 
-// Given a world position (with aspect), calculate grid position
+// Given a world position (grid position with aspect), return grid position
 pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [4]f32) zmath.F32x4 {
     const aspect = getAspectRatio(gctx);
     return .{
@@ -42,7 +50,25 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]f32) [4]f32 {
         grid_pos[2],
         grid_pos[3],
     };
-}    
+}
+
+// Given a grid position, return a pixel position
+pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
+    const grid_pos = .{ g_pos[0], g_pos[1], 0, 1 };
+    const world_pos = zmath.loadArr4(getWorldPosition(gctx, grid_pos));
+    const camera_pos = zmath.mul(world_pos, getObjectToClipMat(gctx));
+    const rel_pos = [4]f32{ camera_pos[0] / -POS_Z, camera_pos[1] / -POS_Z, 0, 1 };
+    
+    const viewport_size = getViewportPixelSize(gctx);
+    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+    const xOffset = width - viewport_size[0];
+    const content_scale = gctx.window.getContentScale();
+
+    const cursor_in_vp_x = ((rel_pos[0] + 1) * viewport_size[0]) / (2 * content_scale[0]);
+    const cursor_in_vp_y = ((-rel_pos[1] + 1) * viewport_size[1]) / (2 * content_scale[1]);
+    const screen_coords =  [2]f32{ cursor_in_vp_x + (xOffset / 2), cursor_in_vp_y };
+    return .{ screen_coords[0] * content_scale[0], screen_coords[1] * content_scale[1] };
+}
 
 pub fn getObjectToClipMat(gctx: *zgpu.GraphicsContext) zmath.Mat {
     const camWorldToView = zmath.lookAtLh(

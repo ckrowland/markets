@@ -56,7 +56,7 @@ fn search_for_producer(index: u32){
         consumers[index].step_size = step_sizes(c.position, c.home, c.moving_rate);
         return;
     }
-    let p_pos = producers[pid].position;  
+    let p_pos = producers[pid].home;  
     consumers[index].destination = p_pos;
     consumers[index].step_size = step_sizes(c.position, p_pos, c.moving_rate);
     consumers[index].producer_id = pid;
@@ -68,7 +68,7 @@ fn find_nearest_stocked_producer(c: Consumer) -> i32 {
     var shortest_distance = 100000.0;
     var pid: i32 = -1;
     for(var i: u32 = 0; i < stats.num_producers; i++){
-        let dist = distance(c.home, producers[i].position);
+        let dist = distance(c.home, producers[i].home);
         let inventory = u32(atomicLoad(&producers[i].inventory));
         if (dist < shortest_distance && inventory > c.demand_rate) {
             shortest_distance = dist;

@@ -104,7 +104,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .{ .v = &demo.params.production_rate, .min = 1, .max = 1000 },
     )) {
         Wgpu.setAll(gctx, Producer, .{
-            .get_buffer = demo.buffers.data.producer,
+            .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
             .parameter = .{
@@ -128,7 +128,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
     )) {
         Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer){
-            .get_buffer = demo.buffers.data.consumer,
+            .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_consumers.new,
             .parameter = .{
@@ -140,7 +140,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.text("Max Producer Inventory", .{});
     if (zgui.sliderScalar("##mi", u32, .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 })) {
         Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
-            .get_buffer = demo.buffers.data.producer,
+            .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
             .parameter = .{
@@ -178,7 +178,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.text("Moving Rate", .{});
     if (zgui.sliderScalar("##mr", f32, .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 })) {
         Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer) {
-            .get_buffer = demo.buffers.data.consumer,
+            .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_consumers.new,
             .parameter = .{
@@ -208,7 +208,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.sameLine(.{});
     if (zgui.button("Supply Shock", .{})) {
         Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
-            .get_buffer = demo.buffers.data.producer,
+            .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
             .parameter = .{

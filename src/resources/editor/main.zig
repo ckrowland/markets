@@ -17,7 +17,7 @@ const Main = @import("../../main.zig");
 const Camera = @import("../../camera.zig");
 const Square = @import("../../shapes/square.zig");
 const Circle = @import("../../shapes/circle.zig");
-const Input = @import("input.zig");
+const Input = @import("mouse.zig");
 const Hover = @import("hover.zig");
 const Popups = @import("popups.zig");
 const content_dir = @import("build_options").content_dir;
@@ -280,7 +280,8 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
-            mem.slice[0] = zm.transpose(cam_world_to_clip);
+            // mem.slice[0] = zm.transpose(cam_world_to_clip);
+            mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
             
             const num_indices_circle = @intCast(u32, cib_info.size / @sizeOf(f32));
