@@ -19,7 +19,7 @@ pub const VP_Y_SIZE: f32 = 0.75;
 
 pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
     const sd = gctx.swapchain_descriptor;
-    return @intToFloat(f32, sd.width) / @intToFloat(f32, sd.height);
+    return @floatFromInt(f32, sd.width) / @floatFromInt(f32, sd.height);
 }
 
 // Given a world position (with aspect), calculate grid position
@@ -42,7 +42,7 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]f32) [4]f32 {
         grid_pos[2],
         grid_pos[3],
     };
-}    
+}
 
 pub fn getObjectToClipMat(gctx: *zgpu.GraphicsContext) zmath.Mat {
     const camWorldToView = zmath.lookAtLh(

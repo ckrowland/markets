@@ -23,7 +23,7 @@ const SetStagingBuffer = struct {
     buffer: wgpu.Buffer = undefined,
 };
 
-pub const zero = [1]u32{ 0 };
+pub const zero = [1]u32{0};
 pub const zeroBuffer = [8]u32{ 0, 0, 0, 0, 0, 0, 0, 0 };
 
 pub fn init(allocator: std.mem.Allocator) Self {
@@ -83,7 +83,7 @@ pub fn clearStatsBuffer(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) voi
 }
 
 pub fn clearNumTransactions(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
-    const stats_data = [1]u32{ 0 };
+    const stats_data = [1]u32{0};
     gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, u32, stats_data[0..]);
 }
 
@@ -92,7 +92,7 @@ pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num:
         gctx.lookupResource(buf).?,
         @sizeOf(u32),
         u32,
-        &.{ num },
+        &.{num},
     );
 }
 
@@ -101,7 +101,7 @@ pub fn setNumProducers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num:
         gctx.lookupResource(buf).?,
         2 * @sizeOf(u32),
         u32,
-        &.{ num },
+        &.{num},
     );
 }
 
@@ -155,4 +155,3 @@ fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaqu
         std.debug.print("[zgpu] Failed to map buffer (code: {any})\n", .{status});
     }
 }
-

@@ -45,7 +45,7 @@ pub fn createVertexBuffer(
     consumer_vertex_data[0] = [3]f32{ 0, 0, 0 };
     var i: u32 = 1;
     while (i < num_vertices) {
-        const current_angle = angle * @intToFloat(f32, i);
+        const current_angle = angle * @floatFromInt(f32, i);
         const x = @cos(current_angle) * radius;
         const y = @sin(current_angle) * radius;
         consumer_vertex_data[i] = [3]f32{ x, y, 0 };

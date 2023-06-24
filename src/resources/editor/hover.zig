@@ -19,7 +19,7 @@ pub fn initBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
         gctx.lookupResource(buf).?,
         0,
         Self,
-        &.{ hoverCircle },
+        &.{hoverCircle},
     );
     return buf;
 }

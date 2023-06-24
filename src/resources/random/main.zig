@@ -42,7 +42,6 @@ pub const Parameters = struct {
     aspect: f32,
 };
 
-
 const Self = @This();
 
 running: bool = false,
@@ -80,28 +79,28 @@ allocator: std.mem.Allocator,
 
 pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const aspect = Camera.getAspectRatio(gctx);
-    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{}};
+    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{} };
 
     const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, MAX_NUM_CONSUMERS);
     const consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, MAX_NUM_CONSUMERS);
     Consumer.generateBulk(gctx, consumer_buffer, params);
-    
+
     const producer_buffer = Wgpu.createBuffer(gctx, Producer, MAX_NUM_PRODUCERS);
     const producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, MAX_NUM_PRODUCERS);
     Producer.generateBulk(gctx, producer_buffer, params);
-    
+
     const stats_buffer = Statistics.createBuffer(gctx);
     const stats_mapped = Statistics.createMappedBuffer(gctx);
     Statistics.setNumConsumers(gctx, stats_buffer, params.num_consumers.new);
     Statistics.setNumProducers(gctx, stats_buffer, params.num_producers.new);
-    
+
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
         .consumer = consumer_buffer,
         .producer = producer_buffer,
         .stats = stats_buffer,
     });
     const depth = Main.createDepthTexture(gctx);
-    
+
     return Self{
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
@@ -168,7 +167,7 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const commands = commands: {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
-        
+
         const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
         const num_producers = Wgpu.getNumStructs(gctx, Producer, demo.buffers.data.stats);
 
@@ -187,10 +186,18 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
                 pass.setBindGroup(0, bg, &.{});
 
                 pass.setPipeline(pcp);
-                pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1,);
+                pass.dispatchWorkgroups(
+                    @divFloor(num_producers, 64) + 1,
+                    1,
+                    1,
+                );
 
                 pass.setPipeline(ccp);
-                pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1,);
+                pass.dispatchWorkgroups(
+                    @divFloor(num_consumers, 64) + 1,
+                    1,
+                    1,
+                );
             }
         }
 
@@ -246,16 +253,16 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
                 pass.release();
             }
 
-            const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+            const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
             const xOffset = width / 4;
-            const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+            const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
             const yOffset = height / 4;
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
             mem.slice[0] = zm.transpose(cam_world_to_clip);
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
-            
+
             const num_indices_circle = @intCast(u32, cib_info.size / @sizeOf(f32));
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);

@@ -52,8 +52,8 @@ pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {
     var producers: [DemoState.MAX_NUM_PRODUCERS]Self = undefined;
     var i: usize = 0;
     while (i < num) {
-        const x = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
-        const y = @intToFloat(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
+        const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
+        const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
         producers[i] = Self{
             .absolute_position = [4]f32{ x, y, 0, 0 },
             .position = [4]f32{ x * params.aspect, y, 0, 0 },

@@ -49,11 +49,7 @@ fn plots(demo: *DemoState) void {
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - margin;
 
-    if (zgui.plot.beginPlot("", .{
-        .w = plot_width,
-        .h = plot_height,
-        .flags = .{}
-    })) {
+    if (zgui.plot.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{} })) {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
@@ -75,10 +71,14 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.text("Number Of Producers", .{});
 
     const p_bufs = demo.buffers.data.producer;
-    if (zgui.sliderScalar("##np", u32, .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },)) {
+    if (zgui.sliderScalar(
+        "##np",
+        u32,
+        .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },
+    )) {
         const num_producers = demo.params.num_producers;
         Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers.new);
-        
+
         if (num_producers.old >= num_producers.new) {
             Wgpu.shrinkBuffer(gctx, Producer, .{
                 .new_size = num_producers.new,
@@ -127,26 +127,16 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         u32,
         .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
     )) {
-        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer){
-            .get_buffer = demo.buffers.data.consumer,
-            .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_consumers.new,
-            .parameter = .{
-                .demand_rate = demo.params.demand_rate,
-            }
-        });
+        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer){ .get_buffer = demo.buffers.data.consumer, .stats = demo.buffers.data.stats, .num_agents = demo.params.num_consumers.new, .parameter = .{
+            .demand_rate = demo.params.demand_rate,
+        } });
     }
 
     zgui.text("Max Producer Inventory", .{});
     if (zgui.sliderScalar("##mi", u32, .{ .v = &demo.params.max_inventory, .min = 10, .max = 10000 })) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
-            .get_buffer = demo.buffers.data.producer,
-            .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_producers.new,
-            .parameter = .{
-                .max_inventory = demo.params.max_inventory,
-            }
-        });
+        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){ .get_buffer = demo.buffers.data.producer, .stats = demo.buffers.data.stats, .num_agents = demo.params.num_producers.new, .parameter = .{
+            .max_inventory = demo.params.max_inventory,
+        } });
     }
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
@@ -156,7 +146,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     if (zgui.sliderScalar("##nc", u32, .{ .v = &demo.params.num_consumers.new, .min = 1, .max = 10000 })) {
         const num_consumers = demo.params.num_consumers;
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers.new);
-        
+
         if (num_consumers.old >= num_consumers.new) {
             Wgpu.shrinkBuffer(gctx, Consumer, .{
                 .new_size = num_consumers.new,
@@ -177,14 +167,9 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.text("Moving Rate", .{});
     if (zgui.sliderScalar("##mr", f32, .{ .v = &demo.params.moving_rate, .min = 1.0, .max = 20 })) {
-        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer) {
-            .get_buffer = demo.buffers.data.consumer,
-            .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_consumers.new,
-            .parameter = .{
-                .moving_rate = demo.params.moving_rate,
-            }
-        });
+        Wgpu.setAll(gctx, Consumer, Wgpu.setArgs(Consumer){ .get_buffer = demo.buffers.data.consumer, .stats = demo.buffers.data.stats, .num_agents = demo.params.num_consumers.new, .parameter = .{
+            .moving_rate = demo.params.moving_rate,
+        } });
     }
 
     zgui.text("Consumer Size", .{});
@@ -207,7 +192,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.sameLine(.{});
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer) {
+        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){
             .get_buffer = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
             .num_agents = demo.params.num_producers.new,
