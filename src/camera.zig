@@ -20,8 +20,8 @@ pub const VP_X_SIZE: f32 = 0.75;
 pub const VP_Y_SIZE: f32 = 0.75;
 
 pub fn getViewportPixelSize(gctx: *zgpu.GraphicsContext) [2]f32 {
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
-    const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+    const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
     return .{ width * VP_X_SIZE, height * VP_Y_SIZE };
 }
 
@@ -60,7 +60,7 @@ pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
     const rel_pos = [4]f32{ camera_pos[0] / -POS_Z, camera_pos[1] / -POS_Z, 0, 1 };
     
     const viewport_size = getViewportPixelSize(gctx);
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
     const xOffset = width - viewport_size[0];
     const content_scale = gctx.window.getContentScale();
 
