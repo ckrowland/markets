@@ -280,7 +280,6 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
-            // mem.slice[0] = zm.transpose(cam_world_to_clip);
             mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
@@ -339,6 +338,7 @@ pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     Wgpu.clearBuffer(gctx, demo.buffers.data.producer.data);
     demo.stats.clear();
     Wgpu.clearBuffer(gctx, demo.buffers.data.stats.data);
+    demo.running = false;
 }
 
 pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {

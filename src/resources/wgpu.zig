@@ -7,13 +7,11 @@ const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
 
 // A mishmash of Wgpu initialization functions and buffer helpers
-
 pub const ObjectBuffer = struct {
     data: zgpu.BufferHandle,
     mapped: zgpu.BufferHandle,
 };
 
-// See if you can create generic function
 fn StagingBuffer(comptime T: type) type {
     return struct {
         slice: ?[]const T = null,
@@ -95,21 +93,6 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
     buf.buffer.unmap();
 
     return @constCast(buf.slice.?[0..buf.num_structs]);
-}
-
-pub fn getParameters(comptime T: type) type {
-    switch (T) {
-        Consumer => return union(enum) {
-            moving_rate: f32,
-            demand_rate: u32,
-        },
-        Producer => return union(enum) {
-            production_rate: u32,
-            inventory: i32,
-            max_inventory: u32,
-        },
-        else => unreachable,
-    }
 }
 
 pub fn setArgs(comptime T: type) type {

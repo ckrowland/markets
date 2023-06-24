@@ -102,6 +102,9 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         });
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
     }
+    // if (demo.mouse.released() and Mouse.onGrid(gctx)) {
+    //     std.debug.print("Done", .{});
+    // }
 }
 
 fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
