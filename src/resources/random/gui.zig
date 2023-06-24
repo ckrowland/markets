@@ -49,11 +49,7 @@ fn plots(demo: *DemoState) void {
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - margin;
 
-    if (zgui.plot.beginPlot("", .{
-        .w = plot_width,
-        .h = plot_height,
-        .flags = .{}
-    })) {
+    if (zgui.plot.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{} })) {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
@@ -75,10 +71,14 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.text("Number Of Producers", .{});
 
     const p_bufs = demo.buffers.data.producer;
-    if (zgui.sliderScalar("##np", u32, .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },)) {
+    if (zgui.sliderScalar(
+        "##np",
+        u32,
+        .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },
+    )) {
         const num_producers = demo.params.num_producers;
         Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers.new);
-        
+
         if (num_producers.old >= num_producers.new) {
             Wgpu.shrinkBuffer(gctx, Producer, .{
                 .new_size = num_producers.new,
@@ -156,7 +156,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     if (zgui.sliderScalar("##nc", u32, .{ .v = &demo.params.num_consumers.new, .min = 1, .max = 10000 })) {
         const num_consumers = demo.params.num_consumers;
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers.new);
-        
+
         if (num_consumers.old >= num_consumers.new) {
             Wgpu.shrinkBuffer(gctx, Consumer, .{
                 .new_size = num_consumers.new,

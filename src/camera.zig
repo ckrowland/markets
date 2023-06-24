@@ -27,7 +27,7 @@ pub fn getViewportPixelSize(gctx: *zgpu.GraphicsContext) [2]f32 {
 
 pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
     const sd = gctx.swapchain_descriptor;
-    return @intToFloat(f32, sd.width) / @intToFloat(f32, sd.height);
+    return @floatFromInt(f32, sd.width) / @floatFromInt(f32, sd.height);
 }
 
 // Given a world position (grid position with aspect), return grid position

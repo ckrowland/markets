@@ -24,10 +24,10 @@ allocator: std.mem.Allocator,
 pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     var randomWave = Waves.Wave.init(allocator, 0, .cos);
     randomWave.createWave();
-    
+
     var inputWave = Waves.Wave.init(allocator, 1, .sin);
     inputWave.createComparisonWave(&randomWave);
-    
+
     var outputWave = Waves.Wave.init(allocator, 2, .result);
     outputWave.multiplyWaves(&randomWave, &inputWave);
 
@@ -54,7 +54,7 @@ pub fn deinit(demo: *Self) void {
 pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     demo.input.createComparisonWave(&demo.random);
     demo.output.multiplyWaves(&demo.random, &demo.input);
-    
+
     Parameter.window(demo, gctx);
     Plot.window(demo, gctx);
     // zgui.plot.showDemoWindow(null);

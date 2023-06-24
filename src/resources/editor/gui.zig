@@ -63,7 +63,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             });
         }
     }
-    
+
     _ = switch (demo.placing) {
         .none => {},
         .consumers => {
@@ -73,7 +73,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .producer => {
             hoverUpdate(gctx, demo);
             addingProducer(gctx, demo);
-        },            
+        },
     };
 }
 
@@ -82,7 +82,7 @@ fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         gctx.lookupResource(demo.buffers.data.hover).?,
         @offsetOf(Hover, "position"),
         [4]f32,
-        &.{Mouse.getWorldPosition(gctx)}
+        &.{Mouse.getWorldPosition(gctx)},
     );
 }
 
@@ -134,11 +134,7 @@ fn plots(demo: *DemoState) void {
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - margin;
 
-    if (zgui.plot.beginPlot("", .{
-        .w = plot_width,
-        .h = plot_height,
-        .flags = .{}
-    })) {
+    if (zgui.plot.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{} })) {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
@@ -175,7 +171,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         pressedColor,
         buttonSize,
     );
-    
+
     zgui.text("Number Of Producers", .{});
 
     zgui.text("Consumer Size", .{});

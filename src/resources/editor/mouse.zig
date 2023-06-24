@@ -23,7 +23,6 @@ pub const MouseButton = struct {
             .repeat, .press => {
                 self.state = true;
             },
-            else => unreachable,
         }
         self.grid_pos = getGridPosition(gctx);
         const content_scale = gctx.window.getContentScale();
@@ -33,7 +32,7 @@ pub const MouseButton = struct {
             @floatCast(f32, cursor_pos[1] * content_scale[1]),
         };
     }
-        
+
     /// Returns true the frame the mouse button was pressed.
     pub fn pressed(self: MouseButton) bool {
         return self.state == true and self.state != self.previousState;
@@ -55,11 +54,10 @@ pub const MouseButton = struct {
     }
 };
 
-
 // Return world position of current cursor pos
 pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) zmath.F32x4 {
     const viewport_size = Camera.getViewportPixelSize(gctx);
-    const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
     const xOffset = width - viewport_size[0];
     const cursor_pos = gctx.window.getCursorPos();
     const cursor_pos_in_vp = [2]f64{ cursor_pos[0] - (xOffset / 2), cursor_pos[1] };

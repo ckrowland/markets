@@ -88,8 +88,8 @@ pub const Parameters = struct {
 
 pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const aspect = Camera.getAspectRatio(gctx);
-    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{}};
-    
+    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{} };
+
     // Create Buffers
     const hover_buffer = Hover.initBuffer(gctx);
     const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
@@ -121,7 +121,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         content_dir ++ "/pngs/producer.png",
     );
     const depth = Main.createDepthTexture(gctx);
-    
+
     return Self{
         .render_pipelines = .{
             .hover = Wgpu.createRenderPipeline(gctx, config.hpi),
@@ -273,9 +273,9 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
                 pass.release();
             }
 
-            const width = @intToFloat(f32, gctx.swapchain_descriptor.width);
+            const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
             const xOffset = width / 4;
-            const height = @intToFloat(f32, gctx.swapchain_descriptor.height);
+            const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
             const yOffset = height / 4;
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
@@ -283,9 +283,9 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             // mem.slice[0] = zm.transpose(cam_world_to_clip);
             mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
-            
+
             const num_indices_circle = @intCast(u32, cib_info.size / @sizeOf(f32));
-            
+
             pass.setPipeline(hoverRP);
             pass.setVertexBuffer(0, hoverVB.gpuobj.?, 0, hoverVB.size);
             pass.setVertexBuffer(1, hoverB.gpuobj.?, 0, hoverB.size);

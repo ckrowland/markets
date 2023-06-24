@@ -90,7 +90,7 @@ pub fn clear(self: *Self) void {
 }
 
 pub fn clearNumTransactions(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
-    gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, u32, &.{ 0 });
+    gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, u32, &.{0});
 }
 
 pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num: u32) void {
@@ -98,7 +98,7 @@ pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num:
         gctx.lookupResource(buf).?,
         @sizeOf(u32),
         u32,
-        &.{ num },
+        &.{num},
     );
 }
 
@@ -107,7 +107,7 @@ pub fn setNumProducers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num:
         gctx.lookupResource(buf).?,
         2 * @sizeOf(u32),
         u32,
-        &.{ num },
+        &.{num},
     );
 }
 

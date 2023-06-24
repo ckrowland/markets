@@ -45,7 +45,7 @@ pub fn getNumStructs(gctx: *zgpu.GraphicsContext, comptime T: type, stat_bufs: O
         .structs = stat_bufs,
         .num_structs = 8,
     }) catch unreachable;
-    switch(T) {
+    switch (T) {
         Consumer => return stats[1],
         Producer => return stats[2],
         else => unreachable,
@@ -71,14 +71,13 @@ pub const getArgs = struct {
     num_structs: u32,
 };
 pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T {
-    var buf = StagingBuffer(T) {
+    var buf = StagingBuffer(T){
         .buffer = gctx.lookupResource(args.structs.mapped).?,
         .num_structs = args.num_structs,
     };
     if (buf.num_structs == 0) {
         return error.EmptyBuffer;
     }
-
     buf.buffer.mapAsync(
         .{ .read = true },
         0,
@@ -112,7 +111,7 @@ pub fn getParameters(comptime T: type) type {
         else => unreachable,
     }
 }
-    
+
 pub fn setArgs(comptime T: type) type {
     switch (T) {
         Consumer => return struct {
