@@ -16,17 +16,16 @@ absolute_home: [4]f32,
 position: [4]f32,
 home: [4]f32,
 destination: [4]f32,
-step_size: [4]f32 = .{ 0, 0, 0, 0 },
 color: [4]f32 = .{ 1, 0, 0, 0 },
+step_size: [2]f32 = .{ 0, 0 },
 moving_rate: f32,
 demand_rate: u32,
 inventory: u32 = 0,
 radius: f32,
 producer_id: i32 = -1,
 _padding1: u32 = 0,
-_padding2: u32 = 0,
-_padding3: u32 = 0,
 
+pub const z_pos = -2;
 pub fn generateBulk(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters) void {
     var consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
     const c_len = createRandomBulk(&consumers, params, params.num_consumers.new);
@@ -44,17 +43,15 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
     while (i < num) {
         const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
         const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
-        const aspect_home = [4]f32{ x * params.aspect, y, 0, 0 };
+        const aspect_home = [2]f32{ x * params.aspect, y };
 
-        consumers[i] = Self{
-            .absolute_home = [4]f32{ x, y, 0, 0 },
-            .position = aspect_home,
+        consumers[i] = create(.{
+            .absolute_home = .{ x, y },
             .home = aspect_home,
-            .destination = aspect_home,
             .moving_rate = params.moving_rate,
             .demand_rate = params.demand_rate,
             .radius = params.consumer_radius,
-        };
+        });
         i += 1;
     }
     std.mem.copy(Self, slice, &consumers);
@@ -62,23 +59,23 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
 }
 
 pub const Args = struct {
-    absolute_home: [4]f32,
-    home: [4]f32,
+    absolute_home: [2]f32,
+    home: [2]f32,
     color: [4]f32 = .{ 1, 0, 0, 0 },
-    movingRate: f32 = 5.0,
-    demandRate: u32 = 100,
+    moving_rate: f32 = 5.0,
+    demand_rate: u32 = 100,
     radius: f32 = 20.0,
 };
 pub fn create(args: Args) Self {
+    const home: [4]f32 = .{ args.home[0], args.home[1], z_pos, 1 };
     return Self{
-        .absolute_home = args.absolute_home,
-        .position = args.home,
-        .home = args.home,
-        .destination = args.home,
-        .step_size = [4]f32{ 0, 0, 0, 0 },
+        .absolute_home = .{args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
+        .position = home,
+        .home = home,
+        .destination = home,
         .color = args.color,
-        .moving_rate = args.movingRate,
-        .demand_rate = args.demandRate,
+        .moving_rate = args.moving_rate,
+        .demand_rate = args.demand_rate,
         .radius = args.radius,
     };
 }

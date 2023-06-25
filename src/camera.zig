@@ -31,13 +31,13 @@ pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
 }
 
 // Given a world position (grid position with aspect), return grid position
-pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [4]f32) zmath.F32x4 {
+pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [2]f32) [2]f32 {
     const aspect = getAspectRatio(gctx);
     return .{
         world_pos[0] / aspect,
         world_pos[1],
-        world_pos[2],
-        world_pos[3],
+        // world_pos[2],
+        // world_pos[3],
     };
 }
 

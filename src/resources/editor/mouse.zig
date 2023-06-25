@@ -55,7 +55,7 @@ pub const MouseButton = struct {
 };
 
 // Return world position of current cursor pos
-pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) zmath.F32x4 {
+pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
     const viewport_size = Camera.getViewportPixelSize(gctx);
     const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
     const xOffset = width - viewport_size[0];
@@ -69,7 +69,8 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) zmath.F32x4 {
     const y = @floatCast(f32, ry);
     const vec = zmath.f32x4(x * -Camera.POS_Z, y * -Camera.POS_Z, 0, 1);
     const inv = zmath.inverse(Camera.getObjectToClipMat(gctx));
-    return zmath.mul(vec, inv);
+    const world_pos = zmath.mul(vec, inv);
+    return .{ world_pos[0], world_pos[1] };
 }
 
 pub fn getGridPosition(gctx: *zgpu.GraphicsContext) [2]f32 {

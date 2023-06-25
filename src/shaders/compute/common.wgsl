@@ -3,8 +3,8 @@ struct Consumer {
   position: vec4<f32>,
   home: vec4<f32>,
   destination: vec4<f32>,
-  step_size: vec4<f32>,
   color: vec4<f32>,
+  step_size: vec2<f32>,
   moving_rate: f32,
   demand_rate: u32,
   inventory: u32,
@@ -30,7 +30,7 @@ struct Stats {
 @group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
 @group(0) @binding(2) var<storage, read_write> stats: Stats;
 
-fn step_sizes(pos: vec4<f32>, dest: vec4<f32>, mr: f32) -> vec4<f32>{
+fn step_sizes(pos: vec2<f32>, dest: vec2<f32>, mr: f32) -> vec2<f32>{
     let x_num_steps = num_steps(pos.x, dest.x, mr);
     let y_num_steps = num_steps(pos.y, dest.y, mr);
     let num_steps = max(x_num_steps, y_num_steps);
@@ -41,7 +41,4 @@ fn num_steps(x: f32, y: f32, rate: f32) -> f32 {
     let distance = abs(x - y);
     if (rate > distance) { return 1.0; }
     return ceil(distance / rate);
-}
-fn calculate_queue_index(start: u32, len: u32, size: u32) -> u32 {
-    return (start + len) % size;
 }

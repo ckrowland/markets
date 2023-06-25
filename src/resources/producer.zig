@@ -20,6 +20,7 @@ inventory: i32 = 0,
 max_inventory: u32 = 10000,
 _padding1: u32 = 0,
 
+pub const z_pos = -2;
 pub const Parameter = enum {
     production_rate,
     supply_shock,
@@ -27,13 +28,17 @@ pub const Parameter = enum {
 };
 
 pub const Args = struct {
-    absolute_home: [4]f32,
-    home: [4]f32,
+    absolute_home: [2]f32,
+    home: [2]f32,
+    color: [4]f32 = .{ 1, 1, 1, 0 },
+    production_rate: u32 = 300,
+    inventory: i32 = 0,
+    max_inventory: u32 = 10000,
 };
 pub fn create(args: Args) Self {
     return Self{
-        .absolute_home = args.absolute_home,
-        .home = args.home,
+        .absolute_home = .{ args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
+        .home = .{ args.home[0], args.home[1], z_pos, 1 },
     };
 }
 
@@ -54,13 +59,13 @@ pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {
     while (i < num) {
         const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
         const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
-        producers[i] = Self{
-            .absolute_home = [4]f32{ x, y, 0, 0 },
-            .home = [4]f32{ x * params.aspect, y, 0, 0 },
+        producers[i] = create(.{
+            .absolute_home = [2]f32{ x, y },
+            .home = [2]f32{ x * params.aspect, y },
             .production_rate = params.production_rate,
             .inventory = @intCast(i32, params.max_inventory),
             .max_inventory = params.max_inventory,
-        };
+        });
         i += 1;
     }
     std.mem.copy(Self, slice, &producers);

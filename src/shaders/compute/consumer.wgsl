@@ -11,12 +11,13 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     }
     
     let c = consumers[index];
-    consumers[index].position += c.step_size;
+    consumers[index].position[0] += c.step_size[0];
+    consumers[index].position[1] += c.step_size[1];
 
     let dist = abs(c.position - c.destination);
     let at_destination = all(dist.xy <= vec2<f32>(0.1));
     if (at_destination) {
-        consumers[index].step_size = vec4<f32>(0);
+        consumers[index].step_size = vec2<f32>(0);
 	consumers[index].position = c.destination;
         let at_home = all(c.destination == c.home);
         if (at_home) {
@@ -41,7 +42,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 	}
         consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
         consumers[index].destination = c.home;
-        consumers[index].step_size = step_sizes(c.position, c.home, c.moving_rate);
+        consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, c.moving_rate);
         consumers[index].inventory += c.demand_rate;
 	consumers[index].producer_id = -1;
         stats.transactions += 1;
@@ -53,12 +54,12 @@ fn search_for_producer(index: u32){
     var pid = find_nearest_stocked_producer(c);
     if (pid == -1) {
         consumers[index].destination = c.home;
-        consumers[index].step_size = step_sizes(c.position, c.home, c.moving_rate);
+        consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, c.moving_rate);
         return;
     }
     let p_pos = producers[pid].home;  
     consumers[index].destination = p_pos;
-    consumers[index].step_size = step_sizes(c.position, p_pos, c.moving_rate);
+    consumers[index].step_size = step_sizes(c.position.xy, p_pos.xy, c.moving_rate);
     consumers[index].producer_id = pid;
 }
 

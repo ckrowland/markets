@@ -29,6 +29,7 @@ mouse: Input.MouseButton = .{},
 popups: Popups,
 render_pipelines: struct {
     circle: zgpu.RenderPipelineHandle,
+    consumer_hover: zgpu.RenderPipelineHandle,
     hover: zgpu.RenderPipelineHandle,
     square: zgpu.RenderPipelineHandle,
 },
@@ -43,6 +44,7 @@ bind_groups: struct {
 buffers: struct {
     data: struct {
         consumer: Wgpu.ObjectBuffer,
+        consumer_hover: zgpu.BufferHandle,
         hover: zgpu.BufferHandle,
         producer: Wgpu.ObjectBuffer,
         stats: Wgpu.ObjectBuffer,
@@ -93,6 +95,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     // Create Buffers
     const hover_buffer = Hover.initBuffer(gctx);
     const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
+    const consumer_hover_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
     const consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, params.max_num_consumers);
     const producer_buffer = Wgpu.createBuffer(gctx, Producer, params.max_num_producers);
     const producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, params.max_num_producers);
@@ -124,8 +127,9 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
 
     return Self{
         .render_pipelines = .{
-            .hover = Wgpu.createRenderPipeline(gctx, config.hpi),
             .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
+            .consumer_hover = Wgpu.createRenderPipeline(gctx, config.chpi),
+            .hover = Wgpu.createRenderPipeline(gctx, config.hpi),
             .square = Wgpu.createRenderPipeline(gctx, config.ppi),
         },
         .compute_pipelines = .{
@@ -142,6 +146,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
                     .data = consumer_buffer,
                     .mapped = consumer_mapped,
                 },
+                .consumer_hover = consumer_hover_buffer,
                 .hover = hover_buffer,
                 .producer = .{
                     .data = producer_buffer,
@@ -248,6 +253,8 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             const cib_info = gctx.lookupResourceInfo(demo.buffers.index.circle) orelse break :pass;
             const square_rp = gctx.lookupResource(demo.render_pipelines.square) orelse break :pass;
             const circle_rp = gctx.lookupResource(demo.render_pipelines.circle) orelse break :pass;
+            const chrp = gctx.lookupResource(demo.render_pipelines.consumer_hover) orelse break :pass;
+            const ch_info = gctx.lookupResourceInfo(demo.buffers.data.consumer_hover) orelse break :pass;
             const render_bind_group = gctx.lookupResource(demo.bind_groups.render) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
 
@@ -284,12 +291,17 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
             const num_indices_circle = @intCast(u32, cib_info.size / @sizeOf(f32));
-
             pass.setPipeline(hoverRP);
             pass.setVertexBuffer(0, hoverVB.gpuobj.?, 0, hoverVB.size);
             pass.setVertexBuffer(1, hoverB.gpuobj.?, 0, hoverB.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
             pass.drawIndexed(num_indices_circle, 1, 0, 0, 0);
+
+            pass.setPipeline(chrp);
+            pass.setVertexBuffer(0, hoverVB.gpuobj.?, 0, hoverVB.size);
+            pass.setVertexBuffer(1, ch_info.gpuobj.?, 0, ch_info.size);
+            pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
+            pass.drawIndexed(num_indices_circle, num_consumers, 0, 0, 0);
 
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
@@ -301,6 +313,7 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
             pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
             pass.draw(6, num_producers, 0, 0);
+            
         }
 
         // Draw ImGui

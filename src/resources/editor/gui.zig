@@ -7,6 +7,7 @@ const zmath = @import("zmath");
 const Camera = @import("../../camera.zig");
 const Circle = @import("../../shapes/circle.zig");
 const Consumer = @import("../consumer.zig");
+const ConsumerHover = @import("../consumer_hover.zig");
 const DemoState = @import("main.zig");
 const Hover = @import("hover.zig");
 const Producer = @import("../producer.zig");
@@ -81,7 +82,7 @@ fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     gctx.queue.writeBuffer(
         gctx.lookupResource(demo.buffers.data.hover).?,
         @offsetOf(Hover, "position"),
-        [4]f32,
+        [2]f32,
         &.{Mouse.getWorldPosition(gctx)},
     );
 }
@@ -90,9 +91,9 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     if (demo.mouse.down() and Mouse.onGrid(gctx)) {
         const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
         const world_pos = Mouse.getWorldPosition(gctx);
-        var consumer = Consumer.create(.{
-            .home = world_pos,
+        const consumer = Consumer.create(.{
             .absolute_home = Camera.getGridPosition(gctx, world_pos),
+            .home = world_pos,
         });
         var consumers = [1]Consumer{consumer};
         Wgpu.appendBuffer(gctx, Consumer, .{
@@ -100,6 +101,18 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
             .buf = demo.buffers.data.consumer.data,
             .structs = consumers[0..],
         });
+
+        const consumer_hover = ConsumerHover.create(.{
+            .absolute_home = Camera.getGridPosition(gctx, world_pos),
+            .home = world_pos,
+        });
+        var hover_circles = [1]ConsumerHover{consumer_hover};
+        Wgpu.appendBuffer(gctx, ConsumerHover, .{
+            .num_old_structs = num_consumers,
+            .buf = demo.buffers.data.consumer_hover,
+            .structs = hover_circles[0..],
+        });
+        
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
     }
     // if (demo.mouse.released() and Mouse.onGrid(gctx)) {
