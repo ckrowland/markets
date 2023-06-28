@@ -24,7 +24,7 @@ const content_dir = @import("build_options").content_dir;
 const Self = @This();
 
 running: bool = false,
-placing: gui.Selection = gui.Selection.producer,
+gui: gui.State = .{},
 mouse: Input.MouseButton = .{},
 popups: Popups,
 render_pipelines: struct {

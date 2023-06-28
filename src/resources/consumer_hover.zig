@@ -14,22 +14,24 @@ const Self = @This();
 
 absolute_home: [4]f32,
 home: [4]f32,
-color: [4]f32 = .{ 0, 1, 1, 0 },
+color: [4]f32 = .{ 0, 0, 0, 0 },
 radius: f32 = 60.0,
+grouping_id: u32 = 0,
 _padding1: u32 = 0,
 _padding2: u32 = 0,
-_padding3: u32 = 0,
 
-pub const z_pos = -5;
+pub const z_pos = 0;
 
 pub const Args = struct {
     absolute_home: [2]f32,
     home: [2]f32,
+    grouping_id: u32,
 };
 pub fn create(args: Args) Self {
     return Self{
         .absolute_home = .{ args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
         .home = .{ args.home[0], args.home[1], z_pos, 1 },
+        .grouping_id = args.grouping_id,
     };
 }
 

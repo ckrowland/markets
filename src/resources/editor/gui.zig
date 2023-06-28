@@ -18,10 +18,14 @@ const Window = @import("../../windows.zig");
 const Mouse = @import("mouse.zig");
 const Popups = @import("popups.zig");
 
-pub const Selection = enum {
-    none,
-    consumers,
-    producer,
+pub const State = struct {
+    pub const Selection = enum {
+        none,
+        consumers,
+        producer,
+    };
+    selection: Selection = .producer,
+    consumer_grouping_id: u32 = 0,
 };
 
 pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
@@ -41,14 +45,11 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     }
     zgui.end();
 
-    demo.popups.display(gctx, demo.mouse, Producer, .{
-        .agents = demo.buffers.data.producer,
+    demo.popups.display(gctx, .{
+        .mouse = demo.mouse,
+        .consumers = demo.buffers.data.consumer,
+        .producers = demo.buffers.data.producer,
         .stats = demo.buffers.data.stats,
-        .num_agents = Wgpu.getNumStructs(gctx, Producer, demo.buffers.data.stats),
-        .params_ref = .{
-            .production_rate = &demo.params.production_rate,
-            .max_inventory = &demo.params.max_inventory,
-        },
     });
 
     if (demo.running) {
@@ -65,7 +66,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         }
     }
 
-    _ = switch (demo.placing) {
+    _ = switch (demo.gui.selection) {
         .none => {},
         .consumers => {
             hoverUpdate(gctx, demo);
@@ -88,12 +89,13 @@ fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
 }
 
 fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
-    if (demo.mouse.down() and Mouse.onGrid(gctx)) {
+    if (demo.mouse.down() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
         const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
         const world_pos = Mouse.getWorldPosition(gctx);
         const consumer = Consumer.create(.{
             .absolute_home = Camera.getGridPosition(gctx, world_pos),
             .home = world_pos,
+            .grouping_id = demo.gui.consumer_grouping_id,
         });
         var consumers = [1]Consumer{consumer};
         Wgpu.appendBuffer(gctx, Consumer, .{
@@ -105,6 +107,7 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         const consumer_hover = ConsumerHover.create(.{
             .absolute_home = Camera.getGridPosition(gctx, world_pos),
             .home = world_pos,
+            .grouping_id = demo.gui.consumer_grouping_id,
         });
         var hover_circles = [1]ConsumerHover{consumer_hover};
         Wgpu.appendBuffer(gctx, ConsumerHover, .{
@@ -115,9 +118,21 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         
         Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
     }
-    // if (demo.mouse.released() and Mouse.onGrid(gctx)) {
-    //     std.debug.print("Done", .{});
-    // }
+    if (demo.mouse.released() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
+        demo.popups.append(.{
+            .window_cursor_pos = demo.mouse.cursor_pos,
+            .grid_cursor_pos = demo.mouse.grid_pos,
+            .type_popup = .consumers,
+            .parameters = .{
+                .consumer = .{
+                    .demand_rate = Consumer.defaults.demand_rate,
+                    .moving_rate = Consumer.defaults.moving_rate,
+                    .grouping_id = demo.gui.consumer_grouping_id,
+                },
+            },
+        });
+        demo.gui.consumer_grouping_id += 1;
+    }
 }
 
 fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
@@ -137,9 +152,16 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers + 1);
 
         // Create zgui window at mouse position
-        demo.popups.addWindow(.{
+        demo.popups.append(.{
             .window_cursor_pos = demo.mouse.cursor_pos,
             .grid_cursor_pos = demo.mouse.grid_pos,
+            .type_popup = .producer,
+            .parameters = .{
+                .producer = .{
+                    .production_rate = producer.production_rate,
+                    .max_inventory = producer.max_inventory,
+                },
+            },
         });
     }
 }
@@ -173,16 +195,16 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     const buttonSize = [2]f32{ 120.0, 120.0 };
     coloredButton(
         gctx,
-        &demo.placing,
-        Selection.consumers,
+        &demo.gui,
+        State.Selection.consumers,
         demo.consumerTextureView,
         pressedColor,
         buttonSize,
     );
     coloredButton(
         gctx,
-        &demo.placing,
-        Selection.producer,
+        &demo.gui,
+        State.Selection.producer,
         demo.producerTextureView,
         pressedColor,
         buttonSize,
@@ -217,7 +239,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_producers.new,
             .parameter = .{
                 .inventory = 0,
             },
@@ -235,23 +256,23 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
 fn coloredButton(
     gctx: *zgpu.GraphicsContext,
-    guiState: *Selection,
-    buttonState: Selection,
+    guiState: *State,
+    buttonState: State.Selection,
     textureView: zgpu.TextureViewHandle,
     color: [4]f32,
     size: [2]f32,
 ) void {
     const tex_id = gctx.lookupResource(textureView).?;
     const id = @tagName(buttonState);
-    if (guiState.* == buttonState) {
+    if (guiState.selection == buttonState) {
         zgui.pushStyleColor4f(.{ .idx = .button, .c = color });
         defer zgui.popStyleColor(.{});
         if (zgui.imageButton(id, tex_id, .{ .w = size[0], .h = size[1] })) {
-            guiState.* = Selection.none;
+            guiState.selection = .none;
         }
     } else {
         if (zgui.imageButton(id, tex_id, .{ .w = size[0], .h = size[1] })) {
-            guiState.* = buttonState;
+            guiState.selection = buttonState;
         }
     }
 }

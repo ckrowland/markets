@@ -4,7 +4,7 @@ const Self = @This();
 position: [4]f32,
 color: [4]f32,
 radius: f32,
-pub const z_pos = -5;
+pub const z_pos = 0;
 pub fn initBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     const buf = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .vertex = true, .storage = true },

@@ -95,61 +95,104 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
     return @constCast(buf.slice.?[0..buf.num_structs]);
 }
 
-pub fn setArgs(comptime T: type) type {
+pub fn agentParameters(comptime T: type) type {
     switch (T) {
-        Consumer => return struct {
-            agents: ObjectBuffer,
-            stats: ObjectBuffer,
-            num_agents: u32,
-            parameter: union(enum) {
-                moving_rate: f32,
-                demand_rate: u32,
-            },
+        Consumer => return union(enum) {
+            moving_rate: f32,
+            demand_rate: u32,
         },
-        Producer => return struct {
-            agents: ObjectBuffer,
-            stats: ObjectBuffer,
-            num_agents: u32,
-            parameter: union(enum) {
-                production_rate: u32,
-                inventory: i32,
-                max_inventory: u32,
-            },
+        Producer => return union(enum) {
+            production_rate: u32,
+            inventory: i32,
+            max_inventory: u32,
+        },
+        else => unreachable,
+    }
+}
+pub fn setArgs(comptime T: type) type {
+    return struct {
+        agents: ObjectBuffer,
+        stats: ObjectBuffer,
+        parameter: agentParameters(T),
+    };
+}
+pub fn setAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: setArgs(T)) void {
+    var agents = getAll(gctx, T, .{
+        .structs = args.agents,
+        .num_structs = getNumStructs(gctx, T, args.stats),
+    }) catch return;
+    for (agents, 0..) |_, i| {
+        setAgentParameter(T, &agents[i], args.parameter);
+    }
+    writeBuffer(gctx, args.agents.data, T, agents);
+}
+
+fn writeBuffer(
+    gctx: *zgpu.GraphicsContext,
+    buf: zgpu.BufferHandle,
+    comptime T: type,
+    structs: []T,
+) void {
+    gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, T, structs);
+}    
+pub fn setAgentArgs(comptime T: type) type {
+    return struct {
+        setArgs: setArgs(T),
+        grid_pos: [2]f32,
+    };
+}
+pub fn setAgent(gctx: *zgpu.GraphicsContext, comptime T: type, args: setAgentArgs(T)) void {
+    var agents = getAll(gctx, T, .{
+        .structs = args.setArgs.agents,
+        .num_structs = getNumStructs(gctx, T, args.setArgs.stats),
+    }) catch return;
+    for (agents, 0..) |agent, i| {
+        const grid_pos = agent.absolute_home;
+        if (args.grid_pos[0] == grid_pos[0] and args.grid_pos[1] == grid_pos[1]) {
+            setAgentParameter(T, &agents[i], args.setArgs.parameter);
+        }
+    }
+    writeBuffer(gctx, args.setArgs.agents.data, T, agents);
+}
+
+fn setAgentParameter(comptime T: type, agent: *T, parameter: agentParameters(T)) void {
+    switch (T) {
+        Consumer => {
+            switch (parameter) {
+                .moving_rate => |v| agent.moving_rate = v,
+                .demand_rate => |v| agent.demand_rate = v,
+            }
+        },
+        Producer => {
+            switch (parameter) {
+                .production_rate => |v| agent.production_rate = v,
+                .inventory => |v| agent.inventory = v,
+                .max_inventory => |v| agent.max_inventory = v,
+            }
         },
         else => unreachable,
     }
 }
 
-pub fn setAll(gctx: *zgpu.GraphicsContext, comptime agent: type, args: setArgs(agent)) void {
-    var agents = getAll(gctx, agent, .{
-        .structs = args.agents,
-        .num_structs = getNumStructs(gctx, agent, args.stats),
+pub fn setGroupingArgs(comptime T: type) type {
+    return struct {
+        setArgs: setArgs(T),
+        grouping_id: u32,
+    };
+}
+pub fn setGroup(gctx: *zgpu.GraphicsContext, comptime T: type, args: setGroupingArgs(T)) void {
+    var agents = getAll(gctx, T, .{
+        .structs = args.setArgs.agents,
+        .num_structs = getNumStructs(gctx, T, args.setArgs.stats),
     }) catch return;
-    for (agents, 0..) |_, i| {
-        switch (agent) {
-            Consumer => {
-                switch (args.parameter) {
-                    .moving_rate => |v| agents[i].moving_rate = v,
-                    .demand_rate => |v| agents[i].demand_rate = v,
-                }
-            },
-            Producer => {
-                switch (args.parameter) {
-                    .production_rate => |v| agents[i].production_rate = v,
-                    .inventory => |v| agents[i].inventory = v,
-                    .max_inventory => |v| agents[i].max_inventory = v,
-                }
-            },
-            else => unreachable,
+    for (agents, 0..) |agent, i| {
+        if (args.grouping_id == agent.grouping_id) {
+            setAgentParameter(T, &agents[i], args.setArgs.parameter);
         }
     }
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(args.agents.data).?,
-        0,
-        agent,
-        agents,
-    );
+    writeBuffer(gctx, args.setArgs.agents.data, T, agents);
 }
+
 
 pub const shrinkArgs = struct {
     new_size: u32,

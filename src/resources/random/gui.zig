@@ -106,7 +106,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Producer, .{
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_producers.new,
             .parameter = .{
                 .production_rate = demo.params.production_rate,
             },
@@ -130,7 +129,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Consumer, .{
             .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_consumers.new,
             .parameter = .{
                 .demand_rate = demo.params.demand_rate,
             },
@@ -142,7 +140,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Producer, .{
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_producers.new,
             .parameter = .{
                 .max_inventory = demo.params.max_inventory,
             },
@@ -180,7 +177,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Consumer, .{
             .agents = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_consumers.new,
             .parameter = .{
                 .moving_rate = demo.params.moving_rate,
             },
@@ -210,7 +206,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         Wgpu.setAll(gctx, Producer, .{
             .agents = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
-            .num_agents = demo.params.num_producers.new,
             .parameter = .{
                 .inventory = 0,
             },

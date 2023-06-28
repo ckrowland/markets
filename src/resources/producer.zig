@@ -14,13 +14,13 @@ const Self = @This();
 
 absolute_home: [4]f32,
 home: [4]f32,
-color: [4]f32 = .{ 1, 1, 1, 0 },
-production_rate: u32 = 300,
-inventory: i32 = 0,
-max_inventory: u32 = 10000,
+color: [4]f32,
+production_rate: u32,
+inventory: i32,
+max_inventory: u32,
 _padding1: u32 = 0,
 
-pub const z_pos = -2;
+pub const z_pos = 0;
 pub const Parameter = enum {
     production_rate,
     supply_shock,
@@ -39,6 +39,10 @@ pub fn create(args: Args) Self {
     return Self{
         .absolute_home = .{ args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
         .home = .{ args.home[0], args.home[1], z_pos, 1 },
+        .color = args.color,
+        .production_rate = args.production_rate,
+        .inventory = args.inventory,
+        .max_inventory = args.max_inventory,
     };
 }
 

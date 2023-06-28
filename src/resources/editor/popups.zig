@@ -4,6 +4,7 @@ const zgui = @import("zgui");
 const zmath = @import("zmath");
 const Wgpu = @import("../wgpu.zig");
 const Windows = @import("../../windows.zig");
+const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
 const Mouse = @import("mouse.zig");
 const Camera = @import("../../camera.zig");
@@ -16,6 +17,18 @@ pub const Popup = struct {
     grid_hover_size: [4]f32 = INITIAL_HOVER_SIZE,
     grid_popup_size: [4]f32 = .{ -30, 600, -600, 30 },
     open: bool = false,
+    type_popup: enum { consumers, producer },
+    parameters: union {
+        consumer: struct {
+            demand_rate: u32,
+            moving_rate: f32,
+            grouping_id: u32,
+        },
+        producer: struct {
+            production_rate: u32,
+            max_inventory: u32,
+        },
+    },
 };
 
 const Self = @This();
@@ -31,7 +44,7 @@ pub fn deinit(self: Self) void {
     self.positions.deinit();
 }
 
-pub fn addWindow(self: *Self, pop_up: Popup) void {
+pub fn append(self: *Self, pop_up: Popup) void {
     self.positions.append(pop_up) catch unreachable;
 }
 
@@ -81,34 +94,26 @@ fn mouseOverPopup(gctx: *zgpu.GraphicsContext, mouse: Mouse.MouseButton, pop_up:
     return in_x and in_y;
 }
 
-pub const ProducerArgs = struct {
-    const parameters = struct {
-        production_rate: *u32,
-        max_inventory: *u32,
-    };
-    params_ref: parameters,
-    agents: Wgpu.ObjectBuffer,
-    stats: Wgpu.ObjectBuffer,
-    num_agents: u32,
-};
-pub fn display(
-    self: Self,
-    gctx: *zgpu.GraphicsContext,
+pub const popupArgs = struct {
+    consumers: Wgpu.ObjectBuffer,
     mouse: Mouse.MouseButton,
-    comptime T: type,
-    args: ProducerArgs,
-) void {
-    _ = T;
+    producers: Wgpu.ObjectBuffer,
+    stats: Wgpu.ObjectBuffer,
+};
+pub fn display(self: Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
     for (self.positions.items, 0..) |pop_up, i| {
         if (pop_up.open) {
             self.positions.items[i].grid_hover_size = pop_up.grid_popup_size;
         }
 
         const popup_ref = &self.positions.items[i];
-        if (mouseOverPopup(gctx, mouse, popup_ref)) {
+        if (mouseOverPopup(gctx, args.mouse, popup_ref)) {
             self.positions.items[i].open = true;
             setupPopupWindow(gctx, popup_ref);
-            producerGui(gctx, i, args);
+            switch (pop_up.type_popup) {
+                .consumers => consumerGui(gctx, i, popup_ref, args),
+                .producer => producerGui(gctx, i, popup_ref, args),
+            }
         } else {
             self.positions.items[i].open = false;
             self.positions.items[i].grid_hover_size = INITIAL_HOVER_SIZE;
@@ -127,49 +132,98 @@ fn setupPopupWindow(gctx: *zgpu.GraphicsContext, pop_up: *Popup) void {
         .h = getPopupSize(gctx, pop_up)[1],
     });
 }
-fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, args: ProducerArgs) void {
+
+fn consumerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
     if (zgui.begin("Test", Windows.window_flags)) {
         zgui.pushIntId(@intCast(i32, idx) + 3);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        productionRateButton(gctx, args);
-        maxInventoryButton(gctx, args);
+        demandRateButton(gctx, pop_up, args);
+        movingRateSlider(gctx, pop_up, args);
         zgui.popId();
     }
     zgui.end();
 }
 
-fn productionRateButton(gctx: *zgpu.GraphicsContext, args: ProducerArgs) void {
-    zgui.text("Production Rate", .{});
-    if (zgui.sliderScalar("##pr", u32, .{
-        .v = args.params_ref.production_rate,
-        .min = 1,
-        .max = 1000,
-    })) {
-        Wgpu.setAll(gctx, Producer, .{
-            .agents = args.agents,
+fn demandRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+    zgui.text("Demand Rate", .{});
+    zgui.sameLine(.{});
+    zgui.textDisabled("(?)", .{});
+    if (zgui.isItemHovered(.{})) {
+        _ = zgui.beginTooltip();
+        zgui.textUnformatted("How much consumers demand from producers on a single trip.");
+        zgui.endTooltip();
+    }
+
+    const demand_rate_ptr = &pop_up.parameters.consumer.demand_rate;
+    if (zgui.sliderScalar("##dr", u32, .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },)) {
+        Wgpu.setAll(gctx, Consumer, .{
+            .agents = args.consumers,
             .stats = args.stats,
-            .num_agents = args.num_agents,
             .parameter = .{
-                .production_rate = args.params_ref.production_rate.*,
+                .demand_rate = demand_rate_ptr.*,
             },
         });
     }
 }
 
-fn maxInventoryButton(gctx: *zgpu.GraphicsContext, args: ProducerArgs) void {
-    zgui.text("Max Inventory", .{});
-    if (zgui.sliderScalar("##mi", u32, .{
-        .v = args.params_ref.max_inventory,
-        .min = 10,
-        .max = 10000,
-    })) {
-        Wgpu.setAll(gctx, Producer, .{
-            .agents = args.agents,
-            .stats = args.stats,
-            .num_agents = args.num_agents,
-            .parameter = .{
-                .max_inventory = args.params_ref.max_inventory.*,
+fn movingRateSlider(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+    zgui.text("Moving Rate", .{});
+    const moving_rate_ptr = &pop_up.parameters.consumer.moving_rate;
+    if (zgui.sliderScalar("##mr", f32, .{ .v = moving_rate_ptr, .min = 1.0, .max = 20 })) {
+        Wgpu.setGroup(gctx, Consumer, .{
+            .setArgs = .{
+                .agents = args.consumers,
+                .stats = args.stats,
+                .parameter = .{
+                    .moving_rate = moving_rate_ptr.*,
+                },
             },
+            .grouping_id = pop_up.parameters.consumer.grouping_id,
+        });
+    }
+}
+
+fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
+    if (zgui.begin("Test", Windows.window_flags)) {
+        zgui.pushIntId(@intCast(i32, idx) + 3);
+        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+        productionRateButton(gctx, pop_up, args);
+        maxInventoryButton(gctx, pop_up, args);
+        zgui.popId();
+    }
+    zgui.end();
+}
+
+fn productionRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+    zgui.text("Production Rate", .{});
+    const production_rate_ptr = &pop_up.parameters.producer.production_rate;
+    if (zgui.sliderScalar("##pr", u32, .{.v = production_rate_ptr, .min = 1, .max = 1000})) {
+        Wgpu.setAgent(gctx, Producer, .{
+            .setArgs = .{
+                .agents = args.producers,
+                .stats = args.stats,
+                .parameter = .{
+                    .production_rate = production_rate_ptr.*,
+                },
+            },
+            .grid_pos = pop_up.grid_cursor_pos,
+        });
+    }
+}
+
+fn maxInventoryButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+    zgui.text("Max Inventory", .{});
+    const max_inventory_ptr = &pop_up.parameters.producer.max_inventory;
+    if (zgui.sliderScalar("##mi", u32, .{.v = max_inventory_ptr, .min = 10, .max = 10000})) {
+        Wgpu.setAgent(gctx, Producer, .{
+            .setArgs = .{
+                .agents = args.producers,
+                .stats = args.stats,
+                .parameter = .{
+                    .max_inventory = max_inventory_ptr.*,
+                },
+            },
+            .grid_pos = pop_up.grid_cursor_pos,
         });
     }
 }

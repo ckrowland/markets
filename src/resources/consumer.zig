@@ -12,20 +12,28 @@ const Wgpu = @import("wgpu.zig");
 const Camera = @import("../camera.zig");
 const Self = @This();
 
+pub const defaults = DEFAULTS{};
+const DEFAULTS = struct {
+    color: [4]f32 = .{ 1, 0, 0, 0 },
+    moving_rate: f32 = 5.0,
+    demand_rate: u32 = 100,
+    radius: f32 = 20.0,
+};
+    
 absolute_home: [4]f32,
 position: [4]f32,
 home: [4]f32,
 destination: [4]f32,
-color: [4]f32 = .{ 1, 0, 0, 0 },
+color: [4]f32 = defaults.color,
 step_size: [2]f32 = .{ 0, 0 },
 moving_rate: f32,
 demand_rate: u32,
 inventory: u32 = 0,
 radius: f32,
 producer_id: i32 = -1,
-_padding1: u32 = 0,
+grouping_id: u32 = 0,
 
-pub const z_pos = -2;
+pub const z_pos = 0;
 pub fn generateBulk(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters) void {
     var consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
     const c_len = createRandomBulk(&consumers, params, params.num_consumers.new);
@@ -61,10 +69,11 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
 pub const Args = struct {
     absolute_home: [2]f32,
     home: [2]f32,
-    color: [4]f32 = .{ 1, 0, 0, 0 },
-    moving_rate: f32 = 5.0,
-    demand_rate: u32 = 100,
-    radius: f32 = 20.0,
+    color: [4]f32 = defaults.color,
+    moving_rate: f32 = defaults.moving_rate,
+    demand_rate: u32 = defaults.demand_rate,
+    radius: f32 = defaults.radius,
+    grouping_id: u32 = 0,
 };
 pub fn create(args: Args) Self {
     const home: [4]f32 = .{ args.home[0], args.home[1], z_pos, 1 };
@@ -77,6 +86,7 @@ pub fn create(args: Args) Self {
         .moving_rate = args.moving_rate,
         .demand_rate = args.demand_rate,
         .radius = args.radius,
+        .grouping_id = args.grouping_id,
     };
 }
 

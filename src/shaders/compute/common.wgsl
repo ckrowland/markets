@@ -10,6 +10,7 @@ struct Consumer {
   inventory: u32,
   radius: f32,
   producer_id: i32,
+  grouping_id: u32,
 }
 struct Producer {
   absolute_home: vec4<f32>,
