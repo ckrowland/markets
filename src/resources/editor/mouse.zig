@@ -10,8 +10,8 @@ pub const MouseButton = struct {
     button: zglfw.MouseButton = zglfw.MouseButton.left,
     state: bool = false,
     previousState: bool = false,
-    grid_pos: [2]f32 = .{ 0, 0 },
-    cursor_pos: [2]f32 = .{ 0, 0 },
+    grid_pos: [2]i32 = .{ 0, 0 },
+    pixel_pos: [2]f32 = .{ 0, 0 },
 
     pub fn update(self: *MouseButton, gctx: *zgpu.GraphicsContext) void {
         self.previousState = self.state;
@@ -26,10 +26,10 @@ pub const MouseButton = struct {
         }
         self.grid_pos = getGridPosition(gctx);
         const content_scale = gctx.window.getContentScale();
-        const cursor_pos = gctx.window.getCursorPos();
-        self.cursor_pos = .{
-            @floatCast(f32, cursor_pos[0] * content_scale[0]),
-            @floatCast(f32, cursor_pos[1] * content_scale[1]),
+        const pixel_pos = gctx.window.getCursorPos();
+        self.pixel_pos = .{
+            @floatCast(f32, pixel_pos[0] * content_scale[0]),
+            @floatCast(f32, pixel_pos[1] * content_scale[1]),
         };
     }
 
@@ -73,7 +73,7 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
     return .{ world_pos[0], world_pos[1] };
 }
 
-pub fn getGridPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
+pub fn getGridPosition(gctx: *zgpu.GraphicsContext) [2]i32 {
     const world_pos = getWorldPosition(gctx);
     const full_grid_pos = Camera.getGridPosition(gctx, world_pos);
     return .{ full_grid_pos[0], full_grid_pos[1] };

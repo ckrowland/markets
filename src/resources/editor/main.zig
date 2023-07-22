@@ -12,20 +12,28 @@ const Wgpu = @import("../wgpu.zig");
 const config = @import("config.zig");
 const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
+const ConsumerHover = @import("consumer_hover.zig");
 const Image = @import("images.zig");
 const Main = @import("../../main.zig");
 const Camera = @import("../../camera.zig");
 const Square = @import("../../shapes/square.zig");
 const Circle = @import("../../shapes/circle.zig");
-const Input = @import("mouse.zig");
+const Mouse = @import("mouse.zig");
 const Hover = @import("hover.zig");
 const Popups = @import("popups.zig");
 const content_dir = @import("build_options").content_dir;
+
+pub const MAX_NUM_AGENTS = Wgpu.MAX_NUM_STRUCTS;
+pub const MAX_NUM_PRODUCERS = 100;
+pub const MAX_NUM_CONSUMERS = MAX_NUM_AGENTS;
+pub const NUM_CONSUMER_SIDES = 40;
+pub const PRODUCER_WIDTH = 40;
+
 const Self = @This();
 
 running: bool = false,
 gui: gui.State = .{},
-mouse: Input.MouseButton = .{},
+mouse: Mouse.MouseButton = .{},
 popups: Popups,
 render_pipelines: struct {
     circle: zgpu.RenderPipelineHandle,
@@ -44,7 +52,7 @@ bind_groups: struct {
 buffers: struct {
     data: struct {
         consumer: Wgpu.ObjectBuffer,
-        consumer_hover: zgpu.BufferHandle,
+        consumer_hover: Wgpu.ObjectBuffer,
         hover: zgpu.BufferHandle,
         producer: Wgpu.ObjectBuffer,
         stats: Wgpu.ObjectBuffer,
@@ -60,8 +68,8 @@ buffers: struct {
 },
 depth_texture: zgpu.TextureHandle,
 depth_texture_view: zgpu.TextureViewHandle,
-consumerTextureView: zgpu.TextureViewHandle,
-producerTextureView: zgpu.TextureViewHandle,
+consumer_texture_view: zgpu.TextureViewHandle,
+producer_texture_view: zgpu.TextureViewHandle,
 params: Parameters,
 stats: Statistics,
 allocator: std.mem.Allocator,
@@ -95,8 +103,9 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     // Create Buffers
     const hover_buffer = Hover.initBuffer(gctx);
     const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
-    const consumer_hover_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
     const consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, params.max_num_consumers);
+    const consumer_hover = Wgpu.createBuffer(gctx, ConsumerHover, params.max_num_consumers);
+    const consumer_h_m = Wgpu.createMappedBuffer(gctx, ConsumerHover, params.max_num_consumers);
     const producer_buffer = Wgpu.createBuffer(gctx, Producer, params.max_num_producers);
     const producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, params.max_num_producers);
     const stats_buffer = Statistics.createBuffer(gctx);
@@ -115,15 +124,15 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const arena = arena_state.allocator();
     zstbi.init(arena);
     defer zstbi.deinit();
-    const consumerTextureView = try Image.createTextureView(
+    const consumer_texture_view = try Image.createTextureView(
         gctx,
         content_dir ++ "/pngs/consumerBrush.png",
     );
-    const producerTextureView = try Image.createTextureView(
+    const producer_texture_view = try Image.createTextureView(
         gctx,
         content_dir ++ "/pngs/producer.png",
     );
-    const depth = Main.createDepthTexture(gctx);
+    const depth = Wgpu.createDepthTexture(gctx);
 
     return Self{
         .render_pipelines = .{
@@ -146,7 +155,10 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
                     .data = consumer_buffer,
                     .mapped = consumer_mapped,
                 },
-                .consumer_hover = consumer_hover_buffer,
+                .consumer_hover = .{
+                    .data = consumer_hover,
+                    .mapped = consumer_h_m,
+                },
                 .hover = hover_buffer,
                 .producer = .{
                     .data = producer_buffer,
@@ -168,8 +180,8 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         },
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
-        .consumerTextureView = consumerTextureView,
-        .producerTextureView = producerTextureView,
+        .consumer_texture_view = consumer_texture_view,
+        .producer_texture_view = producer_texture_view,
         .popups = Popups.init(allocator),
         .allocator = allocator,
         .params = params,
@@ -183,9 +195,9 @@ pub fn deinit(demo: *Self) void {
     demo.* = undefined;
 }
 
-pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) !void {
     demo.mouse.update(gctx);
-    gui.update(demo, gctx);
+    try gui.update(demo, gctx);
 }
 
 pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
@@ -194,10 +206,12 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
 
+    
     const commands = commands: {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
 
+        const data = demo.buffers.data;
         const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
         const num_producers = Wgpu.getNumStructs(gctx, Producer, demo.buffers.data.stats);
 
@@ -225,36 +239,41 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
 
         // Copy data to mapped buffers so we can retrieve it on demand
         pass: {
-            const s = gctx.lookupResource(demo.buffers.data.stats.data) orelse break :pass;
-            const s_info = gctx.lookupResourceInfo(demo.buffers.data.stats.data) orelse break :pass;
-            const sm = gctx.lookupResource(demo.buffers.data.stats.mapped) orelse break :pass;
+            const s = gctx.lookupResource(data.stats.data) orelse break :pass;
+            const s_info = gctx.lookupResourceInfo(data.stats.data) orelse break :pass;
+            const sm = gctx.lookupResource(data.stats.mapped) orelse break :pass;
             encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
 
-            const p = gctx.lookupResource(demo.buffers.data.producer.data) orelse break :pass;
-            const p_info = gctx.lookupResourceInfo(demo.buffers.data.producer.data) orelse break :pass;
-            const pm = gctx.lookupResource(demo.buffers.data.producer.mapped) orelse break :pass;
+            const p = gctx.lookupResource(data.producer.data) orelse break :pass;
+            const p_info = gctx.lookupResourceInfo(data.producer.data) orelse break :pass;
+            const pm = gctx.lookupResource(data.producer.mapped) orelse break :pass;
             encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
 
-            const c = gctx.lookupResource(demo.buffers.data.consumer.data) orelse break :pass;
-            const c_info = gctx.lookupResourceInfo(demo.buffers.data.consumer.data) orelse break :pass;
-            const cm = gctx.lookupResource(demo.buffers.data.consumer.mapped) orelse break :pass;
+            const c = gctx.lookupResource(data.consumer.data) orelse break :pass;
+            const c_info = gctx.lookupResourceInfo(data.consumer.data) orelse break :pass;
+            const cm = gctx.lookupResource(data.consumer.mapped) orelse break :pass;
             encoder.copyBufferToBuffer(c, 0, cm, 0, c_info.size);
+            
+            const ch = gctx.lookupResource(data.consumer_hover.data) orelse break :pass;
+            const ch_info = gctx.lookupResourceInfo(data.consumer_hover.data) orelse break :pass;
+            const chm = gctx.lookupResource(data.consumer_hover.mapped) orelse break :pass;
+            encoder.copyBufferToBuffer(ch, 0, chm, 0, ch_info.size);
         }
 
         // Draw the circles and squares in our defined viewport
         pass: {
             const hoverRP = gctx.lookupResource(demo.render_pipelines.hover) orelse break :pass;
             const hoverVB = gctx.lookupResourceInfo(demo.buffers.vertex.hover) orelse break :pass;
-            const hoverB = gctx.lookupResourceInfo(demo.buffers.data.hover) orelse break :pass;
+            const hoverB = gctx.lookupResourceInfo(data.hover) orelse break :pass;
             const svb_info = gctx.lookupResourceInfo(demo.buffers.vertex.square) orelse break :pass;
-            const pb_info = gctx.lookupResourceInfo(demo.buffers.data.producer.data) orelse break :pass;
+            const pb_info = gctx.lookupResourceInfo(data.producer.data) orelse break :pass;
             const cvb_info = gctx.lookupResourceInfo(demo.buffers.vertex.circle) orelse break :pass;
-            const cb_info = gctx.lookupResourceInfo(demo.buffers.data.consumer.data) orelse break :pass;
+            const cb_info = gctx.lookupResourceInfo(data.consumer.data) orelse break :pass;
             const cib_info = gctx.lookupResourceInfo(demo.buffers.index.circle) orelse break :pass;
             const square_rp = gctx.lookupResource(demo.render_pipelines.square) orelse break :pass;
             const circle_rp = gctx.lookupResource(demo.render_pipelines.circle) orelse break :pass;
             const chrp = gctx.lookupResource(demo.render_pipelines.consumer_hover) orelse break :pass;
-            const ch_info = gctx.lookupResourceInfo(demo.buffers.data.consumer_hover) orelse break :pass;
+            const ch_info = gctx.lookupResourceInfo(data.consumer_hover.data) orelse break :pass;
             const render_bind_group = gctx.lookupResource(demo.bind_groups.render) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
 
@@ -335,12 +354,16 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
         // Update grid positions to new aspect ratio
         const aspect = Camera.getAspectRatio(gctx);
         demo.params.aspect = aspect;
-        Consumer.updateCoords(gctx, .{
-            .consumers = demo.buffers.data.consumer,
+        Wgpu.updateCoords(gctx, Consumer, .{
+            .structs = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
         });
-        Producer.updateCoords(gctx, .{
-            .producers = demo.buffers.data.producer,
+        Wgpu.updateCoords(gctx, Producer, .{
+            .structs = demo.buffers.data.producer,
+            .stats = demo.buffers.data.stats,
+        });
+        Wgpu.updateCoords(gctx, ConsumerHover, .{
+            .structs = demo.buffers.data.consumer_hover,
             .stats = demo.buffers.data.stats,
         });
     }
@@ -349,18 +372,23 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
 pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     Wgpu.clearBuffer(gctx, demo.buffers.data.consumer.data);
     Wgpu.clearBuffer(gctx, demo.buffers.data.producer.data);
-    demo.stats.clear();
+    Wgpu.clearBuffer(gctx, demo.buffers.data.consumer_hover.data);
     Wgpu.clearBuffer(gctx, demo.buffers.data.stats.data);
+    Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, 0);
+    Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, 0);
+    demo.stats.clear();
+    demo.popups.clear();
     demo.running = false;
 }
 
-pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {
+pub fn updateDepthTexture(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     // Release old depth texture.
-    gctx.releaseResource(state.depth_texture_view);
-    gctx.destroyResource(state.depth_texture);
+    gctx.releaseResource(demo.depth_texture_view);
+    gctx.destroyResource(demo.depth_texture);
 
     // Create a new depth texture to match the new window size.
-    const depth = Main.createDepthTexture(gctx);
-    state.depth_texture = depth.texture;
-    state.depth_texture_view = depth.view;
+    const depth = Wgpu.createDepthTexture(gctx);
+    demo.depth_texture = depth.texture;
+    demo.depth_texture_view = depth.view;
 }
+

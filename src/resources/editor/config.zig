@@ -1,6 +1,6 @@
 const Hover = @import("hover.zig");
 const Consumer = @import("../consumer.zig");
-const HoverConsumer = @import("../consumer_hover.zig");
+const HoverConsumer = @import("consumer_hover.zig");
 const Producer = @import("../producer.zig");
 const Wgpu = @import("../wgpu.zig");
 

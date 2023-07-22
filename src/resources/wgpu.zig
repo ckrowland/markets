@@ -5,8 +5,14 @@ const Gctx = zgpu.GraphicsContext;
 const wgpu = zgpu.wgpu;
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
+const ConsumerHover = @import("editor/consumer_hover.zig");
+const Camera = @import("../camera.zig");
 
-// A mishmash of Wgpu initialization functions and buffer helpers
+pub const MAX_NUM_STRUCTS = 10000;
+
+// A mishmash of Wgpu initialization functions and buffer helpers for an array of generic structs
+
+// Data Types
 pub const ObjectBuffer = struct {
     data: zgpu.BufferHandle,
     mapped: zgpu.BufferHandle,
@@ -37,14 +43,14 @@ pub const ComputePipelineInfo = struct {
     entry_point: [:0]const u8,
 };
 
-// Helpers
+// Functions
 pub fn getNumStructs(gctx: *zgpu.GraphicsContext, comptime T: type, stat_bufs: ObjectBuffer) u32 {
     const stats = getAll(gctx, u32, .{
         .structs = stat_bufs,
         .num_structs = 8,
     }) catch unreachable;
     switch (T) {
-        Consumer => return stats[1],
+        Consumer, ConsumerHover => return stats[1],
         Producer => return stats[2],
         else => unreachable,
     }
@@ -106,6 +112,9 @@ pub fn agentParameters(comptime T: type) type {
             inventory: i32,
             max_inventory: u32,
         },
+        ConsumerHover => return union(enum) {
+            color: [4]f32,
+        },            
         else => unreachable,
     }
 }
@@ -127,7 +136,7 @@ pub fn setAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: setArgs(T)) v
     writeBuffer(gctx, args.agents.data, T, agents);
 }
 
-fn writeBuffer(
+pub fn writeBuffer(
     gctx: *zgpu.GraphicsContext,
     buf: zgpu.BufferHandle,
     comptime T: type,
@@ -138,7 +147,7 @@ fn writeBuffer(
 pub fn setAgentArgs(comptime T: type) type {
     return struct {
         setArgs: setArgs(T),
-        grid_pos: [2]f32,
+        grid_pos: [2]i32,
     };
 }
 pub fn setAgent(gctx: *zgpu.GraphicsContext, comptime T: type, args: setAgentArgs(T)) void {
@@ -170,6 +179,11 @@ fn setAgentParameter(comptime T: type, agent: *T, parameter: agentParameters(T))
                 .max_inventory => |v| agent.max_inventory = v,
             }
         },
+        ConsumerHover => {
+            switch (parameter) {
+                .color => |v| agent.color = v,
+            }
+        },
         else => unreachable,
     }
 }
@@ -193,6 +207,59 @@ pub fn setGroup(gctx: *zgpu.GraphicsContext, comptime T: type, args: setGrouping
     writeBuffer(gctx, args.setArgs.agents.data, T, agents);
 }
 
+pub const updateCoordArgs = struct {
+    structs: ObjectBuffer,
+    stats: ObjectBuffer,
+};
+pub fn updateCoords(gctx: *zgpu.GraphicsContext, comptime T: type, args: updateCoordArgs) void {
+    const structs = getAll(gctx, T, .{
+        .structs = args.structs,
+        .num_structs = getNumStructs(gctx, T, args.stats),
+    }) catch return;
+    var new_structs: [MAX_NUM_STRUCTS]T = undefined;
+    for (structs, 0..) |s, i| {
+        const world_pos = Camera.getWorldPosition(gctx, s.absolute_home);
+        new_structs[i] = s;
+        switch (T) {
+            Consumer => {
+                new_structs[i].position = world_pos;
+                new_structs[i].home = world_pos;
+                new_structs[i].destination = world_pos;
+            },
+            Producer => {
+                new_structs[i].home = world_pos;
+            },
+            ConsumerHover => {
+                new_structs[i].home = world_pos;
+            },
+            else => unreachable,
+        }
+    }
+
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(args.structs.data).?,
+        0,
+        T,
+        new_structs[0..structs.len],
+    );
+
+    // Since aspect update is done at end of draw loop, updateCoords must write to the mapped
+    // buffers before next update function to have accurate data
+    const commands = commands: {
+        const encoder = gctx.device.createCommandEncoder(null);
+        defer encoder.release();
+
+        pass: {
+            const p = gctx.lookupResource(args.structs.data) orelse break :pass;
+            const p_info = gctx.lookupResourceInfo(args.structs.data) orelse break :pass;
+            const pm = gctx.lookupResource(args.structs.mapped) orelse break :pass;
+            encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
+        }
+        break :commands encoder.finish(null);
+    };
+    defer commands.release();
+    gctx.submit(&.{commands});
+}    
 
 pub const shrinkArgs = struct {
     new_size: u32,
@@ -252,6 +319,27 @@ pub fn createMappedBuffer(gctx: *Gctx, comptime T: type, num: u32) zgpu.BufferHa
         .usage = .{ .copy_dst = true, .map_read = true },
         .size = num * @sizeOf(T),
     });
+}
+
+// Depth Texture
+pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+    texture: zgpu.TextureHandle,
+    view: zgpu.TextureViewHandle,
+} {
+    const texture = gctx.createTexture(.{
+        .usage = .{ .render_attachment = true },
+        .dimension = .tdim_2d,
+        .size = .{
+            .width = gctx.swapchain_descriptor.width,
+            .height = gctx.swapchain_descriptor.height,
+            .depth_or_array_layers = 1,
+        },
+        .format = .depth32_float,
+        .mip_level_count = 1,
+        .sample_count = 1,
+    });
+    const view = gctx.createTextureView(texture, .{});
+    return .{ .texture = texture, .view = view };
 }
 
 // Bind Group Layouts

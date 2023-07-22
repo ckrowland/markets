@@ -20,7 +20,7 @@ const DEFAULTS = struct {
     radius: f32 = 20.0,
 };
     
-absolute_home: [4]f32,
+absolute_home: [4]i32,
 position: [4]f32,
 home: [4]f32,
 destination: [4]f32,
@@ -49,9 +49,12 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
     var consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
     var i: usize = 0;
     while (i < num) {
-        const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
-        const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
-        const aspect_home = [2]f32{ x * params.aspect, y };
+        const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
+        const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
+        const aspect_home = [2]f32{
+            @floatFromInt(f32, x) * params.aspect,
+            @floatFromInt(f32, y),
+        };
 
         consumers[i] = create(.{
             .absolute_home = .{ x, y },
@@ -67,7 +70,7 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
 }
 
 pub const Args = struct {
-    absolute_home: [2]f32,
+    absolute_home: [2]i32,
     home: [2]f32,
     color: [4]f32 = defaults.color,
     moving_rate: f32 = defaults.moving_rate,
@@ -88,30 +91,4 @@ pub fn create(args: Args) Self {
         .radius = args.radius,
         .grouping_id = args.grouping_id,
     };
-}
-
-pub const updateCoordsArgs = struct {
-    consumers: Wgpu.ObjectBuffer,
-    stats: Wgpu.ObjectBuffer,
-};
-
-pub fn updateCoords(gctx: *zgpu.GraphicsContext, args: updateCoordsArgs) void {
-    const consumers = Wgpu.getAll(gctx, Self, .{
-        .structs = args.consumers,
-        .num_structs = Wgpu.getNumStructs(gctx, Self, args.stats),
-    }) catch return;
-    var new_consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
-    for (consumers, 0..) |c, i| {
-        const world_pos = Camera.getWorldPosition(gctx, c.absolute_home);
-        new_consumers[i] = c;
-        new_consumers[i].position = world_pos;
-        new_consumers[i].home = world_pos;
-        new_consumers[i].destination = world_pos;
-    }
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(args.consumers.data).?,
-        0,
-        Self,
-        new_consumers[0..consumers.len],
-    );
 }

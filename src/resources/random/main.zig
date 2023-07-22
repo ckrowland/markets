@@ -99,7 +99,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         .producer = producer_buffer,
         .stats = stats_buffer,
     });
-    const depth = Main.createDepthTexture(gctx);
+    const depth = Wgpu.createDepthTexture(gctx);
 
     return Self{
         .render_pipelines = .{
@@ -295,12 +295,12 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
         // Update grid positions to new aspect ratio
         const aspect = Camera.getAspectRatio(gctx);
         demo.params.aspect = aspect;
-        Consumer.updateCoords(gctx, .{
-            .consumers = demo.buffers.data.consumer,
+        Wgpu.updateCoords(gctx, Consumer, .{
+            .structs = demo.buffers.data.consumer,
             .stats = demo.buffers.data.stats,
         });
-        Producer.updateCoords(gctx, .{
-            .producers = demo.buffers.data.producer,
+        Wgpu.updateCoords(gctx, Producer, .{
+            .structs = demo.buffers.data.producer,
             .stats = demo.buffers.data.stats,
         });
     }
@@ -319,7 +319,7 @@ pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {
     gctx.destroyResource(state.depth_texture);
 
     // Create a new depth texture to match the new window size.
-    const depth = Main.createDepthTexture(gctx);
+    const depth = Wgpu.createDepthTexture(gctx);
     state.depth_texture = depth.texture;
     state.depth_texture_view = depth.view;
 }

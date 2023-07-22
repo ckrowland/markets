@@ -42,7 +42,7 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     // demo.signals.deinit();
 }
 
-fn update(demo: *DemoState) void {
+fn update(demo: *DemoState) !void {
     const sd = demo.gctx.swapchain_descriptor;
     zgui.backend.newFrame(sd.width, sd.height);
     Window.commonGui(demo);
@@ -51,7 +51,7 @@ fn update(demo: *DemoState) void {
             demo.random.update(demo.gctx);
         },
         1 => {
-            demo.editor.update(demo.gctx);
+            try demo.editor.update(demo.gctx);
         },
         // 2 => {
         //     demo.signals.update(demo.gctx);
@@ -75,26 +75,6 @@ fn draw(demo: *DemoState) void {
             demo.random.draw(demo.gctx);
         },
     }
-}
-
-pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
-    texture: zgpu.TextureHandle,
-    view: zgpu.TextureViewHandle,
-} {
-    const texture = gctx.createTexture(.{
-        .usage = .{ .render_attachment = true },
-        .dimension = .tdim_2d,
-        .size = .{
-            .width = gctx.swapchain_descriptor.width,
-            .height = gctx.swapchain_descriptor.height,
-            .depth_or_array_layers = 1,
-        },
-        .format = .depth32_float,
-        .mip_level_count = 1,
-        .sample_count = 1,
-    });
-    const view = gctx.createTextureView(texture, .{});
-    return .{ .texture = texture, .view = view };
 }
 
 pub fn main() !void {
@@ -143,7 +123,7 @@ pub fn main() !void {
         if (!window.getAttribute(.focused)) {
             continue;
         }
-        update(&demo);
+        try update(&demo);
         draw(&demo);
     }
 }

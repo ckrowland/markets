@@ -7,7 +7,7 @@ const zmath = @import("zmath");
 const Camera = @import("../../camera.zig");
 const Circle = @import("../../shapes/circle.zig");
 const Consumer = @import("../consumer.zig");
-const ConsumerHover = @import("../consumer_hover.zig");
+const ConsumerHover = @import("consumer_hover.zig");
 const DemoState = @import("main.zig");
 const Hover = @import("hover.zig");
 const Producer = @import("../producer.zig");
@@ -28,7 +28,7 @@ pub const State = struct {
     consumer_grouping_id: u32 = 0,
 };
 
-pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
         zgui.pushIntId(2);
@@ -45,12 +45,15 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     }
     zgui.end();
 
-    demo.popups.display(gctx, .{
-        .mouse = demo.mouse,
+    try demo.popups.display(gctx, .{
         .consumers = demo.buffers.data.consumer,
+        .consumer_hover = demo.buffers.data.consumer_hover,
+        .mouse = demo.mouse,
         .producers = demo.buffers.data.producer,
         .stats = demo.buffers.data.stats,
+        .allocator = demo.allocator,
     });
+
 
     if (demo.running) {
         Statistics.generateAndFillRandomColor(gctx, demo.buffers.data.stats.data);
@@ -70,11 +73,11 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .none => {},
         .consumers => {
             hoverUpdate(gctx, demo);
-            addingConsumer(gctx, demo);
+            try addingConsumer(gctx, demo);
         },
         .producer => {
             hoverUpdate(gctx, demo);
-            addingProducer(gctx, demo);
+            try addingProducer(gctx, demo);
         },
     };
 }
@@ -88,54 +91,65 @@ fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     );
 }
 
-fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
+fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     if (demo.mouse.down() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
-        const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
-        const world_pos = Mouse.getWorldPosition(gctx);
-        const consumer = Consumer.create(.{
-            .absolute_home = Camera.getGridPosition(gctx, world_pos),
-            .home = world_pos,
-            .grouping_id = demo.gui.consumer_grouping_id,
-        });
-        var consumers = [1]Consumer{consumer};
-        Wgpu.appendBuffer(gctx, Consumer, .{
-            .num_old_structs = num_consumers,
-            .buf = demo.buffers.data.consumer.data,
-            .structs = consumers[0..],
-        });
-
-        const consumer_hover = ConsumerHover.create(.{
-            .absolute_home = Camera.getGridPosition(gctx, world_pos),
-            .home = world_pos,
-            .grouping_id = demo.gui.consumer_grouping_id,
-        });
-        var hover_circles = [1]ConsumerHover{consumer_hover};
-        Wgpu.appendBuffer(gctx, ConsumerHover, .{
-            .num_old_structs = num_consumers,
-            .buf = demo.buffers.data.consumer_hover,
-            .structs = hover_circles[0..],
-        });
-        
-        Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
+        try addConsumer(gctx, demo);
     }
     if (demo.mouse.released() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
-        demo.popups.append(.{
-            .window_cursor_pos = demo.mouse.cursor_pos,
-            .grid_cursor_pos = demo.mouse.grid_pos,
+        try addConsumer(gctx, demo);
+        
+        const gui_id = @intCast(u32, demo.popups.popups.items.len);
+        try demo.popups.appendPopup(.{
+            .id = .{ .gui_id = gui_id, },
+            .grid_agent_center = demo.mouse.grid_pos,
             .type_popup = .consumers,
             .parameters = .{
                 .consumer = .{
                     .demand_rate = Consumer.defaults.demand_rate,
                     .moving_rate = Consumer.defaults.moving_rate,
-                    .grouping_id = demo.gui.consumer_grouping_id,
                 },
             },
         });
-        demo.gui.consumer_grouping_id += 1;
     }
 }
 
-fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
+fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
+    const gui_id = @intCast(u32, demo.popups.popups.items.len);
+    const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
+    const world_pos = Mouse.getWorldPosition(gctx);
+    const consumer = Consumer.create(.{
+        .absolute_home = Camera.getGridPosition(gctx, world_pos),
+        .home = world_pos,
+        .grouping_id = gui_id,
+    });
+    var consumers = [1]Consumer{consumer};
+    Wgpu.appendBuffer(gctx, Consumer, .{
+        .num_old_structs = num_consumers,
+        .buf = demo.buffers.data.consumer.data,
+        .structs = consumers[0..],
+    });
+
+    const consumer_hover = ConsumerHover.create(.{
+        .absolute_home = Camera.getGridPosition(gctx, world_pos),
+        .home = world_pos,
+        .grouping_id = gui_id,
+    });
+    var hover_circles = [1]ConsumerHover{consumer_hover};
+    Wgpu.appendBuffer(gctx, ConsumerHover, .{
+        .num_old_structs = num_consumers,
+        .buf = demo.buffers.data.consumer_hover.data,
+        .structs = hover_circles[0..],
+    });
+    
+    Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 1);
+    const corners = Popups.getGridEdges(demo.mouse.grid_pos, Popups.CLOSED_SIZE);
+    try demo.popups.appendSquare(demo.allocator, .{
+        .id = .{ .gui_id = gui_id },
+        .grid_corners = corners,
+    });
+}
+
+fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     if (demo.mouse.pressed() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
         const num_producers = Wgpu.getNumStructs(gctx, Producer, demo.buffers.data.stats);
         const world_pos = Mouse.getWorldPosition(gctx);
@@ -151,10 +165,10 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
         });
         Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers + 1);
 
-        // Create zgui window at mouse position
-        demo.popups.append(.{
-            .window_cursor_pos = demo.mouse.cursor_pos,
-            .grid_cursor_pos = demo.mouse.grid_pos,
+        const gui_id = @intCast(u32, demo.popups.popups.items.len);
+        try demo.popups.appendPopup(.{
+            .id = .{ .gui_id = gui_id, },
+            .grid_agent_center = demo.mouse.grid_pos,
             .type_popup = .producer,
             .parameters = .{
                 .producer = .{
@@ -162,6 +176,10 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
                     .max_inventory = producer.max_inventory,
                 },
             },
+        });
+        try demo.popups.appendSquare(demo.allocator, .{
+            .id = .{ .gui_id = gui_id },
+            .grid_corners = Popups.getGridEdges(demo.mouse.grid_pos, Popups.CLOSED_SIZE),
         });
     }
 }
@@ -197,7 +215,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         gctx,
         &demo.gui,
         State.Selection.consumers,
-        demo.consumerTextureView,
+        demo.consumer_texture_view,
         pressedColor,
         buttonSize,
     );
@@ -205,12 +223,10 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         gctx,
         &demo.gui,
         State.Selection.producer,
-        demo.producerTextureView,
+        demo.producer_texture_view,
         pressedColor,
         buttonSize,
     );
-
-    zgui.text("Number Of Producers", .{});
 
     zgui.text("Consumer Size", .{});
     if (zgui.sliderScalar("##cs", f32, .{ .v = &demo.params.consumer_radius, .min = 1, .max = 40 })) {

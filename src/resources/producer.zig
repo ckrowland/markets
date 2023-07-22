@@ -12,7 +12,7 @@ const Camera = @import("../camera.zig");
 
 const Self = @This();
 
-absolute_home: [4]f32,
+absolute_home: [4]i32,
 home: [4]f32,
 color: [4]f32,
 production_rate: u32,
@@ -28,7 +28,7 @@ pub const Parameter = enum {
 };
 
 pub const Args = struct {
-    absolute_home: [2]f32,
+    absolute_home: [2]i32,
     home: [2]f32,
     color: [4]f32 = .{ 1, 1, 1, 0 },
     production_rate: u32 = 300,
@@ -61,11 +61,11 @@ pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {
     var producers: [DemoState.MAX_NUM_PRODUCERS]Self = undefined;
     var i: usize = 0;
     while (i < num) {
-        const x = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X));
-        const y = @floatFromInt(f32, random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y));
+        const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
+        const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
         producers[i] = create(.{
-            .absolute_home = [2]f32{ x, y },
-            .home = [2]f32{ x * params.aspect, y },
+            .absolute_home = .{ x, y },
+            .home = [2]f32{ @floatFromInt(f32, x) * params.aspect, @floatFromInt(f32, y) },
             .production_rate = params.production_rate,
             .inventory = @intCast(i32, params.max_inventory),
             .max_inventory = params.max_inventory,

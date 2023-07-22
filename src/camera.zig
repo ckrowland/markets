@@ -31,29 +31,29 @@ pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
 }
 
 // Given a world position (grid position with aspect), return grid position
-pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [2]f32) [2]f32 {
+pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [2]f32) [2]i32 {
     const aspect = getAspectRatio(gctx);
     return .{
-        world_pos[0] / aspect,
-        world_pos[1],
+        @intFromFloat(i32, world_pos[0] / aspect),
+        @intFromFloat(i32, world_pos[1]),
         // world_pos[2],
         // world_pos[3],
     };
 }
 
 // Given a grid position, return a world position
-pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]f32) [4]f32 {
+pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]i32) [4]f32 {
     const aspect = getAspectRatio(gctx);
     return .{
-        grid_pos[0] * aspect,
-        grid_pos[1],
-        grid_pos[2],
-        grid_pos[3],
+        @floatFromInt(f32, grid_pos[0]) * aspect,
+        @floatFromInt(f32, grid_pos[1]),
+        @floatFromInt(f32, grid_pos[2]),
+        @floatFromInt(f32, grid_pos[3]),
     };
 }
 
 // Given a grid position, return a pixel position
-pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
+pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]i32) [2]f32 {
     const grid_pos = .{ g_pos[0], g_pos[1], 0, 1 };
     const world_pos = zmath.loadArr4(getWorldPosition(gctx, grid_pos));
     const camera_pos = zmath.mul(world_pos, getObjectToClipMat(gctx));

@@ -1,5 +1,5 @@
 struct Consumer {
-  absolute_home: vec4<f32>,
+  absolute_home: vec4<i32>,
   position: vec4<f32>,
   home: vec4<f32>,
   destination: vec4<f32>,
@@ -13,7 +13,7 @@ struct Consumer {
   grouping_id: u32,
 }
 struct Producer {
-  absolute_home: vec4<f32>,
+  absolute_home: vec4<i32>,
   home: vec4<f32>,
   color: vec4<f32>,
   production_rate: u32,
