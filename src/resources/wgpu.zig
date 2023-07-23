@@ -50,8 +50,9 @@ pub fn getNumStructs(gctx: *zgpu.GraphicsContext, comptime T: type, stat_bufs: O
         .num_structs = 8,
     }) catch unreachable;
     switch (T) {
-        Consumer, ConsumerHover => return stats[1],
+        Consumer => return stats[1],
         Producer => return stats[2],
+        ConsumerHover => return stats[3],
         else => unreachable,
     }
 }

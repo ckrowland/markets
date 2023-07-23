@@ -38,7 +38,7 @@ pub fn deinit(self: *Self) void {
 pub fn generateAndFillRandomColor(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
     gctx.queue.writeBuffer(
         gctx.lookupResource(buf).?,
-        3 * @sizeOf(u32),
+        4 * @sizeOf(u32),
         f32,
         &.{ random.float(f32), random.float(f32), random.float(f32) },
     );
@@ -111,6 +111,15 @@ pub fn setNumProducers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num:
     );
 }
 
+pub fn setNumConsumerHovers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num: u32) void {
+    gctx.queue.writeBuffer(
+        gctx.lookupResource(buf).?,
+        3 * @sizeOf(u32),
+        u32,
+        &.{num},
+    );
+}
+
 pub fn createBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .storage = true },
@@ -124,10 +133,3 @@ pub fn createMappedBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
         .size = @sizeOf(u32) * zero.len,
     });
 }
-
-// pub fn getNumConsumers(gctx: *zgpu.GraphicsContext, stat_bufs: Wgpu.ObjectBuffer) u32 {
-//     return Wgpu.getGPUStatistics(gctx, stat_bufs)[1];
-// }
-// pub fn getNumProducers(gctx: *zgpu.GraphicsContext, stat_bufs: Wgpu.ObjectBuffer) u32 {
-//     return getGPUStatistics(gctx, stat_bufs)[2];
-// }

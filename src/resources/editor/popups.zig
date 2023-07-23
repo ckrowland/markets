@@ -252,6 +252,37 @@ fn isPopupOpen(self: *Self, gui_id: u32) bool {
     return false;
 }
 
+pub fn doesAgentExist(self: *Self, grid_pos: [2]i32) bool {
+    var x_set = self.x_axis.get(grid_pos[0]);
+    var y_set = self.y_axis.get(grid_pos[1]);
+    if (x_set == null or y_set == null) {
+        return false;
+    }
+    const gui_id: ?u32 = blk: {
+        var last_gui_id: ?u32 = null;
+        var it = x_set.?.keyIterator();
+        while (it.next()) |key| {
+            if (y_set.?.contains(key.*)) {
+                last_gui_id = key.gui_id;
+                if (isPopupOpen(self, key.gui_id)) {
+                    break :blk key.gui_id;
+                }
+            }
+        }
+
+        // If neither gui is open, just open the last one we saw
+        if (last_gui_id) |gid| {
+            break :blk gid;
+        }
+        break :blk null;
+    };
+    
+    if (gui_id == null) {
+        return false;
+    }
+    return true;
+}
+
 fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
     var x_set = self.x_axis.get(grid_pos[0]);
     var y_set = self.y_axis.get(grid_pos[1]);

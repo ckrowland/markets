@@ -24,6 +24,7 @@ struct Stats {
   transactions: u32,
   num_consumers: u32,
   num_producers: u32,
+  num_consumer_hovers: u32,
   random_color: vec4<f32>,
 }
 

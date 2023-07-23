@@ -117,6 +117,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     });
     Statistics.setNumConsumers(gctx, stats_buffer, 0);
     Statistics.setNumProducers(gctx, stats_buffer, 0);
+    Statistics.setNumConsumerHovers(gctx, stats_buffer, 0);
 
     // Create textures for consumer and producer button images
     var arena_state = std.heap.ArenaAllocator.init(allocator);
@@ -212,9 +213,9 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
         defer encoder.release();
 
         const data = demo.buffers.data;
-        const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
-        const num_producers = Wgpu.getNumStructs(gctx, Producer, demo.buffers.data.stats);
-
+        const num_consumers = Wgpu.getNumStructs(gctx, Consumer, data.stats);
+        const num_producers = Wgpu.getNumStructs(gctx, Producer, data.stats);
+        const num_consumer_hovers = Wgpu.getNumStructs(gctx, ConsumerHover, data.stats);
         // Compute shaders
         if (demo.running) {
             pass: {
@@ -320,7 +321,7 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             pass.setVertexBuffer(0, hoverVB.gpuobj.?, 0, hoverVB.size);
             pass.setVertexBuffer(1, ch_info.gpuobj.?, 0, ch_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
-            pass.drawIndexed(num_indices_circle, num_consumers, 0, 0, 0);
+            pass.drawIndexed(num_indices_circle, num_consumer_hovers, 0, 0, 0);
 
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
