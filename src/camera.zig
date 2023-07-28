@@ -20,22 +20,22 @@ pub const VP_X_SIZE: f32 = 0.75;
 pub const VP_Y_SIZE: f32 = 0.75;
 
 pub fn getViewportPixelSize(gctx: *zgpu.GraphicsContext) [2]f32 {
-    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
-    const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
+    const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
     return .{ width * VP_X_SIZE, height * VP_Y_SIZE };
 }
 
 pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
     const sd = gctx.swapchain_descriptor;
-    return @floatFromInt(f32, sd.width) / @floatFromInt(f32, sd.height);
+    return @as(f32, @floatFromInt(sd.width)) / @as(f32, @floatFromInt(sd.height));
 }
 
 // Given a world position (grid position with aspect), return grid position
 pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [2]f32) [2]i32 {
     const aspect = getAspectRatio(gctx);
     return .{
-        @intFromFloat(i32, world_pos[0] / aspect),
-        @intFromFloat(i32, world_pos[1]),
+        @as(i32, @intFromFloat(world_pos[0] / aspect)),
+        @as(i32, @intFromFloat(world_pos[1])),
         // world_pos[2],
         // world_pos[3],
     };
@@ -45,10 +45,10 @@ pub fn getGridPosition(gctx: *zgpu.GraphicsContext, world_pos: [2]f32) [2]i32 {
 pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]i32) [4]f32 {
     const aspect = getAspectRatio(gctx);
     return .{
-        @floatFromInt(f32, grid_pos[0]) * aspect,
-        @floatFromInt(f32, grid_pos[1]),
-        @floatFromInt(f32, grid_pos[2]),
-        @floatFromInt(f32, grid_pos[3]),
+        @as(f32, @floatFromInt(grid_pos[0])) * aspect,
+        @as(f32, @floatFromInt(grid_pos[1])),
+        @as(f32, @floatFromInt(grid_pos[2])),
+        @as(f32, @floatFromInt(grid_pos[3])),
     };
 }
 
@@ -60,7 +60,7 @@ pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]i32) [2]f32 {
     const rel_pos = [4]f32{ camera_pos[0] / -POS_Z, camera_pos[1] / -POS_Z, 0, 1 };
 
     const viewport_size = getViewportPixelSize(gctx);
-    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
     const content_scale = gctx.window.getContentScale();
 

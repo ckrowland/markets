@@ -18,13 +18,13 @@ pub const HoverBox = struct {
 };
 const MIN_X = -70;
 const MIN_Y = -70;
-pub const CLOSED_SIZE = HoverBox {
+pub const CLOSED_SIZE = HoverBox{
     .min_x = MIN_X,
     .max_x = -MIN_X,
     .min_y = MIN_Y,
     .max_y = -MIN_Y,
 };
-pub const OPEN_SIZE = HoverBox {
+pub const OPEN_SIZE = HoverBox{
     .min_x = MIN_X,
     .max_x = 600,
     .min_y = -390,
@@ -37,8 +37,6 @@ const HoverSquareID = struct {
 };
 pub const Popup = struct {
     id: HoverSquareID,
-    // I'm done with calculating it all on the fly, just store center closed and open
-    // Then push to github
     grid_agent_center: [2]i32,
     grid_gui_center: [2]i32 = undefined,
     grid_corners_closed: [4]i32 = undefined,
@@ -84,7 +82,7 @@ pub fn deinit(self: *Self) void {
         set.deinit();
     }
     self.x_axis.deinit();
-    
+
     var y_arrays = self.y_axis.valueIterator();
     while (y_arrays.next()) |set| {
         set.deinit();
@@ -101,7 +99,7 @@ pub fn clear(self: *Self) void {
         set.clearAndFree();
     }
     self.x_axis.clearAndFree();
-    
+
     var y_arrays = self.y_axis.valueIterator();
     while (y_arrays.next()) |set| {
         set.clearAndFree();
@@ -115,7 +113,7 @@ pub fn appendPopup(self: *Self, popup: Popup) !void {
 
     const closed_edges = getGridEdges(popup.grid_agent_center, CLOSED_SIZE);
     copy.grid_corners_closed = closed_edges;
-    
+
     var open_edges = getGridEdges(popup.grid_agent_center, OPEN_SIZE);
     var center = popup.grid_agent_center;
     if (open_edges[1] >= Camera.MAX_X) {
@@ -129,16 +127,19 @@ pub fn appendPopup(self: *Self, popup: Popup) !void {
     }
     copy.grid_corners_open = open_edges;
     copy.grid_gui_center = center;
-    
+
     try self.popups.append(copy);
 }
 
-pub fn appendSquare(self: *Self, allocator: std.mem.Allocator, square: HoverSquare) !void {
-    var copy = square;
-    copy.id.hs_id = self.hover_square_len;
-    
-    
-    try self.appendRange(allocator, copy);
+pub fn appendSquare(self: *Self, allocator: std.mem.Allocator, gui_id: u32, grid_pos: [2]i32) !void {
+    var square = HoverSquare{
+        .id = .{
+            .hs_id = self.hover_square_len,
+            .gui_id = gui_id,
+        },
+        .grid_corners = getGridEdges(grid_pos, CLOSED_SIZE),
+    };
+    try self.appendRange(allocator, square);
     self.hover_square_len += 1;
 }
 
@@ -203,12 +204,11 @@ fn resetRange(self: *Self, edges: [4]i32, gui_id: u32) void {
     resetCoords(&self.x_axis, edges[0..2], gui_id);
     resetCoords(&self.y_axis, edges[2..4], gui_id);
 }
-    
+
 fn appendRange(self: *Self, allocator: std.mem.Allocator, hs: HoverSquare) !void {
     try addCoords(&self.x_axis, allocator, hs.grid_corners[0..2], hs.id);
     try addCoords(&self.y_axis, allocator, hs.grid_corners[2..4], hs.id);
 }
-
 
 fn printAxis(axis: *std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void))) void {
     var it = axis.iterator();
@@ -220,9 +220,8 @@ fn printAxis(axis: *std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void))) 
         }
         std.debug.print("\n", .{});
     }
-        std.debug.print("\n", .{});
+    std.debug.print("\n", .{});
 }
-
 
 pub fn anyOpen(self: *Self) bool {
     var b = false;
@@ -276,7 +275,7 @@ pub fn doesAgentExist(self: *Self, grid_pos: [2]i32) bool {
         }
         break :blk null;
     };
-    
+
     if (gui_id == null) {
         return false;
     }
@@ -289,7 +288,7 @@ fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
     if (x_set == null or y_set == null) {
         return error.PopupNotFound;
     }
-    
+
     const gui_id: ?u32 = blk: {
         var last_gui_id: ?u32 = null;
         var it = x_set.?.keyIterator();
@@ -308,14 +307,14 @@ fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
         }
         break :blk null;
     };
-    
+
     if (gui_id == null) {
         return error.PopupNotFound;
     }
     if (gui_id.? >= self.popups.items.len) {
         return error.PopupNotFound;
     }
-    return @intCast(usize, gui_id.?);
+    return @as(usize, @intCast(gui_id.?));
 }
 
 pub const popupArgs = struct {
@@ -398,7 +397,7 @@ fn setupPopupWindow(gctx: *zgpu.GraphicsContext, pop_up: *Popup) void {
 
 fn consumerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
     if (zgui.begin("Test", Windows.window_flags)) {
-        zgui.pushIntId(@intCast(i32, idx) + 3);
+        zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
         demandRateButton(gctx, pop_up, args);
         movingRateSlider(gctx, pop_up, args);
@@ -418,13 +417,20 @@ fn demandRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs
     }
 
     const demand_rate_ptr = &pop_up.parameters.consumer.demand_rate;
-    if (zgui.sliderScalar("##dr", u32, .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },)) {
-        Wgpu.setAll(gctx, Consumer, .{
-            .agents = args.consumers,
-            .stats = args.stats,
-            .parameter = .{
-                .demand_rate = demand_rate_ptr.*,
+    if (zgui.sliderScalar(
+        "##dr",
+        u32,
+        .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },
+    )) {
+        Wgpu.setGroup(gctx, Consumer, .{
+            .setArgs = .{
+                .agents = args.consumers,
+                .stats = args.stats,
+                .parameter = .{
+                    .demand_rate = demand_rate_ptr.*,
+                },
             },
+            .grouping_id = pop_up.id.gui_id,
         });
     }
 }
@@ -448,7 +454,7 @@ fn movingRateSlider(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs
 
 fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
     if (zgui.begin("Test", Windows.window_flags)) {
-        zgui.pushIntId(@intCast(i32, idx) + 3);
+        zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
         productionRateButton(gctx, pop_up, args);
         maxInventoryButton(gctx, pop_up, args);
@@ -460,7 +466,7 @@ fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: po
 fn productionRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
     zgui.text("Production Rate", .{});
     const production_rate_ptr = &pop_up.parameters.producer.production_rate;
-    if (zgui.sliderScalar("##pr", u32, .{.v = production_rate_ptr, .min = 1, .max = 1000})) {
+    if (zgui.sliderScalar("##pr", u32, .{ .v = production_rate_ptr, .min = 1, .max = 1000 })) {
         Wgpu.setAgent(gctx, Producer, .{
             .setArgs = .{
                 .agents = args.producers,
@@ -477,7 +483,7 @@ fn productionRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popup
 fn maxInventoryButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
     zgui.text("Max Inventory", .{});
     const max_inventory_ptr = &pop_up.parameters.producer.max_inventory;
-    if (zgui.sliderScalar("##mi", u32, .{.v = max_inventory_ptr, .min = 10, .max = 10000})) {
+    if (zgui.sliderScalar("##mi", u32, .{ .v = max_inventory_ptr, .min = 10, .max = 10000 })) {
         Wgpu.setAgent(gctx, Producer, .{
             .setArgs = .{
                 .agents = args.producers,

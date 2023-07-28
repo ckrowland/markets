@@ -253,9 +253,9 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
                 pass.release();
             }
 
-            const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+            const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
             const xOffset = width / 4;
-            const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
+            const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
             const yOffset = height / 4;
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
@@ -263,7 +263,7 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
-            const num_indices_circle = @intCast(u32, cib_info.size / @sizeOf(f32));
+            const num_indices_circle = @as(u32, @intCast(cib_info.size / @sizeOf(f32)));
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);

@@ -60,7 +60,7 @@ pub fn getNumStructs(gctx: *zgpu.GraphicsContext, comptime T: type, stat_bufs: O
 fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
     return struct {
         fn callback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
-            const usb = @ptrCast(*StagingBuffer(T), @alignCast(@sizeOf(usize), userdata));
+            const usb = @as(*StagingBuffer(T), @ptrCast(@alignCast(userdata)));
             std.debug.assert(usb.slice == null);
             if (status == .success) {
                 usb.slice = usb.buffer.getConstMappedRange(T, 0, usb.num_structs).?;
@@ -88,7 +88,7 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
         0,
         @sizeOf(T) * buf.num_structs,
         GenCallback(T),
-        @ptrCast(*anyopaque, &buf),
+        @as(*anyopaque, @ptrCast(&buf)),
     );
     wait_loop: while (true) {
         gctx.device.tick();
@@ -115,7 +115,7 @@ pub fn agentParameters(comptime T: type) type {
         },
         ConsumerHover => return union(enum) {
             color: [4]f32,
-        },            
+        },
         else => unreachable,
     }
 }
@@ -144,7 +144,7 @@ pub fn writeBuffer(
     structs: []T,
 ) void {
     gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, T, structs);
-}    
+}
 pub fn setAgentArgs(comptime T: type) type {
     return struct {
         setArgs: setArgs(T),
@@ -260,7 +260,7 @@ pub fn updateCoords(gctx: *zgpu.GraphicsContext, comptime T: type, args: updateC
     };
     defer commands.release();
     gctx.submit(&.{commands});
-}    
+}
 
 pub const shrinkArgs = struct {
     new_size: u32,

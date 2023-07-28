@@ -40,14 +40,14 @@ fn waveInput(wave: *Wave, comptime id: []const u8) void {
     zgui.text("Wave Type", .{});
 
     _ = zgui.radioButtonStatePtr(sinId, .{
-        .v = @ptrCast(*i32, &wave.waveType),
+        .v = @as(*i32, @ptrCast(&wave.waveType)),
         .v_button = 0,
     });
     zgui.sameLine(.{});
     zgui.text("Sin", .{});
     zgui.sameLine(.{});
     _ = zgui.radioButtonStatePtr(cosId, .{
-        .v = @ptrCast(*i32, &wave.waveType),
+        .v = @as(*i32, @ptrCast(&wave.waveType)),
         .v_button = 1,
     });
     zgui.sameLine(.{});

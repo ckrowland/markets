@@ -10,6 +10,7 @@ const Parameters = DemoState.Parameters;
 const CoordinateSize = DemoState.CoordinateSize;
 const Wgpu = @import("wgpu.zig");
 const Camera = @import("../camera.zig");
+const Statistics = @import("statistics.zig");
 const Self = @This();
 
 pub const defaults = DEFAULTS{};
@@ -19,7 +20,7 @@ const DEFAULTS = struct {
     demand_rate: u32 = 100,
     radius: f32 = 20.0,
 };
-    
+
 absolute_home: [4]i32,
 position: [4]f32,
 home: [4]f32,
@@ -52,8 +53,8 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
         const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
         const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
         const aspect_home = [2]f32{
-            @floatFromInt(f32, x) * params.aspect,
-            @floatFromInt(f32, y),
+            @as(f32, @floatFromInt(x)) * params.aspect,
+            @as(f32, @floatFromInt(y)),
         };
 
         consumers[i] = create(.{
@@ -81,7 +82,7 @@ pub const Args = struct {
 pub fn create(args: Args) Self {
     const home: [4]f32 = .{ args.home[0], args.home[1], z_pos, 1 };
     return Self{
-        .absolute_home = .{args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
+        .absolute_home = .{ args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
         .position = home,
         .home = home,
         .destination = home,
@@ -91,4 +92,22 @@ pub fn create(args: Args) Self {
         .radius = args.radius,
         .grouping_id = args.grouping_id,
     };
+}
+
+pub const AppendArgs = struct {
+    consumer_args: Args,
+    consumer_buf: zgpu.BufferHandle,
+    stat_obj: Wgpu.ObjectBuffer,
+};
+pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
+    const num_consumers = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
+    var consumers: [1]Self = .{
+        create(args.consumer_args),
+    };
+    Wgpu.appendBuffer(gctx, Self, .{
+        .num_old_structs = num_consumers,
+        .buf = args.consumer_buf,
+        .structs = consumers[0..],
+    });
+    Statistics.setNumConsumers(gctx, args.stat_obj, num_consumers + 1);
 }

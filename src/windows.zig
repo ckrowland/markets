@@ -47,8 +47,8 @@ pub fn setNextWindow(gctx: *zgpu.GraphicsContext, args: PercentArgs) void {
     std.debug.assert(0.0 <= args.w and args.w <= 1.0);
     std.debug.assert(0.0 <= args.h and args.h <= 1.0);
     std.debug.assert(0.0 <= args.margin and args.margin <= 1.0);
-    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
-    const height = @floatFromInt(f32, gctx.swapchain_descriptor.height);
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
+    const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
     const margin_x = width * args.margin;
     const margin_y = height * args.margin;
     const margin_pixels = @min(margin_x, margin_y);

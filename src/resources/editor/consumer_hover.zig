@@ -6,28 +6,42 @@ const Wgpu = @import("../wgpu.zig");
 const Camera = @import("../../camera.zig");
 const Mouse = @import("mouse.zig");
 const Popups = @import("popups.zig");
+const Statistics = @import("../statistics.zig");
+const Consumer = @import("../consumer.zig");
 
 const Self = @This();
 
 absolute_home: [4]i32,
 home: [4]f32,
 color: [4]f32 = .{ 0, 0, 0, 0 },
-radius: f32 = 60.0,
 grouping_id: u32 = 0,
 
 pub const z_pos = 0;
 
-pub const Args = struct {
-    absolute_home: [2]i32,
-    home: [2]f32,
-    grouping_id: u32,
-};
-pub fn create(args: Args) Self {
+pub fn create(args: Consumer.Args) Self {
     return Self{
         .absolute_home = .{ args.absolute_home[0], args.absolute_home[1], z_pos, 1 },
         .home = .{ args.home[0], args.home[1], z_pos, 1 },
         .grouping_id = args.grouping_id,
     };
+}
+
+pub const AppendArgs = struct {
+    hover_args: Consumer.Args,
+    hover_buf: zgpu.BufferHandle,
+    stat_obj: Wgpu.ObjectBuffer,
+};
+pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
+    const num_structs = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
+    var hovers: [1]Self = .{
+        create(args.hover_args),
+    };
+    Wgpu.appendBuffer(gctx, Self, .{
+        .num_old_structs = num_structs,
+        .buf = args.hover_buf,
+        .structs = hovers[0..],
+    });
+    Statistics.setNumConsumerHovers(gctx, args.stat_obj, num_structs + 1);
 }
 
 pub const hoverArgs = struct {
@@ -36,7 +50,7 @@ pub const hoverArgs = struct {
 };
 pub fn highlightConsumers(gctx: *zgpu.GraphicsContext, gui_id: usize, args: hoverArgs) void {
     Wgpu.setGroup(gctx, Self, .{
-        .grouping_id = @intCast(u32, gui_id),
+        .grouping_id = @as(u32, @intCast(gui_id)),
         .setArgs = .{
             .agents = args.consumer_hover,
             .stats = args.stats,
@@ -55,45 +69,4 @@ pub fn clearHover(gctx: *zgpu.GraphicsContext, args: hoverArgs) void {
             .color = .{ 0, 0, 0, 0 },
         },
     });
-}
-    
-pub fn displayOnHover(gctx: *zgpu.GraphicsContext, args: hoverArgs) void {
-    var consumer_hover = Wgpu.getAll(gctx, Self, .{
-        .structs = args.consumer_hover,
-        .num_structs = Wgpu.getNumStructs(gctx, Self, args.stats),
-    }) catch return;
-
-    for (consumer_hover) |circle| {
-        const center = Camera.getPixelPosition(gctx, circle.absolute_home[0..2].*);
-        const in_x = (center[0] - circle.radius) < args.mouse.cursor_pos[0] and
-            args.mouse.cursor_pos[0] < (center[0] + circle.radius);
-        const in_y = (center[1] - circle.radius) < args.mouse.cursor_pos[1] and
-            args.mouse.cursor_pos[1] < (center[1] + circle.radius);
-
-        var grouping_gui_open = false;
-        if (circle.grouping_id < args.popups.popups.items.len) {
-            grouping_gui_open = args.popups.popups.items[circle.grouping_id].open;
-        }
-        if (in_x and in_y or grouping_gui_open) {
-            Wgpu.setGroup(gctx, Self, .{
-                .grouping_id = circle.grouping_id,
-                .setArgs = .{
-                    .agents = args.consumer_hover,
-                    .stats = args.stats,
-                    .parameter = .{
-                        .color = .{ 0, 0.5, 1, 0 },
-                    },
-                },
-            });
-            break;
-        }
-        
-        Wgpu.setAll(gctx, Self, .{
-            .agents = args.consumer_hover,
-            .stats = args.stats,
-            .parameter = .{
-                .color = .{ 0, 0, 0, 0 },
-            },
-        });
-    }
 }

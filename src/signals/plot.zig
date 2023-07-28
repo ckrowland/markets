@@ -73,7 +73,7 @@ fn setupAxes(max_x: f32) void {
         .auto_fit = true,
     } });
 
-    const largest_axis = @floatCast(f64, max_x);
+    const largest_axis = @as(f64, @floatCast(max_x));
     zgui.plot.setupAxisLimits(.x1, .{
         .min = 0,
         .max = largest_axis,

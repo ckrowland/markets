@@ -1,7 +1,14 @@
 # Simulations
 GPU accelerated visual simulations.
 
-### Resource Distribution
+* Simulations
+  * [Resource Simulation](#resource-simulation) - Generate economy via input parameters
+  * [Resource Editor](#resource-editor) - Manually create economy with individualized parameters
+* [Download a Release](https://github.com/ckrowland/simulations/releases) - Available for MacOS Intel, MacOS M1 and Windows
+* [Build](#build) - For the linux folks
+* Libraries Used: [zig-gamedev](https://github.com/michal-z/zig-gamedev/)
+
+## Resource Simulation
 
 [demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
 
@@ -23,12 +30,13 @@ GPU accelerated visual simulations.
   - Total Producer Inventory
 - To remove a line from the graph, click it's title in the legend.
 
-## Download
-[Releases](https://github.com/ckrowland/simulations/releases)
+## Resource Editor
 
-Available for MacOS Intel, MacOS M1 and Windows.
+- Manually place position of consumers and producers.
+- Each producer and consumer grouping has individual parameters.
 
-## Install from Source
+
+## Build
 
 ### Download
 - [Git](https://git-scm.com/)
@@ -42,7 +50,3 @@ cd simulations
 git submodule update --init --remote
 zig build demos-run
 ```
-
-## Libraries Used
-- [zig-gamedev](https://github.com/michal-z/zig-gamedev/)
-

@@ -62,7 +62,7 @@ pub fn update(self: *Self, gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     }) catch return;
     var total_inventory: u32 = 0;
     for (producers) |p| {
-        total_inventory += @intCast(u32, p.inventory);
+        total_inventory += @as(u32, @intCast(p.inventory));
     }
     self.num_total_producer_inventory.append(total_inventory) catch unreachable;
 }
@@ -133,7 +133,7 @@ pub fn getGPUStatistics(demo: *DemoState, gctx: *zgpu.GraphicsContext) [zero.len
         .slice = null,
         .buffer = gctx.lookupResource(demo.buffers.data.stats.mapped).?,
     };
-    buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(u32) * zero.len, buffersMappedCallback, @ptrCast(*anyopaque, &buf));
+    buf.buffer.mapAsync(.{ .read = true }, 0, @sizeOf(u32) * zero.len, buffersMappedCallback, @as(*anyopaque, @ptrCast(&buf)));
     wait_loop: while (true) {
         gctx.device.tick();
         if (buf.slice == null) {
@@ -147,7 +147,7 @@ pub fn getGPUStatistics(demo: *DemoState, gctx: *zgpu.GraphicsContext) [zero.len
 }
 
 fn buffersMappedCallback(status: wgpu.BufferMapAsyncStatus, userdata: ?*anyopaque) callconv(.C) void {
-    const usb = @ptrCast(*StagingBuffer, @alignCast(@sizeOf(usize), userdata));
+    const usb = @as(*StagingBuffer, @ptrCast(@alignCast(userdata)));
     std.debug.assert(usb.slice == null);
     if (status == .success) {
         usb.slice = usb.buffer.getConstMappedRange(u32, 0, zero.len).?;

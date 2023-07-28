@@ -28,8 +28,8 @@ pub const MouseButton = struct {
         const content_scale = gctx.window.getContentScale();
         const pixel_pos = gctx.window.getCursorPos();
         self.pixel_pos = .{
-            @floatCast(f32, pixel_pos[0] * content_scale[0]),
-            @floatCast(f32, pixel_pos[1] * content_scale[1]),
+            @as(f32, @floatCast(pixel_pos[0] * content_scale[0])),
+            @as(f32, @floatCast(pixel_pos[1] * content_scale[1])),
         };
     }
 
@@ -57,7 +57,7 @@ pub const MouseButton = struct {
 // Return world position of current cursor pos
 pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
     const viewport_size = Camera.getViewportPixelSize(gctx);
-    const width = @floatFromInt(f32, gctx.swapchain_descriptor.width);
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
     const cursor_pos = gctx.window.getCursorPos();
     const cursor_pos_in_vp = [2]f64{ cursor_pos[0] - (xOffset / 2), cursor_pos[1] };
@@ -65,8 +65,8 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
 
     const rx = (cursor_pos_in_vp[0] * (2 * content_scale[0])) / viewport_size[0] - 1;
     const ry = 1 - (cursor_pos_in_vp[1] * (2 * content_scale[1])) / viewport_size[1];
-    const x = @floatCast(f32, rx);
-    const y = @floatCast(f32, ry);
+    const x = @as(f32, @floatCast(rx));
+    const y = @as(f32, @floatCast(ry));
     const vec = zmath.f32x4(x * -Camera.POS_Z, y * -Camera.POS_Z, 0, 1);
     const inv = zmath.inverse(Camera.getObjectToClipMat(gctx));
     const world_pos = zmath.mul(vec, inv);

@@ -53,9 +53,9 @@ pub const Wave = struct {
         var point: u32 = 0;
         var radians: f32 = 0;
         const numPoints = self.calculateNumPoints();
-        const numIncrements = @floatFromInt(f32, self.pointsPerCycle - 1);
+        const numIncrements = @as(f32, @floatFromInt(self.pointsPerCycle - 1));
         while (point < numPoints) : (point += 1) {
-            const fPoint = @floatFromInt(f32, point);
+            const fPoint = @as(f32, @floatFromInt(point));
             const point_num = fPoint / numIncrements;
             radians = point_num * std.math.tau;
             self.xv.append(radians) catch unreachable;
@@ -75,7 +75,7 @@ pub const Wave = struct {
     pub fn createComparisonWave(self: *Wave, random: *Wave) void {
         self.clearWave();
         const endRadian = random.getLastPointX();
-        const fNumCycles = @floatFromInt(f32, self.cycles);
+        const fNumCycles = @as(f32, @floatFromInt(self.cycles));
 
         for (random.xv.items) |xv| {
             const percentToEndRadian = xv / (endRadian / fNumCycles);

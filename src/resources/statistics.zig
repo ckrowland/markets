@@ -74,7 +74,7 @@ pub fn update(self: *Self, gctx: *zgpu.GraphicsContext, args: updateBuffers) voi
     }) catch return;
     var total_inventory: u32 = 0;
     for (producers) |p| {
-        total_inventory += @intCast(u32, p.inventory);
+        total_inventory += @as(u32, @intCast(p.inventory));
     }
     self.num_total_producer_inventory.append(total_inventory) catch unreachable;
 }
@@ -93,31 +93,51 @@ pub fn clearNumTransactions(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle)
     gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, u32, &.{0});
 }
 
-pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num: u32) void {
+pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
     gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
+        gctx.lookupResource(stat_obj.data).?,
         @sizeOf(u32),
         u32,
         &.{num},
     );
+    copyToMappedBuffer(gctx, stat_obj);
 }
 
-pub fn setNumProducers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num: u32) void {
+pub fn setNumProducers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
     gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
+        gctx.lookupResource(stat_obj.data).?,
         2 * @sizeOf(u32),
         u32,
         &.{num},
     );
+    copyToMappedBuffer(gctx, stat_obj);
 }
 
-pub fn setNumConsumerHovers(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, num: u32) void {
+pub fn setNumConsumerHovers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
     gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
+        gctx.lookupResource(stat_obj.data).?,
         3 * @sizeOf(u32),
         u32,
         &.{num},
     );
+    copyToMappedBuffer(gctx, stat_obj);
+}
+
+pub fn copyToMappedBuffer(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer) void {
+    const commands = commands: {
+        const encoder = gctx.device.createCommandEncoder(null);
+        defer encoder.release();
+
+        const s = gctx.lookupResource(stat_obj.data).?;
+        const s_info = gctx.lookupResourceInfo(stat_obj.data).?;
+        const sm = gctx.lookupResource(stat_obj.mapped).?;
+        encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
+
+        break :commands encoder.finish(null);
+    };
+    defer commands.release();
+
+    gctx.queue.submit(&.{commands});
 }
 
 pub fn createBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {

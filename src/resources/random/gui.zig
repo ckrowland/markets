@@ -34,7 +34,7 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             f32,
             &.{ random.float(f32), random.float(f32), random.float(f32) },
         );
-        const current_time = @floatCast(f32, gctx.stats.time);
+        const current_time = @as(f32, @floatCast(gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
             demo.stats.second = current_time;

@@ -65,9 +65,9 @@ pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {
         const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
         producers[i] = create(.{
             .absolute_home = .{ x, y },
-            .home = [2]f32{ @floatFromInt(f32, x) * params.aspect, @floatFromInt(f32, y) },
+            .home = [2]f32{ @as(f32, @floatFromInt(x)) * params.aspect, @as(f32, @floatFromInt(y)) },
             .production_rate = params.production_rate,
-            .inventory = @intCast(i32, params.max_inventory),
+            .inventory = @as(i32, @intCast(params.max_inventory)),
             .max_inventory = params.max_inventory,
         });
         i += 1;

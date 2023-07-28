@@ -20,8 +20,8 @@ pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32
     var i: usize = 0;
     while (i < num_triangles) {
         indices[i * 3] = 0;
-        indices[i * 3 + 1] = @intCast(u32, i) + 1;
-        indices[i * 3 + 2] = @intCast(u32, i) + 2;
+        indices[i * 3 + 1] = @as(u32, @intCast(i)) + 1;
+        indices[i * 3 + 2] = @as(u32, @intCast(i)) + 2;
         i += 1;
     }
     indices[num_indices - 1] = 1;
@@ -45,7 +45,7 @@ pub fn createVertexBuffer(
     consumer_vertex_data[0] = [3]f32{ 0, 0, 0 };
     var i: u32 = 1;
     while (i < num_vertices) {
-        const current_angle = angle * @floatFromInt(f32, i);
+        const current_angle = angle * @as(f32, @floatFromInt(i));
         const x = @cos(current_angle) * radius;
         const y = @sin(current_angle) * radius;
         consumer_vertex_data[i] = [3]f32{ x, y, 0 };

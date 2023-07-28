@@ -21,10 +21,14 @@ const Popups = @import("popups.zig");
 pub const State = struct {
     pub const Selection = enum {
         none,
+        consumer,
         consumers,
         producer,
     };
     selection: Selection = .producer,
+    producer: zgpu.TextureViewHandle,
+    consumer: zgpu.TextureViewHandle,
+    consumers: zgpu.TextureViewHandle,
     consumer_grouping_id: u32 = 0,
 };
 
@@ -54,10 +58,9 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
         .allocator = demo.allocator,
     });
 
-
     if (demo.running) {
         Statistics.generateAndFillRandomColor(gctx, demo.buffers.data.stats.data);
-        const current_time = @floatCast(f32, gctx.stats.time);
+        const current_time = @as(f32, @floatCast(gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
             demo.stats.second = current_time;
@@ -71,9 +74,13 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
 
     _ = switch (demo.gui.selection) {
         .none => {},
-        .consumers => {
+        .consumer => {
             hoverUpdate(gctx, demo);
             try addingConsumer(gctx, demo);
+        },
+        .consumers => {
+            hoverUpdate(gctx, demo);
+            try addingConsumerBrush(gctx, demo);
         },
         .producer => {
             hoverUpdate(gctx, demo);
@@ -94,16 +101,20 @@ fn hoverUpdate(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
 fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
     if (demo.mouse.down() and Mouse.onGrid(gctx) and !demo.popups.anyOpen() and !space_taken) {
-        try addConsumer(gctx, demo);
+        const world_pos = Mouse.getWorldPosition(gctx);
+        try addConsumer(gctx, demo, world_pos);
     }
     if (demo.mouse.released() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
+        const world_pos = Mouse.getWorldPosition(gctx);
         if (!space_taken) {
-            try addConsumer(gctx, demo);
+            try addConsumer(gctx, demo, world_pos);
         }
-        
-        const gui_id = @intCast(u32, demo.popups.popups.items.len);
+
+        const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
         try demo.popups.appendPopup(.{
-            .id = .{ .gui_id = gui_id, },
+            .id = .{
+                .gui_id = gui_id,
+            },
             .grid_agent_center = demo.mouse.grid_pos,
             .type_popup = .consumers,
             .parameters = .{
@@ -116,10 +127,36 @@ fn addingConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     }
 }
 
-fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
-    const gui_id = @intCast(u32, demo.popups.popups.items.len);
-    const world_pos = Mouse.getWorldPosition(gctx);
+fn addingConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
+    const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
+    if (demo.mouse.down() and Mouse.onGrid(gctx) and !demo.popups.anyOpen() and !space_taken) {
+        const world_pos = Mouse.getWorldPosition(gctx);
+        try addConsumerBrush(gctx, demo, world_pos);
+    }
+    if (demo.mouse.released() and Mouse.onGrid(gctx) and !demo.popups.anyOpen()) {
+        const world_pos = Mouse.getWorldPosition(gctx);
+        if (!space_taken) {
+            try addConsumerBrush(gctx, demo, world_pos);
+        }
 
+        const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
+        try demo.popups.appendPopup(.{
+            .id = .{
+                .gui_id = gui_id,
+            },
+            .grid_agent_center = demo.mouse.grid_pos,
+            .type_popup = .consumers,
+            .parameters = .{
+                .consumer = .{
+                    .demand_rate = Consumer.defaults.demand_rate,
+                    .moving_rate = Consumer.defaults.moving_rate,
+                },
+            },
+        });
+    }
+}
+
+fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState, world_pos: [2]f32) !void {
     const offset = 20;
     const array_positions: [5][2]f32 = .{
         world_pos,
@@ -128,43 +165,51 @@ fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
         .{ world_pos[0] - offset, world_pos[1] - offset },
         .{ world_pos[0] + offset, world_pos[1] - offset },
     };
-
-    const num_consumers = Wgpu.getNumStructs(gctx, Consumer, demo.buffers.data.stats);
-    var consumers: [5]Consumer = undefined;
-    for (array_positions, 0..) |pos, i| {
-        const consumer = Consumer.create(.{
-            .absolute_home = Camera.getGridPosition(gctx, pos),
-            .home = pos,
-            .grouping_id = gui_id,
+    const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
+    for (array_positions) |pos| {
+        Consumer.createAndAppend(gctx, .{
+            .consumer_args = .{
+                .absolute_home = Camera.getGridPosition(gctx, pos),
+                .home = pos,
+                .grouping_id = gui_id,
+            },
+            .consumer_buf = demo.buffers.data.consumer.data,
+            .stat_obj = demo.buffers.data.stats,
         });
-        consumers[i] = consumer;
     }
-    Wgpu.appendBuffer(gctx, Consumer, .{
-        .num_old_structs = num_consumers,
-        .buf = demo.buffers.data.consumer.data,
-        .structs = consumers[0..],
+    ConsumerHover.createAndAppend(gctx, .{
+        .hover_args = .{
+            .absolute_home = Camera.getGridPosition(gctx, world_pos),
+            .home = world_pos,
+            .grouping_id = gui_id,
+        },
+        .hover_buf = demo.buffers.data.consumer_hover.data,
+        .stat_obj = demo.buffers.data.stats,
     });
-    Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers + 5);
+    try demo.popups.appendSquare(demo.allocator, gui_id, demo.mouse.grid_pos);
+}
 
-    const consumer_hover = ConsumerHover.create(.{
+fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState, world_pos: [2]f32) !void {
+    const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
+    const consumer_args = Consumer.Args {
         .absolute_home = Camera.getGridPosition(gctx, world_pos),
         .home = world_pos,
         .grouping_id = gui_id,
-    });
-    var hover_circles = [1]ConsumerHover{consumer_hover};
-    const num_consumer_hovers = Wgpu.getNumStructs(gctx, ConsumerHover, demo.buffers.data.stats);
-    Wgpu.appendBuffer(gctx, ConsumerHover, .{
-        .num_old_structs = num_consumer_hovers,
-        .buf = demo.buffers.data.consumer_hover.data,
-        .structs = hover_circles[0..],
-    });
-    Statistics.setNumConsumerHovers(gctx, demo.buffers.data.stats.data, num_consumer_hovers + 1);
+    };
     
-    const corners = Popups.getGridEdges(demo.mouse.grid_pos, Popups.CLOSED_SIZE);
-    try demo.popups.appendSquare(demo.allocator, .{
-        .id = .{ .gui_id = gui_id },
-        .grid_corners = corners,
+    Consumer.createAndAppend(gctx, .{
+        .consumer_args = consumer_args,
+        .consumer_buf = demo.buffers.data.consumer.data,
+        .stat_obj = demo.buffers.data.stats,
     });
+
+    ConsumerHover.createAndAppend(gctx, .{
+        .hover_args = consumer_args,
+        .hover_buf = demo.buffers.data.consumer_hover.data,
+        .stat_obj = demo.buffers.data.stats,
+    });
+
+    try demo.popups.appendSquare(demo.allocator, gui_id, demo.mouse.grid_pos);
 }
 
 fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
@@ -182,11 +227,13 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
             .buf = demo.buffers.data.producer.data,
             .structs = producers[0..],
         });
-        Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers + 1);
+        Statistics.setNumProducers(gctx, demo.buffers.data.stats, num_producers + 1);
 
-        const gui_id = @intCast(u32, demo.popups.popups.items.len);
+        const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
         try demo.popups.appendPopup(.{
-            .id = .{ .gui_id = gui_id, },
+            .id = .{
+                .gui_id = gui_id,
+            },
             .grid_agent_center = demo.mouse.grid_pos,
             .type_popup = .producer,
             .parameters = .{
@@ -196,10 +243,7 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
                 },
             },
         });
-        try demo.popups.appendSquare(demo.allocator, .{
-            .id = .{ .gui_id = gui_id },
-            .grid_corners = Popups.getGridEdges(demo.mouse.grid_pos, Popups.CLOSED_SIZE),
-        });
+        try demo.popups.appendSquare(demo.allocator, gui_id, demo.mouse.grid_pos);
     }
 }
 
@@ -230,19 +274,43 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
     const pressedColor = [4]f32{ 0.0, 0.5, 1.0, 1.0 };
     const buttonSize = [2]f32{ 120.0, 120.0 };
-    coloredButton(
-        gctx,
-        &demo.gui,
-        State.Selection.consumers,
-        demo.consumer_texture_view,
-        pressedColor,
-        buttonSize,
-    );
+
+    if (demo.gui.selection == .consumers) {
+        coloredButton(
+            gctx,
+            &demo.gui,
+            State.Selection.consumers,
+            demo.gui.consumers,
+            pressedColor,
+            buttonSize,
+        );
+    } else {
+        coloredButton(
+            gctx,
+            &demo.gui,
+            State.Selection.consumer,
+            demo.gui.consumer,
+            pressedColor,
+            buttonSize,
+        );
+    }
+    
+    zgui.sameLine(.{});
+    if (zgui.arrowButton("left_button_id", .{ .dir = .left })) {
+        demo.gui.selection = .consumer;
+    }
+        
+    zgui.sameLine(.{});
+    if (zgui.arrowButton("right_button_id", .{ .dir = .right })) {
+        demo.gui.selection = .consumers;
+    }
+    zgui.spacing();
+
     coloredButton(
         gctx,
         &demo.gui,
         State.Selection.producer,
-        demo.producer_texture_view,
+        demo.gui.producer,
         pressedColor,
         buttonSize,
     );
