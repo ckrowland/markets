@@ -31,6 +31,7 @@ GPU accelerated visual simulations.
 - To remove a line from the graph, click it's title in the legend.
 
 ## Resource Editor
+[editor.webm](https://github.com/ckrowland/simulations/assets/95145274/2c21762f-0dd2-4a00-8d2e-0aad38e83c78)
 
 - Manually place position of consumers and producers.
 - Each producer and consumer grouping has individual parameters.
