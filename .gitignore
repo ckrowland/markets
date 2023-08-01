@@ -1,4 +1,6 @@
 buildApps.txt
+build.sh
+*.swp
 imgui.ini
 zig-cache/
 zig-out/

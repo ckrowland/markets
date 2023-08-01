@@ -28,7 +28,7 @@ pub fn build(b: *std.build.Builder) void {
 
     var exe = createExe(b, options);
     install_step.dependOn(&b.addInstallArtifact(exe).step);
-    
+
     const run_step = b.step("demos-run", "Run demos");
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(install_step);
@@ -40,9 +40,9 @@ pub fn build(b: *std.build.Builder) void {
 fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     const target = options.target;
     const optimize = options.optimize;
-    
+
     const exe = b.addExecutable(.{
-        .name = "Visual Simulations",
+        .name = "exe",
         .root_source_file = .{ .path = thisDir() ++ "/src/main.zig" },
         .target = target,
         .optimize = optimize,
@@ -61,16 +61,16 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
         .options = .{ .enable_cross_platform_determinism = true },
     });
     const zstbi_pkg = zstbi.package(b, target, optimize, .{});
-    
+
     zglfw_pkg.link(exe);
     zgpu_pkg.link(exe);
     zmath_pkg.link(exe);
     zstbi_pkg.link(exe);
-    
+
     const exe_options = b.addOptions();
     exe.addOptions("build_options", exe_options);
     exe_options.addOption([]const u8, "content_dir", content_dir);
-    
+
     const install_content_step = b.addInstallDirectory(.{
         .source_dir = .{ .path = thisDir() ++ "/content/" },
         .install_dir = .{ .custom = "" },
