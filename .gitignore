@@ -5,3 +5,4 @@ zig-out/
 apps/
 *~
 *#
+.DS_Store
