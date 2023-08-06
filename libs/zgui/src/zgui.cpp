@@ -1084,6 +1084,10 @@ ZGUI_API bool zguiTreeNode(const char* label) {
     return ImGui::TreeNode(label);
 }
 
+ZGUI_API bool zguiTreeNodeFlags(const char* label, ImGuiTreeNodeFlags flags) {
+    return ImGui::TreeNodeEx(label, flags);
+}
+
 ZGUI_API bool zguiTreeNodeStrId(const char* str_id, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -1465,6 +1469,10 @@ ZGUI_API void zguiEndTooltip(void) {
     ImGui::EndTooltip();
 }
 
+ZGUI_API bool zguiBeginPopup(const char* str_id, ImGuiWindowFlags flags){
+    return ImGui::BeginPopup(str_id, flags);
+}
+
 ZGUI_API bool zguiBeginPopupContextWindow(void) {
     return ImGui::BeginPopupContextWindow();
 }
@@ -1493,14 +1501,14 @@ ZGUI_API void zguiCloseCurrentPopup(void) {
 // Tables
 //
 //--------------------------------------------------------------------------------------------------
-ZGUI_API void zguiBeginTable(
+ZGUI_API bool zguiBeginTable(
     const char* str_id,
     int column,
     ImGuiTableFlags flags,
     const float outer_size[2],
     float inner_width
 ) {
-    ImGui::BeginTable(str_id, column, flags, { outer_size[0], outer_size[1] }, inner_width);
+    return ImGui::BeginTable(str_id, column, flags, { outer_size[0], outer_size[1] }, inner_width);
 }
 
 ZGUI_API void zguiEndTable(void) {
@@ -2399,7 +2407,7 @@ ZGUI_API bool zguiPlot_DragPoint(
 }
 
 ZGUI_API void zguiPlot_PlotText(
-        const char* text, 
+        const char* text,
         double x, double y,
         const float pix_offset[2],
         ImPlotTextFlags flags=0

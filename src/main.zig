@@ -22,7 +22,7 @@ pub const DemoState = struct {
 };
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(allocator, window);
+    const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
     // const signals = try Signals.init(allocator, gctx);
     const random = try Random.init(allocator, gctx);
     const editor = try Editor.init(allocator, gctx);

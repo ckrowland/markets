@@ -27,7 +27,7 @@ pub fn build(b: *std.build.Builder) void {
     const install_step = b.step("demos", "Build demos");
 
     var exe = createExe(b, options);
-    install_step.dependOn(&b.addInstallArtifact(exe).step);
+    install_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
 
     const run_step = b.step("demos-run", "Run demos");
     const run_cmd = b.addRunArtifact(exe);
