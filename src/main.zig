@@ -117,6 +117,7 @@ pub fn main() !void {
     defer zgui.backend.deinit();
 
     zgui.getStyle().scaleAllSizes(scale_factor);
+    zgui.io.setIniFilename(null);
 
     while (!window.shouldClose()) {
         zglfw.pollEvents();
