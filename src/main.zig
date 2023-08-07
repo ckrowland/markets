@@ -107,7 +107,10 @@ pub fn main() !void {
     zgui.plot.init();
     defer zgui.plot.deinit();
 
-    _ = zgui.io.addFontFromFile(content_dir ++ "/fonts/Roboto-Medium.ttf", 19.0 * scale_factor);
+    _ = zgui.io.addFontFromFile(
+        content_dir ++ "/fonts/Roboto-Medium.ttf",
+        20.0 * scale_factor,
+    );
 
     zgui.backend.init(
         window,

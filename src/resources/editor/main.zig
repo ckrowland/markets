@@ -129,7 +129,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     zstbi.init(arena);
     defer zstbi.deinit();
 
-    const gui_state = Gui.State {
+    const gui_state = Gui.State{
         .consumer = try Image.createTextureView(
             gctx,
             content_dir ++ "/pngs/consumer.png",

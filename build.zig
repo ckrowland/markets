@@ -15,9 +15,6 @@ pub const Options = struct {
 
 pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
-    if (target.os_tag == std.Target.Os.Tag.macos) {
-        content_dir = "../Resources/";
-    }
 
     var options = Options{
         .optimize = b.standardOptimizeOption(.{}),
@@ -72,9 +69,9 @@ fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
     exe_options.addOption([]const u8, "content_dir", content_dir);
 
     const install_content_step = b.addInstallDirectory(.{
-        .source_dir = .{ .path = thisDir() ++ "/content/" },
+        .source_dir = .{ .path = thisDir() ++ "/content" },
         .install_dir = .{ .custom = "" },
-        .install_subdir = "bin/content/",
+        .install_subdir = "bin/content",
     });
     exe.step.dependOn(&install_content_step.step);
 
