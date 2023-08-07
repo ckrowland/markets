@@ -18,12 +18,12 @@ pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     random: Random,
     editor: Editor,
-    // signals: Signals,
+    signals: Signals,
 };
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
-    // const signals = try Signals.init(allocator, gctx);
+    const signals = try Signals.init(allocator, gctx);
     const random = try Random.init(allocator, gctx);
     const editor = try Editor.init(allocator, gctx);
     return DemoState{
@@ -31,7 +31,7 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .gctx = gctx,
         .random = random,
         .editor = editor,
-        // .signals = signals,
+        .signals = signals,
     };
 }
 
@@ -39,7 +39,7 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
     demo.random.deinit();
     demo.editor.deinit();
-    // demo.signals.deinit();
+    demo.signals.deinit();
 }
 
 fn update(demo: *DemoState) !void {
@@ -53,9 +53,9 @@ fn update(demo: *DemoState) !void {
         1 => {
             try demo.editor.update(demo.gctx);
         },
-        // 2 => {
-        //     demo.signals.update(demo.gctx);
-        // },
+        2 => {
+            demo.signals.update(demo.gctx);
+        },
         else => {},
     }
 }
@@ -68,12 +68,10 @@ fn draw(demo: *DemoState) void {
         1 => {
             demo.editor.draw(demo.gctx);
         },
-        // 2 => {
-        //     demo.signals.draw(demo.gctx);
-        // },
-        else => {
-            demo.random.draw(demo.gctx);
+        2 => {
+            demo.signals.draw(demo.gctx);
         },
+        else => {},
     }
 }
 

@@ -4,7 +4,7 @@ const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
-const Statistics = @import("statistics.zig");
+const Statistics = @import("../statistics.zig");
 const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
 const Wgpu = @import("../wgpu.zig");
@@ -38,7 +38,11 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
             demo.stats.second = current_time;
-            demo.stats.update(gctx, demo);
+            demo.stats.update(gctx, .{
+                .stats = demo.buffers.data.stats,
+                .consumers = demo.buffers.data.consumer,
+                .producers = demo.buffers.data.producer,
+            });
         }
     }
 }
@@ -77,7 +81,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },
     )) {
         const num_producers = demo.params.num_producers;
-        Statistics.setNumProducers(gctx, demo.buffers.data.stats.data, num_producers.new);
+        Statistics.setNumProducers(gctx, demo.buffers.data.stats, num_producers.new);
 
         if (num_producers.old >= num_producers.new) {
             Wgpu.shrinkBuffer(gctx, Producer, .{
@@ -152,7 +156,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.text("Number of Consumers", .{});
     if (zgui.sliderScalar("##nc", u32, .{ .v = &demo.params.num_consumers.new, .min = 1, .max = 10000 })) {
         const num_consumers = demo.params.num_consumers;
-        Statistics.setNumConsumers(gctx, demo.buffers.data.stats.data, num_consumers.new);
+        Statistics.setNumConsumers(gctx, demo.buffers.data.stats, num_consumers.new);
 
         if (num_consumers.old >= num_consumers.new) {
             Wgpu.shrinkBuffer(gctx, Consumer, .{

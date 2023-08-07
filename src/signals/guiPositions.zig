@@ -1,6 +1,6 @@
 const Window = @import("../windows.zig");
 
-pub const plot = Window.Args{
+pub const plot = Window.PercentArgs{
     .x = 0.25,
     .y = 0.0,
     .w = 0.75,
@@ -11,7 +11,7 @@ pub const plot = Window.Args{
     },
 };
 
-pub const parameter = Window.Args{
+pub const parameter = Window.PercentArgs{
     .x = 0.0,
     .y = 0.13,
     .w = 0.25,

@@ -83,10 +83,6 @@ pub fn setNextWindow(gctx: *zgpu.GraphicsContext, args: PercentArgs) void {
     });
 }
 
-fn assertPercent(num: f32) void {
-    std.debug.assert(0.0 <= num and num <= 1.0);
-}
-
 pub fn commonGui(demo: *main.DemoState) void {
     setNextWindow(demo.gctx, PercentArgs{
         .x = 0.0,
@@ -112,7 +108,7 @@ pub fn commonParameters(demo: *main.DemoState) void {
 
     if (zgui.combo("Select Demo", .{
         .current_item = &demo.number,
-        .items_separated_by_zeros = "Resource Simulation\x00Resource Editor\x00",
+        .items_separated_by_zeros = "Resource Simulation\x00Resource Editor\x00Signal Explorer\x00",
     })) {
         if (demo.number != 0) {
             demo.random.running = false;
@@ -120,8 +116,8 @@ pub fn commonParameters(demo: *main.DemoState) void {
         if (demo.number != 1) {
             demo.editor.running = false;
         }
-        demo.random.updateDepthTexture(demo.gctx);
-        demo.editor.updateDepthTexture(demo.gctx);
+        demo.random.updateAspectRatio(demo.gctx);
+        demo.editor.updateAspectRatio(demo.gctx);
     }
     zgui.spacing();
 }

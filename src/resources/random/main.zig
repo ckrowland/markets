@@ -5,7 +5,7 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
-const Statistics = @import("statistics.zig");
+const Statistics = @import("../statistics.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("../wgpu.zig");
 const config = @import("config.zig");
@@ -81,23 +81,32 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     const aspect = Camera.getAspectRatio(gctx);
     const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{} };
 
-    const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, MAX_NUM_CONSUMERS);
-    const consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, MAX_NUM_CONSUMERS);
-    Consumer.generateBulk(gctx, consumer_buffer, params);
+    const consumer_object = Wgpu.createObjectBuffer(
+        gctx,
+        Consumer,
+        MAX_NUM_CONSUMERS,
+    );
+    Consumer.generateBulk(gctx, consumer_object, params);
 
-    const producer_buffer = Wgpu.createBuffer(gctx, Producer, MAX_NUM_PRODUCERS);
-    const producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, MAX_NUM_PRODUCERS);
-    Producer.generateBulk(gctx, producer_buffer, params);
+    const producer_object = Wgpu.createObjectBuffer(
+        gctx,
+        Producer,
+        MAX_NUM_PRODUCERS,
+    );
+    Producer.generateBulk(gctx, producer_object, params);
 
-    const stats_buffer = Statistics.createBuffer(gctx);
-    const stats_mapped = Statistics.createMappedBuffer(gctx);
-    Statistics.setNumConsumers(gctx, stats_buffer, params.num_consumers.new);
-    Statistics.setNumProducers(gctx, stats_buffer, params.num_producers.new);
+    const stats_object = Wgpu.createObjectBuffer(
+        gctx,
+        u32,
+        Statistics.NUM_STATS,
+    );
+    Statistics.setNumConsumers(gctx, stats_object, params.num_consumers.new);
+    Statistics.setNumProducers(gctx, stats_object, params.num_producers.new);
 
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
-        .consumer = consumer_buffer,
-        .producer = producer_buffer,
-        .stats = stats_buffer,
+        .consumer = consumer_object.data,
+        .producer = producer_object.data,
+        .stats = stats_object.data,
     });
     const depth = Wgpu.createDepthTexture(gctx);
 
@@ -116,18 +125,9 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         },
         .buffers = .{
             .data = .{
-                .consumer = .{
-                    .data = consumer_buffer,
-                    .mapped = consumer_mapped,
-                },
-                .producer = .{
-                    .data = producer_buffer,
-                    .mapped = producer_mapped,
-                },
-                .stats = .{
-                    .data = stats_buffer,
-                    .mapped = stats_mapped,
-                },
+                .consumer = consumer_object,
+                .producer = producer_object,
+                .stats = stats_object,
             },
             .index = .{
                 .circle = Circle.createIndexBuffer(gctx, NUM_CONSUMER_SIDES),
@@ -290,25 +290,13 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     gctx.submit(&.{commands});
 
     if (gctx.present() == .swap_chain_resized) {
-        demo.updateDepthTexture(gctx);
-
-        // Update grid positions to new aspect ratio
-        const aspect = Camera.getAspectRatio(gctx);
-        demo.params.aspect = aspect;
-        Wgpu.updateCoords(gctx, Consumer, .{
-            .structs = demo.buffers.data.consumer,
-            .stats = demo.buffers.data.stats,
-        });
-        Wgpu.updateCoords(gctx, Producer, .{
-            .structs = demo.buffers.data.producer,
-            .stats = demo.buffers.data.stats,
-        });
+        demo.updateAspectRatio(gctx);
     }
 }
 
 pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
-    Consumer.generateBulk(gctx, demo.buffers.data.consumer.data, demo.params);
-    Producer.generateBulk(gctx, demo.buffers.data.producer.data, demo.params);
+    Consumer.generateBulk(gctx, demo.buffers.data.consumer, demo.params);
+    Producer.generateBulk(gctx, demo.buffers.data.producer, demo.params);
     demo.stats.clear();
     Statistics.clearNumTransactions(gctx, demo.buffers.data.stats.data);
 }
@@ -322,4 +310,20 @@ pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {
     const depth = Wgpu.createDepthTexture(gctx);
     state.depth_texture = depth.texture;
     state.depth_texture_view = depth.view;
+}
+
+pub fn updateAspectRatio(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    demo.updateDepthTexture(gctx);
+
+    // Update grid positions to new aspect ratio
+    const aspect = Camera.getAspectRatio(gctx);
+    demo.params.aspect = aspect;
+    Wgpu.updateCoords(gctx, Consumer, .{
+        .structs = demo.buffers.data.consumer,
+        .stats = demo.buffers.data.stats,
+    });
+    Wgpu.updateCoords(gctx, Producer, .{
+        .structs = demo.buffers.data.producer,
+        .stats = demo.buffers.data.stats,
+    });
 }

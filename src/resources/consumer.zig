@@ -35,15 +35,20 @@ producer_id: i32 = -1,
 grouping_id: u32 = 0,
 
 pub const z_pos = 0;
-pub fn generateBulk(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters) void {
+pub fn generateBulk(
+    gctx: *zgpu.GraphicsContext,
+    obj_buf: Wgpu.ObjectBuffer,
+    params: Parameters,
+) void {
     var consumers: [DemoState.MAX_NUM_CONSUMERS]Self = undefined;
     const c_len = createRandomBulk(&consumers, params, params.num_consumers.new);
     gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
+        gctx.lookupResource(obj_buf.data).?,
         0,
         Self,
         consumers[0..c_len],
     );
+    Wgpu.writeToMappedBuffer(gctx, obj_buf);
 }
 
 pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {

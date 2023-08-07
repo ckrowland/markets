@@ -100,26 +100,34 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
 
     // Create Buffers
     const hover_buffer = Hover.initBuffer(gctx);
-    const consumer_buffer = Wgpu.createBuffer(gctx, Consumer, params.max_num_consumers);
-    const consumer_mapped = Wgpu.createMappedBuffer(gctx, Consumer, params.max_num_consumers);
-    const consumer_hover = Wgpu.createBuffer(gctx, ConsumerHover, params.max_num_consumers);
-    const consumer_h_m = Wgpu.createMappedBuffer(gctx, ConsumerHover, params.max_num_consumers);
-    const producer_buffer = Wgpu.createBuffer(gctx, Producer, params.max_num_producers);
-    const producer_mapped = Wgpu.createMappedBuffer(gctx, Producer, params.max_num_producers);
-    const stats_buffer = Statistics.createBuffer(gctx);
-    const stats_mapped = Statistics.createMappedBuffer(gctx);
+    const consumer_object = Wgpu.createObjectBuffer(
+        gctx,
+        Consumer,
+        MAX_NUM_CONSUMERS,
+    );
+    const consumer_hover_object = Wgpu.createObjectBuffer(
+        gctx,
+        ConsumerHover,
+        MAX_NUM_CONSUMERS,
+    );
+    const producer_object = Wgpu.createObjectBuffer(
+        gctx,
+        Producer,
+        MAX_NUM_PRODUCERS,
+    );
+    const stats_object = Wgpu.createObjectBuffer(
+        gctx,
+        u32,
+        Statistics.NUM_STATS,
+    );
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
-        .consumer = consumer_buffer,
-        .producer = producer_buffer,
-        .stats = stats_buffer,
+        .consumer = consumer_object.data,
+        .producer = producer_object.data,
+        .stats = stats_object.data,
     });
-    const stats_obj = Wgpu.ObjectBuffer{
-        .data = stats_buffer,
-        .mapped = stats_mapped,
-    };
-    Statistics.setNumConsumers(gctx, stats_obj, 0);
-    Statistics.setNumProducers(gctx, stats_obj, 0);
-    Statistics.setNumConsumerHovers(gctx, stats_obj, 0);
+    Statistics.setNumConsumers(gctx, stats_object, 0);
+    Statistics.setNumProducers(gctx, stats_object, 0);
+    Statistics.setNumConsumerHovers(gctx, stats_object, 0);
     const depth = Wgpu.createDepthTexture(gctx);
 
     // Create textures for consumer and producer button images
@@ -161,23 +169,11 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
         },
         .buffers = .{
             .data = .{
-                .consumer = .{
-                    .data = consumer_buffer,
-                    .mapped = consumer_mapped,
-                },
-                .consumer_hover = .{
-                    .data = consumer_hover,
-                    .mapped = consumer_h_m,
-                },
+                .consumer = consumer_object,
+                .consumer_hover = consumer_hover_object,
                 .hover = hover_buffer,
-                .producer = .{
-                    .data = producer_buffer,
-                    .mapped = producer_mapped,
-                },
-                .stats = .{
-                    .data = stats_buffer,
-                    .mapped = stats_mapped,
-                },
+                .producer = producer_object,
+                .stats = stats_object,
             },
             .index = .{
                 .circle = Circle.createIndexBuffer(gctx, 40),
@@ -355,23 +351,7 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     gctx.submit(&.{commands});
 
     if (gctx.present() == .swap_chain_resized) {
-        demo.updateDepthTexture(gctx);
-
-        // Update grid positions to new aspect ratio
-        const aspect = Camera.getAspectRatio(gctx);
-        demo.params.aspect = aspect;
-        Wgpu.updateCoords(gctx, Consumer, .{
-            .structs = demo.buffers.data.consumer,
-            .stats = demo.buffers.data.stats,
-        });
-        Wgpu.updateCoords(gctx, Producer, .{
-            .structs = demo.buffers.data.producer,
-            .stats = demo.buffers.data.stats,
-        });
-        Wgpu.updateCoords(gctx, ConsumerHover, .{
-            .structs = demo.buffers.data.consumer_hover,
-            .stats = demo.buffers.data.stats,
-        });
+        demo.updateAspectRatio(gctx);
     }
 }
 
@@ -397,4 +377,24 @@ pub fn updateDepthTexture(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const depth = Wgpu.createDepthTexture(gctx);
     demo.depth_texture = depth.texture;
     demo.depth_texture_view = depth.view;
+}
+
+pub fn updateAspectRatio(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    demo.updateDepthTexture(gctx);
+
+    // Update grid positions to new aspect ratio
+    const aspect = Camera.getAspectRatio(gctx);
+    demo.params.aspect = aspect;
+    Wgpu.updateCoords(gctx, Consumer, .{
+        .structs = demo.buffers.data.consumer,
+        .stats = demo.buffers.data.stats,
+    });
+    Wgpu.updateCoords(gctx, Producer, .{
+        .structs = demo.buffers.data.producer,
+        .stats = demo.buffers.data.stats,
+    });
+    Wgpu.updateCoords(gctx, ConsumerHover, .{
+        .structs = demo.buffers.data.consumer_hover,
+        .stats = demo.buffers.data.stats,
+    });
 }

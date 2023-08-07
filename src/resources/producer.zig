@@ -46,15 +46,20 @@ pub fn create(args: Args) Self {
     };
 }
 
-pub fn generateBulk(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle, params: Parameters) void {
+pub fn generateBulk(
+    gctx: *zgpu.GraphicsContext,
+    obj_buf: Wgpu.ObjectBuffer,
+    params: Parameters,
+) void {
     var producers: [DemoState.MAX_NUM_PRODUCERS]Self = undefined;
     const p_len = createBulk(&producers, params, params.num_producers.new);
     gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
+        gctx.lookupResource(obj_buf.data).?,
         0,
         Self,
         producers[0..p_len],
     );
+    Wgpu.writeToMappedBuffer(gctx, obj_buf);
 }
 
 pub fn createBulk(slice: []Self, params: Parameters, num: usize) usize {

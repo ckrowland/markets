@@ -244,16 +244,20 @@ pub fn updateCoords(gctx: *zgpu.GraphicsContext, comptime T: type, args: updateC
         new_structs[0..structs.len],
     );
 
-    // Since aspect update is done at end of draw loop, updateCoords must write to the mapped
-    // buffers before next update function to have accurate data
+    // Since aspect update is done at end of draw loop,
+    // updateCoords must write to the mapped buffers before next update
+    writeToMappedBuffer(gctx, args.structs);
+}
+
+pub fn writeToMappedBuffer(gctx: *Gctx, obj_buf: ObjectBuffer) void {
     const commands = commands: {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
 
         pass: {
-            const p = gctx.lookupResource(args.structs.data) orelse break :pass;
-            const p_info = gctx.lookupResourceInfo(args.structs.data) orelse break :pass;
-            const pm = gctx.lookupResource(args.structs.mapped) orelse break :pass;
+            const p = gctx.lookupResource(obj_buf.data) orelse break :pass;
+            const p_info = gctx.lookupResourceInfo(obj_buf.data) orelse break :pass;
+            const pm = gctx.lookupResource(obj_buf.mapped) orelse break :pass;
             encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
         }
         break :commands encoder.finish(null);
@@ -308,18 +312,33 @@ pub fn clearBuffer(gctx: *Gctx, buf: zgpu.BufferHandle) void {
 }
 
 // Blank Buffers
-pub fn createBuffer(gctx: *Gctx, comptime T: type, num: u32) zgpu.BufferHandle {
+pub fn createBuffer(
+    gctx: *Gctx,
+    comptime T: type,
+    num: u32,
+) zgpu.BufferHandle {
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .vertex = true, .storage = true },
         .size = num * @sizeOf(T),
     });
 }
 
-pub fn createMappedBuffer(gctx: *Gctx, comptime T: type, num: u32) zgpu.BufferHandle {
+pub fn createMappedBuffer(
+    gctx: *Gctx,
+    comptime T: type,
+    num: u32,
+) zgpu.BufferHandle {
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .map_read = true },
         .size = num * @sizeOf(T),
     });
+}
+
+pub fn createObjectBuffer(gctx: *Gctx, comptime T: type, num: u32) ObjectBuffer {
+    return .{
+        .data = createBuffer(gctx, T, num),
+        .mapped = createMappedBuffer(gctx, T, num),
+    };
 }
 
 // Depth Texture
