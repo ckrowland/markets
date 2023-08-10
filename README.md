@@ -47,6 +47,5 @@ GPU accelerated visual simulations. Built on [zig-gamedev](https://github.com/mi
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-git submodule update --init --remote
 zig build demos-run
 ```
