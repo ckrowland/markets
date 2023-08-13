@@ -9,8 +9,8 @@ const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
 const Wgpu = @import("../wgpu.zig");
 const Window = @import("../../windows.zig");
-const Square = @import("../../shapes/square.zig");
-const Circle = @import("../../shapes/circle.zig");
+const Square = @import("square.zig");
+const Circle = @import("circle.zig");
 
 pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     Window.setNextWindow(gctx, Window.ParametersWindow);

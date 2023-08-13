@@ -108,7 +108,7 @@ pub fn commonParameters(demo: *main.DemoState) void {
 
     if (zgui.combo("Select Demo", .{
         .current_item = &demo.number,
-        .items_separated_by_zeros = "Resource Simulation\x00Resource Editor\x00Signal Explorer\x00",
+        .items_separated_by_zeros = "Resource Simulation\x00Resource Editor\x00Signal Explorer\x00Arithmetic Visualization\x00",
     })) {
         if (demo.number != 0) {
             demo.random.running = false;
@@ -118,6 +118,7 @@ pub fn commonParameters(demo: *main.DemoState) void {
         }
         demo.random.updateAspectRatio(demo.gctx);
         demo.editor.updateAspectRatio(demo.gctx);
+        demo.arithmetic.updateAspectRatio(demo.gctx);
     }
     zgui.spacing();
 }

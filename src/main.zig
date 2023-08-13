@@ -8,6 +8,7 @@ const zm = @import("zmath");
 const Random = @import("resources/random/main.zig");
 const Editor = @import("resources/editor/main.zig");
 const Signals = @import("signals/main.zig");
+const Arithmetic = @import("arithmetic/main.zig");
 const Window = @import("windows.zig");
 
 const content_dir = @import("build_options").content_dir;
@@ -19,6 +20,7 @@ pub const DemoState = struct {
     random: Random,
     editor: Editor,
     signals: Signals,
+    arithmetic: Arithmetic,
 };
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
@@ -26,12 +28,14 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const signals = try Signals.init(allocator, gctx);
     const random = try Random.init(allocator, gctx);
     const editor = try Editor.init(allocator, gctx);
+    const arithmetic = try Arithmetic.init(allocator, gctx);
     return DemoState{
         .number = 1,
         .gctx = gctx,
         .random = random,
         .editor = editor,
         .signals = signals,
+        .arithmetic = arithmetic,
     };
 }
 
@@ -40,6 +44,7 @@ fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.random.deinit();
     demo.editor.deinit();
     demo.signals.deinit();
+    demo.arithmetic.deinit();
 }
 
 fn update(demo: *DemoState) !void {
@@ -56,6 +61,9 @@ fn update(demo: *DemoState) !void {
         2 => {
             demo.signals.update(demo.gctx);
         },
+        3 => {
+            demo.arithmetic.update(demo.gctx);
+        },
         else => {},
     }
 }
@@ -70,6 +78,9 @@ fn draw(demo: *DemoState) void {
         },
         2 => {
             demo.signals.draw(demo.gctx);
+        },
+        3 => {
+            demo.arithmetic.draw(demo.gctx);
         },
         else => {},
     }

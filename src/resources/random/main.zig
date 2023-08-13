@@ -13,8 +13,8 @@ const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
 const Main = @import("../../main.zig");
 const Camera = @import("../../camera.zig");
-const Square = @import("../../shapes/square.zig");
-const Circle = @import("../../shapes/circle.zig");
+const Square = @import("square.zig");
+const Circle = @import("circle.zig");
 
 const content_dir = @import("build_options").content_dir;
 

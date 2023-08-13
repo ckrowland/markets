@@ -5,13 +5,13 @@ const wgpu = zgpu.wgpu;
 const zmath = @import("zmath");
 
 const Camera = @import("../../camera.zig");
-const Circle = @import("../../shapes/circle.zig");
+const Circle = @import("circle.zig");
 const Consumer = @import("../consumer.zig");
 const ConsumerHover = @import("consumer_hover.zig");
 const DemoState = @import("main.zig");
 const Hover = @import("hover.zig");
 const Producer = @import("../producer.zig");
-const Square = @import("../../shapes/square.zig");
+const Square = @import("square.zig");
 const Statistics = @import("../statistics.zig");
 const Wgpu = @import("../wgpu.zig");
 const Window = @import("../../windows.zig");
@@ -191,12 +191,12 @@ fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState, world_pos: [2
 
 fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState, world_pos: [2]f32) !void {
     const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
-    const consumer_args = Consumer.Args {
+    const consumer_args = Consumer.Args{
         .absolute_home = Camera.getGridPosition(gctx, world_pos),
         .home = world_pos,
         .grouping_id = gui_id,
     };
-    
+
     Consumer.createAndAppend(gctx, .{
         .consumer_args = consumer_args,
         .consumer_buf = demo.buffers.data.consumer.data,
@@ -294,12 +294,12 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             buttonSize,
         );
     }
-    
+
     zgui.sameLine(.{});
     if (zgui.arrowButton("left_button_id", .{ .dir = .left })) {
         demo.gui.selection = .consumer;
     }
-        
+
     zgui.sameLine(.{});
     if (zgui.arrowButton("right_button_id", .{ .dir = .right })) {
         demo.gui.selection = .consumers;
