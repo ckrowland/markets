@@ -79,6 +79,11 @@ fn setupAxes(max_x: f32) void {
         .max = largest_axis,
         .cond = .always,
     });
+    zgui.plot.setupAxisLimits(.y1, .{
+        .min = -1,
+        .max = 1,
+        .cond = .always,
+    });
 }
 
 fn setupMarkers() void {
