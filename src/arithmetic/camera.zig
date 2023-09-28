@@ -2,14 +2,10 @@ const std = @import("std");
 const zgpu = @import("zgpu");
 const zmath = @import("zmath");
 
-// Camera Settings
-pub const POS: [3]f32 = .{ 0.0, 0.0, -3000.0 };
-pub const FOCUS: [3]f32 = .{ 0.0, 0.0, 0.0 };
-pub const UP: [4]f32 = .{ 0.0, 1.0, 0.0, 0.0 };
-
-pub const FOV_Y: f32 = 0.22 * std.math.pi;
-pub const NEAR_PLANE: f32 = 0.01;
-pub const FAR_PLANE: f32 = 3000.0;
+// Camera Position
+pub const POS_X: f32 = 500.0;
+pub const POS_Y: f32 = 500.0;
+pub const POS_Z: f32 = -500.0;
 
 // Grid limits for absolute positions (without aspect ratio)
 pub const MAX_X: i32 = 1000;
@@ -58,32 +54,47 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]i32) [4]f32 {
 
 // Given a grid position, return a pixel position
 pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]i32) [2]f32 {
-    const grid_pos = .{ g_pos[0], g_pos[1], 1, 1 };
+    const grid_pos = .{ g_pos[0], g_pos[1], 0, 1 };
     const world_pos = zmath.loadArr4(getWorldPosition(gctx, grid_pos));
     const camera_pos = zmath.mul(world_pos, getObjectToClipMat(gctx));
-    const rel_pos = [4]f32{ camera_pos[0] / -POS[2], camera_pos[1] / -POS[2], 0, 1 };
+    const rel_pos = [4]f32{ camera_pos[0] / -POS_Z, camera_pos[1] / -POS_Z, 0, 1 };
+
     const viewport_size = getViewportPixelSize(gctx);
     const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
+    const content_scale = gctx.window.getContentScale();
 
-    const cursor_in_vp_x = ((rel_pos[0] + 1) * viewport_size[0]) / 2;
-    const cursor_in_vp_y = ((-rel_pos[1] + 1) * viewport_size[1]) / 2;
-    return .{ cursor_in_vp_x + xOffset, cursor_in_vp_y };
+    const cursor_in_vp_x = ((rel_pos[0] + 1) * viewport_size[0]) / (2 * content_scale[0]);
+    const cursor_in_vp_y = ((-rel_pos[1] + 1) * viewport_size[1]) / (2 * content_scale[1]);
+    const screen_coords = [2]f32{ cursor_in_vp_x + (xOffset / 2), cursor_in_vp_y };
+    return .{ screen_coords[0] * content_scale[0], screen_coords[1] * content_scale[1] };
 }
 
 pub fn getObjectToClipMat(gctx: *zgpu.GraphicsContext) zmath.Mat {
     const camWorldToView = zmath.lookAtLh(
-        zmath.loadArr3(POS),
-        zmath.loadArr3(FOCUS),
-        zmath.loadArr4(UP),
-    );
-    const camViewToClip = zmath.perspectiveFovLh(
-        FOV_Y,
-        getAspectRatio(gctx),
-        NEAR_PLANE,
-        FAR_PLANE,
+        //eye position
+        zmath.f32x4(POS_X, POS_Y, POS_Z, 0.0),
+
+        //focus position
+        zmath.f32x4(0.0, 0.0, 0.0, 0.0),
+
+        //up direction
+        zmath.f32x4(0.0, 1.0, 0.0, 0.0),
     );
 
+    const camViewToClip = zmath.perspectiveFovLh(
+        //fovy
+        0.22 * std.math.pi,
+
+        //aspect
+        getAspectRatio(gctx),
+
+        //near
+        0.01,
+
+        //far
+        3000.0,
+    );
     const camWorldToClip = zmath.mul(camWorldToView, camViewToClip);
     // return zmath.transpose(camWorldToClip);
     return camWorldToClip;

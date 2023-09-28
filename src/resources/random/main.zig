@@ -39,7 +39,7 @@ pub const Parameters = struct {
     moving_rate: f32 = 5.0,
     consumer_radius: f32 = 20.0,
     num_consumer_sides: u32 = 20,
-    aspect: f32,
+    aspect: *f32,
 };
 
 const Self = @This();
@@ -77,9 +77,15 @@ params: Parameters,
 stats: Statistics,
 allocator: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
-    const aspect = Camera.getAspectRatio(gctx);
-    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{} };
+pub fn init(demo: *Main.DemoState) !Self {
+    const gctx = demo.gctx;
+    const allocator = demo.allocator;
+
+    const params = Parameters{
+        .aspect = &demo.aspect,
+        .num_producers = .{},
+        .num_consumers = .{},
+    };
 
     const consumer_object = Wgpu.createObjectBuffer(
         gctx,
@@ -253,9 +259,10 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
                 pass.release();
             }
 
-            const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
+            const sd = gctx.swapchain_descriptor;
+            const width = @as(f32, @floatFromInt(sd.width));
             const xOffset = width / 4;
-            const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
+            const height = @as(f32, @floatFromInt(sd.height));
             const yOffset = height / 4;
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
@@ -263,7 +270,10 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
             mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
-            const num_indices_circle = @as(u32, @intCast(cib_info.size / @sizeOf(f32)));
+            const num_indices_circle = @as(
+                u32,
+                @intCast(cib_info.size / @sizeOf(f32)),
+            );
             pass.setPipeline(circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
@@ -288,10 +298,6 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     defer commands.release();
 
     gctx.submit(&.{commands});
-
-    if (gctx.present() == .swap_chain_resized) {
-        demo.updateAspectRatio(gctx);
-    }
 }
 
 pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
@@ -315,9 +321,6 @@ pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {
 pub fn updateAspectRatio(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     demo.updateDepthTexture(gctx);
 
-    // Update grid positions to new aspect ratio
-    const aspect = Camera.getAspectRatio(gctx);
-    demo.params.aspect = aspect;
     Wgpu.updateCoords(gctx, Consumer, .{
         .structs = demo.buffers.data.consumer,
         .stats = demo.buffers.data.stats,

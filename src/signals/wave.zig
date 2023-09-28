@@ -4,10 +4,6 @@ const DemoState = main.DemoState;
 const InputParams = main.Parameters;
 const Signal = main.Signal;
 
-// Should I have different structs for random wave, sin/cos wave, result wave?
-// Then have a super struct of a fourier transform with a random, input and resulting
-// frequency graph struct?
-
 pub const Wave = struct {
     id: u32,
     pointsPerCycle: u32 = 10,

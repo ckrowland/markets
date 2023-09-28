@@ -32,11 +32,11 @@ pub const OPEN_SIZE = HoverBox{
 };
 
 const HoverSquareID = struct {
-    hs_id: u32 = undefined,
+    hs_id: u32,
     gui_id: u32,
 };
 pub const Popup = struct {
-    id: HoverSquareID,
+    id: HoverSquareID = undefined,
     grid_agent_center: [2]i32,
     grid_gui_center: [2]i32 = undefined,
     grid_corners_closed: [4]i32 = undefined,
@@ -109,6 +109,7 @@ pub fn clear(self: *Self) void {
 
 pub fn appendPopup(self: *Self, popup: Popup) !void {
     var copy = popup;
+    copy.id.gui_id = @as(u32, @intCast(self.popups.items.len));
     copy.id.hs_id = self.hover_square_len;
 
     const closed_edges = getGridEdges(popup.grid_agent_center, CLOSED_SIZE);
@@ -131,7 +132,8 @@ pub fn appendPopup(self: *Self, popup: Popup) !void {
     try self.popups.append(copy);
 }
 
-pub fn appendSquare(self: *Self, allocator: std.mem.Allocator, gui_id: u32, grid_pos: [2]i32) !void {
+pub fn appendSquare(self: *Self, allocator: std.mem.Allocator, grid_pos: [2]i32) !void {
+    const gui_id = @as(u32, @intCast(self.popups.items.len));
     var square = HoverSquare{
         .id = .{
             .hs_id = self.hover_square_len,
@@ -320,6 +322,7 @@ fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
 pub const popupArgs = struct {
     consumers: Wgpu.ObjectBuffer,
     consumer_hover: Wgpu.ObjectBuffer,
+    consumer_hover_len: u32,
     mouse: Mouse.MouseButton,
     producers: Wgpu.ObjectBuffer,
     stats: Wgpu.ObjectBuffer,
@@ -328,7 +331,7 @@ pub const popupArgs = struct {
 pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) !void {
     ConsumerHover.clearHover(gctx, .{
         .consumer_hover = args.consumer_hover,
-        .stats = args.stats,
+        .num_structs = args.consumer_hover_len,
     });
 
     const popup_idx = getPopupIndex(self, args.mouse.grid_pos) catch {
@@ -341,7 +344,7 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) !void 
     }
     ConsumerHover.highlightConsumers(gctx, popup_idx, .{
         .consumer_hover = args.consumer_hover,
-        .stats = args.stats,
+        .num_structs = args.consumer_hover_len,
     });
     setupPopupWindow(gctx, popup);
     switch (popup.type_popup) {
@@ -425,7 +428,7 @@ fn demandRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs
         Wgpu.setGroup(gctx, Consumer, .{
             .setArgs = .{
                 .agents = args.consumers,
-                .stats = args.stats,
+                .num_structs = args.consumer_hover_len,
                 .parameter = .{
                     .demand_rate = demand_rate_ptr.*,
                 },
@@ -442,7 +445,7 @@ fn movingRateSlider(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs
         Wgpu.setGroup(gctx, Consumer, .{
             .setArgs = .{
                 .agents = args.consumers,
-                .stats = args.stats,
+                .num_structs = args.consumer_hover_len,
                 .parameter = .{
                     .moving_rate = moving_rate_ptr.*,
                 },
@@ -470,7 +473,7 @@ fn productionRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popup
         Wgpu.setAgent(gctx, Producer, .{
             .setArgs = .{
                 .agents = args.producers,
-                .stats = args.stats,
+                .num_structs = args.consumer_hover_len,
                 .parameter = .{
                     .production_rate = production_rate_ptr.*,
                 },
@@ -487,7 +490,7 @@ fn maxInventoryButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupAr
         Wgpu.setAgent(gctx, Producer, .{
             .setArgs = .{
                 .agents = args.producers,
-                .stats = args.stats,
+                .num_structs = args.consumer_hover_len,
                 .parameter = .{
                     .max_inventory = max_inventory_ptr.*,
                 },

@@ -26,7 +26,7 @@ const content_dir = @import("build_options").content_dir;
 pub const MAX_NUM_AGENTS = Wgpu.MAX_NUM_STRUCTS;
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = MAX_NUM_AGENTS;
-pub const NUM_CONSUMER_SIDES = 40;
+pub const NUM_CONSUMER_SIDES = 80;
 pub const PRODUCER_WIDTH = 40;
 
 const Self = @This();
@@ -76,14 +76,9 @@ pub const Parameters = struct {
     max_num_producers: u32 = 100,
     max_num_consumers: u32 = 10000,
     max_num_stats: u32 = 3,
-    num_producers: struct {
-        old: u32 = 10,
-        new: u32 = 10,
-    },
-    num_consumers: struct {
-        old: u32 = 5000,
-        new: u32 = 5000,
-    },
+    num_producers: u32 = 0,
+    num_consumers: u32 = 0,
+    num_consumer_hovers: u32 = 0,
     production_rate: u32 = 300,
     demand_rate: u32 = 100,
     max_inventory: u32 = 10000,
@@ -91,12 +86,13 @@ pub const Parameters = struct {
     consumer_radius: f32 = 20.0,
     num_consumer_sides: u32 = 20,
     hover_radius: f32 = 70.0,
-    aspect: f32,
+    aspect: *f32,
 };
 
-pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
-    const aspect = Camera.getAspectRatio(gctx);
-    const params = Parameters{ .aspect = aspect, .num_producers = .{}, .num_consumers = .{} };
+pub fn init(demo: *Main.DemoState) !Self {
+    const gctx = demo.gctx;
+    const allocator = demo.allocator;
+    const params = Parameters{ .aspect = &demo.aspect };
 
     // Create Buffers
     const hover_buffer = Hover.initBuffer(gctx);
@@ -176,11 +172,19 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
                 .stats = stats_object,
             },
             .index = .{
-                .circle = Circle.createIndexBuffer(gctx, 40),
+                .circle = Circle.createIndexBuffer(gctx, NUM_CONSUMER_SIDES),
             },
             .vertex = .{
-                .circle = Circle.createVertexBuffer(gctx, 40, params.consumer_radius),
-                .hover = Circle.createVertexBuffer(gctx, 40, params.hover_radius),
+                .circle = Circle.createVertexBuffer(
+                    gctx,
+                    NUM_CONSUMER_SIDES,
+                    params.consumer_radius,
+                ),
+                .hover = Circle.createVertexBuffer(
+                    gctx,
+                    NUM_CONSUMER_SIDES,
+                    params.hover_radius,
+                ),
                 .square = Square.createVertexBuffer(gctx, 40),
             },
         },
@@ -215,9 +219,12 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
         defer encoder.release();
 
         const data = demo.buffers.data;
-        const num_consumers = Wgpu.getNumStructs(gctx, Consumer, data.stats);
+        // const num_consumers = Wgpu.getNumStructs(gctx, Consumer, data.stats);
+        const num_consumers = demo.params.num_consumers;
         const num_producers = Wgpu.getNumStructs(gctx, Producer, data.stats);
-        const num_consumer_hovers = Wgpu.getNumStructs(gctx, ConsumerHover, data.stats);
+        // const num_consumer_hovers = Wgpu.getNumStructs(gctx, ConsumerHover, data.stats);
+        const num_consumer_hovers = demo.params.num_consumer_hovers;
+
         // Compute shaders
         if (demo.running) {
             pass: {
@@ -349,10 +356,6 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     defer commands.release();
 
     gctx.submit(&.{commands});
-
-    if (gctx.present() == .swap_chain_resized) {
-        demo.updateAspectRatio(gctx);
-    }
 }
 
 pub fn restartSimulation(demo: *Self, gctx: *zgpu.GraphicsContext) void {
@@ -382,9 +385,6 @@ pub fn updateDepthTexture(demo: *Self, gctx: *zgpu.GraphicsContext) void {
 pub fn updateAspectRatio(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     demo.updateDepthTexture(gctx);
 
-    // Update grid positions to new aspect ratio
-    const aspect = Camera.getAspectRatio(gctx);
-    demo.params.aspect = aspect;
     Wgpu.updateCoords(gctx, Consumer, .{
         .structs = demo.buffers.data.consumer,
         .stats = demo.buffers.data.stats,

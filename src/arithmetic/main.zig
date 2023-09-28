@@ -6,39 +6,29 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
 const Wgpu = @import("../resources/wgpu.zig");
-const Main = @import("../../main.zig");
-const Camera = @import("../camera.zig");
+const Main = @import("../main.zig");
+const Camera = @import("camera.zig");
 const Window = @import("../windows.zig");
 const Config = @import("config.zig");
-
+const Block = @import("block.zig");
 const content_dir = @import("build_options").content_dir;
-
-pub const Parameters = struct {
-    aspect: f32,
-};
 
 const Self = @This();
 
-block_rp: zgpu.RenderPipelineHandle,
-depth_texture: zgpu.TextureHandle,
-depth_texture_view: zgpu.TextureViewHandle,
-params: Parameters,
 allocator: std.mem.Allocator,
+aspect: f32,
+block: Block.GraphicsObjects,
+render_bg: zgpu.BindGroupHandle,
+depth: Wgpu.Depth,
 
-pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
-    const aspect = Camera.getAspectRatio(gctx);
-    const params = Parameters{ .aspect = aspect };
-    const depth = Wgpu.createDepthTexture(gctx);
-
+pub fn init(demo: *Main.DemoState) !Self {
+    const gctx = demo.gctx;
     return Self{
-        .block_rp = Wgpu.createRenderPipeline(
-            gctx,
-            Config.block_render_pipeline,
-        ),
-        .depth_texture = depth.texture,
-        .depth_texture_view = depth.view,
-        .allocator = allocator,
-        .params = params,
+        .allocator = demo.allocator,
+        .aspect = Camera.getAspectRatio(gctx),
+        .block = Block.init(gctx),
+        .render_bg = Wgpu.createUniformBindGroup(gctx),
+        .depth = Wgpu.createDepthTexture(gctx),
     };
 }
 
@@ -48,18 +38,11 @@ pub fn deinit(demo: *Self) void {
 
 pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     _ = demo;
-    Window.setNextWindow(gctx, Window.ParametersWindow);
-    if (zgui.begin("Parameters", Window.window_flags)) {
-        zgui.pushIntId(2);
-        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        zgui.text("Number Of Producers", .{});
-        zgui.popId();
-    }
-    zgui.end();
+    _ = gctx;
 }
 
 pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
-    //const cam_world_to_clip = Camera.getObjectToClipMat(gctx);
+    const cam_world_to_clip = Camera.getObjectToClipMat(gctx);
 
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
@@ -67,6 +50,39 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     const commands = commands: {
         const encoder = gctx.device.createCommandEncoder(null);
         defer encoder.release();
+
+        pass: {
+            const render_bind_group = gctx.lookupResource(demo.render_bg) orelse break :pass;
+            const depth_view = gctx.lookupResource(demo.depth.view) orelse break :pass;
+            const color_attachments = [_]wgpu.RenderPassColorAttachment{.{
+                .view = back_buffer_view,
+                .load_op = .clear,
+                .store_op = .store,
+            }};
+            const depth_attachment = wgpu.RenderPassDepthStencilAttachment{
+                .view = depth_view,
+                .depth_load_op = .clear,
+                .depth_store_op = .store,
+                .depth_clear_value = 1.0,
+            };
+            const render_pass_info = wgpu.RenderPassDescriptor{
+                .color_attachment_count = color_attachments.len,
+                .color_attachments = &color_attachments,
+                .depth_stencil_attachment = &depth_attachment,
+            };
+
+            const pass = encoder.beginRenderPass(render_pass_info);
+            defer {
+                pass.end();
+                pass.release();
+            }
+
+            var mem = gctx.uniformsAllocate(zm.Mat, 1);
+            mem.slice[0] = cam_world_to_clip;
+            pass.setBindGroup(0, render_bind_group, &.{mem.offset});
+            Wgpu.draw(demo.block.block, gctx, pass);
+            // Wgpu.draw(demo.block.border, gctx, pass);
+        }
 
         // Draw ImGui
         {
@@ -87,27 +103,13 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     defer commands.release();
 
     gctx.submit(&.{commands});
-
-    if (gctx.present() == .swap_chain_resized) {
-        demo.updateAspectRatio(gctx);
-    }
 }
 
 pub fn updateDepthTexture(state: *Self, gctx: *zgpu.GraphicsContext) void {
     // Release old depth texture.
-    gctx.releaseResource(state.depth_texture_view);
-    gctx.destroyResource(state.depth_texture);
+    gctx.releaseResource(state.depth.view);
+    gctx.destroyResource(state.depth.texture);
 
     // Create a new depth texture to match the new window size.
-    const depth = Wgpu.createDepthTexture(gctx);
-    state.depth_texture = depth.texture;
-    state.depth_texture_view = depth.view;
-}
-
-pub fn updateAspectRatio(demo: *Self, gctx: *zgpu.GraphicsContext) void {
-    demo.updateDepthTexture(gctx);
-
-    // Update grid positions to new aspect ratio
-    const aspect = Camera.getAspectRatio(gctx);
-    demo.params.aspect = aspect;
+    state.depth = Wgpu.createDepthTexture(gctx);
 }

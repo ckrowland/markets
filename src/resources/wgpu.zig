@@ -13,6 +13,65 @@ pub const MAX_NUM_STRUCTS = 10000;
 // A mishmash of Wgpu initialization functions and buffer helpers for an array of generic structs
 
 // Data Types
+pub const GraphicsObject = struct {
+    render_pipeline: zgpu.RenderPipelineHandle,
+    attribute_buffer: zgpu.BufferHandle,
+    vertex_buffer: zgpu.BufferHandle,
+    index_buffer: zgpu.BufferHandle,
+    size_of_struct: u32,
+};
+//    pub const Resources = struct {
+//        render_pipeline: wgpu.RenderPipeline,
+//        attribute_buffer: zgpu.BufferInfo,
+//        vertex_buffer: zgpu.BufferInfo,
+//        index_buffer: zgpu.BufferInfo,
+//    };
+//    pub fn getResources(
+//        self: GraphicsObject,
+//        gctx: *zgpu.GraphicsContext,
+//    ) !Resources {
+//        return .{
+//            .render_pipeline = try gctx.lookupResource(self.render_pipeline),
+//            .attribute_buffer = try gctx.lookupResourceInfo(self.attribute_buffer),
+//            .vertex_buffer = try gctx.lookupResourceInfo(self.vertex_buffer),
+//            .index_buffer = try gctx.lookupResourceInfo(self.index_buffer),
+//        };
+//    }
+pub fn draw(
+    obj: GraphicsObject,
+    gctx: *zgpu.GraphicsContext,
+    pass: wgpu.RenderPassEncoder,
+) void {
+    const render_pipeline = gctx.lookupResource(obj.render_pipeline) orelse return;
+    const vertex_buffer = gctx.lookupResourceInfo(obj.vertex_buffer) orelse return;
+    const attribute_buffer = gctx.lookupResourceInfo(obj.attribute_buffer) orelse return;
+    const index_buffer = gctx.lookupResourceInfo(obj.index_buffer) orelse return;
+
+    pass.setPipeline(render_pipeline);
+    pass.setVertexBuffer(
+        0,
+        vertex_buffer.gpuobj.?,
+        0,
+        vertex_buffer.size,
+    );
+    pass.setVertexBuffer(
+        1,
+        attribute_buffer.gpuobj.?,
+        0,
+        attribute_buffer.size,
+    );
+    pass.setIndexBuffer(
+        index_buffer.gpuobj.?,
+        .uint32,
+        0,
+        index_buffer.size,
+    );
+
+    const num_indices: u32 = @intCast(index_buffer.size / @sizeOf(u32));
+    //const num_structs: u32 = @intCast(attribute_buffer.size / obj.size_of_struct);
+    pass.drawIndexed(num_indices, 1, 0, 0, 0);
+}
+
 pub const ObjectBuffer = struct {
     data: zgpu.BufferHandle,
     mapped: zgpu.BufferHandle,
@@ -36,6 +95,7 @@ pub const RenderPipelineInfo = struct {
     fs: [:0]const u8,
     inst_type: type,
     inst_attrs: []const Attribute,
+    primitive_topology: wgpu.PrimitiveTopology = .triangle_list,
 };
 
 pub const ComputePipelineInfo = struct {
@@ -102,6 +162,11 @@ pub fn getAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) ![]T
     return @constCast(buf.slice.?[0..buf.num_structs]);
 }
 
+pub fn getLast(gctx: *zgpu.GraphicsContext, comptime T: type, args: getArgs) !T {
+    const structs = try getAll(gctx, T, args);
+    return structs[args.num_structs - 1];
+}
+
 pub fn agentParameters(comptime T: type) type {
     switch (T) {
         Consumer => return union(enum) {
@@ -122,14 +187,14 @@ pub fn agentParameters(comptime T: type) type {
 pub fn setArgs(comptime T: type) type {
     return struct {
         agents: ObjectBuffer,
-        stats: ObjectBuffer,
+        num_structs: u32,
         parameter: agentParameters(T),
     };
 }
 pub fn setAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: setArgs(T)) void {
     var agents = getAll(gctx, T, .{
         .structs = args.agents,
-        .num_structs = getNumStructs(gctx, T, args.stats),
+        .num_structs = args.num_structs,
     }) catch return;
     for (agents, 0..) |_, i| {
         setAgentParameter(T, &agents[i], args.parameter);
@@ -154,7 +219,7 @@ pub fn setAgentArgs(comptime T: type) type {
 pub fn setAgent(gctx: *zgpu.GraphicsContext, comptime T: type, args: setAgentArgs(T)) void {
     var agents = getAll(gctx, T, .{
         .structs = args.setArgs.agents,
-        .num_structs = getNumStructs(gctx, T, args.setArgs.stats),
+        .num_structs = args.setArgs.num_structs,
     }) catch return;
     for (agents, 0..) |agent, i| {
         const grid_pos = agent.absolute_home;
@@ -198,7 +263,7 @@ pub fn setGroupingArgs(comptime T: type) type {
 pub fn setGroup(gctx: *zgpu.GraphicsContext, comptime T: type, args: setGroupingArgs(T)) void {
     var agents = getAll(gctx, T, .{
         .structs = args.setArgs.agents,
-        .num_structs = getNumStructs(gctx, T, args.setArgs.stats),
+        .num_structs = args.setArgs.num_structs,
     }) catch return;
     for (agents, 0..) |agent, i| {
         if (args.grouping_id == agent.grouping_id) {
@@ -342,10 +407,11 @@ pub fn createObjectBuffer(gctx: *Gctx, comptime T: type, num: u32) ObjectBuffer 
 }
 
 // Depth Texture
-pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
+pub const Depth = struct {
     texture: zgpu.TextureHandle,
     view: zgpu.TextureViewHandle,
-} {
+};
+pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) Depth {
     const texture = gctx.createTexture(.{
         .usage = .{ .render_attachment = true },
         .dimension = .tdim_2d,
@@ -490,7 +556,7 @@ pub fn createRenderPipeline(
         .primitive = wgpu.PrimitiveState{
             .front_face = .ccw,
             .cull_mode = .none,
-            .topology = .triangle_list,
+            .topology = args.primitive_topology,
         },
         .depth_stencil = &wgpu.DepthStencilState{
             .format = .depth32_float,

@@ -10,13 +10,21 @@ const Editor = @import("resources/editor/main.zig");
 const Signals = @import("signals/main.zig");
 const Arithmetic = @import("arithmetic/main.zig");
 const Window = @import("windows.zig");
+const Camera = @import("camera.zig");
 
 const content_dir = @import("build_options").content_dir;
 const window_title = "Visual Simulations";
 
 pub const DemoState = struct {
-    number: i32,
+    allocator: std.mem.Allocator,
     gctx: *zgpu.GraphicsContext,
+    current_demo: i32,
+    aspect: f32,
+    content_scale: [2]f32,
+    demos: Demos = undefined,
+};
+
+const Demos = struct {
     random: Random,
     editor: Editor,
     signals: Signals,
@@ -25,65 +33,86 @@ pub const DemoState = struct {
 
 fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
-    const signals = try Signals.init(allocator, gctx);
-    const random = try Random.init(allocator, gctx);
-    const editor = try Editor.init(allocator, gctx);
-    const arithmetic = try Arithmetic.init(allocator, gctx);
     return DemoState{
-        .number = 1,
+        .allocator = allocator,
         .gctx = gctx,
-        .random = random,
-        .editor = editor,
-        .signals = signals,
-        .arithmetic = arithmetic,
+        .current_demo = 0,
+        .aspect = Camera.getAspectRatio(gctx),
+        .content_scale = gctx.window.getContentScale(),
+    };
+}
+
+fn initDemos(demo: *DemoState) !Demos {
+    return Demos{
+        .random = try Random.init(demo),
+        .editor = try Editor.init(demo),
+        .signals = try Signals.init(demo),
+        .arithmetic = try Arithmetic.init(demo),
     };
 }
 
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
-    demo.random.deinit();
-    demo.editor.deinit();
-    demo.signals.deinit();
-    demo.arithmetic.deinit();
+    demo.demos.random.deinit();
+    demo.demos.editor.deinit();
+    demo.demos.signals.deinit();
+    demo.demos.arithmetic.deinit();
 }
 
 fn update(demo: *DemoState) !void {
     const sd = demo.gctx.swapchain_descriptor;
     zgui.backend.newFrame(sd.width, sd.height);
     Window.commonGui(demo);
-    switch (demo.number) {
+    switch (demo.current_demo) {
         0 => {
-            demo.random.update(demo.gctx);
+            demo.demos.random.update(demo.gctx);
         },
         1 => {
-            try demo.editor.update(demo.gctx);
+            try demo.demos.editor.update(demo.gctx);
         },
         2 => {
-            demo.signals.update(demo.gctx);
+            demo.demos.signals.update(demo.gctx);
         },
         3 => {
-            demo.arithmetic.update(demo.gctx);
+            demo.demos.arithmetic.update(demo.gctx);
         },
         else => {},
     }
 }
 
 fn draw(demo: *DemoState) void {
-    switch (demo.number) {
+    switch (demo.current_demo) {
         0 => {
-            demo.random.draw(demo.gctx);
+            demo.demos.random.draw(demo.gctx);
         },
         1 => {
-            demo.editor.draw(demo.gctx);
+            demo.demos.editor.draw(demo.gctx);
         },
         2 => {
-            demo.signals.draw(demo.gctx);
+            demo.demos.signals.draw(demo.gctx);
         },
         3 => {
-            demo.arithmetic.draw(demo.gctx);
+            demo.demos.arithmetic.draw(demo.gctx);
         },
         else => {},
     }
+
+    if (demo.gctx.present() == .swap_chain_resized) {
+        demo.aspect = Camera.getAspectRatio(demo.gctx);
+        demo.content_scale = demo.gctx.window.getContentScale();
+        setImguiContentScale(demo);
+
+        demo.demos.editor.updateAspectRatio(demo.gctx);
+        demo.demos.random.updateAspectRatio(demo.gctx);
+        demo.demos.signals.updateDepthTexture(demo.gctx);
+        demo.demos.arithmetic.updateDepthTexture(demo.gctx);
+    }
+}
+
+fn setImguiContentScale(demo: *DemoState) void {
+    const scale = @max(demo.content_scale[0], demo.content_scale[1]);
+    zgui.getStyle().* = zgui.Style.init();
+    zgui.getStyle().scaleAllSizes(scale);
 }
 
 pub fn main() !void {
@@ -104,22 +133,25 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     var demo = try init(allocator, window);
-    defer deinit(allocator, &demo);
-
-    const scale_factor = scale_factor: {
-        const scale = window.getContentScale();
-        break :scale_factor @max(scale[0], scale[1]);
+    demo.demos = .{
+        .random = try Random.init(&demo),
+        .editor = try Editor.init(&demo),
+        .signals = try Signals.init(&demo),
+        .arithmetic = try Arithmetic.init(&demo),
     };
+    defer deinit(allocator, &demo);
 
     zgui.init(allocator);
     defer zgui.deinit();
     zgui.plot.init();
     defer zgui.plot.deinit();
 
+    const scale = @max(demo.content_scale[0], demo.content_scale[1]);
     _ = zgui.io.addFontFromFile(
         content_dir ++ "/fonts/Roboto-Medium.ttf",
-        20.0 * scale_factor,
+        20.0 * scale,
     );
+    setImguiContentScale(&demo);
 
     zgui.backend.init(
         window,
@@ -127,8 +159,6 @@ pub fn main() !void {
         @intFromEnum(zgpu.GraphicsContext.swapchain_format),
     );
     defer zgui.backend.deinit();
-
-    zgui.getStyle().scaleAllSizes(scale_factor);
     zgui.io.setIniFilename(null);
 
     while (!window.shouldClose()) {

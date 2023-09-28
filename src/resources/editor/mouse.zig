@@ -1,6 +1,6 @@
 const std = @import("std");
 const zglfw = @import("zglfw");
-const zmath = @import("zmath");
+const zm = @import("zmath");
 const zgpu = @import("zgpu");
 const main = @import("main.zig");
 const Camera = @import("../../camera.zig");
@@ -12,6 +12,7 @@ pub const MouseButton = struct {
     previousState: bool = false,
     grid_pos: [2]i32 = .{ 0, 0 },
     pixel_pos: [2]f32 = .{ 0, 0 },
+    world_pos: [2]f32 = .{ 0, 0 },
 
     pub fn update(self: *MouseButton, gctx: *zgpu.GraphicsContext) void {
         self.previousState = self.state;
@@ -24,6 +25,7 @@ pub const MouseButton = struct {
                 self.state = true;
             },
         }
+        self.world_pos = getWorldPosition(gctx);
         self.grid_pos = getGridPosition(gctx);
         const content_scale = gctx.window.getContentScale();
         const pixel_pos = gctx.window.getCursorPos();
@@ -60,17 +62,24 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
     const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
     const cursor_pos = gctx.window.getCursorPos();
-    const cursor_pos_in_vp = [2]f64{ cursor_pos[0] - (xOffset / 2), cursor_pos[1] };
     const content_scale = gctx.window.getContentScale();
+    const vp_cursor_pos = [2]f64{
+        cursor_pos[0] * content_scale[0] - xOffset,
+        cursor_pos[1] * content_scale[1],
+    };
 
-    const rx = (cursor_pos_in_vp[0] * (2 * content_scale[0])) / viewport_size[0] - 1;
-    const ry = 1 - (cursor_pos_in_vp[1] * (2 * content_scale[1])) / viewport_size[1];
+    const rx = (vp_cursor_pos[0] * 2) / viewport_size[0] - 1;
+    const ry = 1 - (vp_cursor_pos[1] * 2) / viewport_size[1];
     const x = @as(f32, @floatCast(rx));
     const y = @as(f32, @floatCast(ry));
-    const vec = zmath.f32x4(x * -Camera.POS_Z, y * -Camera.POS_Z, 0, 1);
-    const inv = zmath.inverse(Camera.getObjectToClipMat(gctx));
-    const world_pos = zmath.mul(vec, inv);
-    return .{ world_pos[0], world_pos[1] };
+    const vec = zm.f32x4(x, y, 1, 1);
+    const inv = zm.inverse(Camera.getObjectToClipMat(gctx));
+    const world_pos = zm.mul(vec, inv);
+
+    return .{
+        world_pos[0] / world_pos[3],
+        world_pos[1] / world_pos[3],
+    };
 }
 
 pub fn getGridPosition(gctx: *zgpu.GraphicsContext) [2]i32 {

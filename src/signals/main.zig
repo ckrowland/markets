@@ -5,6 +5,8 @@ const zgui = @import("zgui");
 const zm = @import("zmath");
 const math = std.math;
 const wgpu = zgpu.wgpu;
+const Main = @import("../main.zig");
+const Wgpu = @import("../resources/wgpu.zig");
 const Plot = @import("plot.zig");
 const Parameter = @import("parameter.zig");
 const Waves = @import("wave.zig");
@@ -21,7 +23,10 @@ input: Wave,
 output: Wave,
 allocator: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
+pub fn init(demo: *Main.DemoState) !Self {
+    const allocator = demo.allocator;
+    const gctx = demo.gctx;
+
     var randomWave = Waves.Wave.init(allocator, 0, .cos);
     randomWave.createWave();
 
@@ -32,7 +37,7 @@ pub fn init(allocator: std.mem.Allocator, gctx: *zgpu.GraphicsContext) !Self {
     outputWave.multiplyWaves(&randomWave, &inputWave);
 
     // Create a depth texture and its 'view'.
-    const depth = createDepthTexture(gctx);
+    const depth = Wgpu.createDepthTexture(gctx);
 
     return Self{
         .depth_texture = depth.texture,
@@ -61,6 +66,7 @@ pub fn update(demo: *Self, gctx: *zgpu.GraphicsContext) void {
 }
 
 pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    _ = demo;
     const back_buffer_view = gctx.swapchain.getCurrentTextureView();
     defer back_buffer_view.release();
 
@@ -78,35 +84,15 @@ pub fn draw(demo: *Self, gctx: *zgpu.GraphicsContext) void {
     defer commands.release();
 
     gctx.submit(&.{commands});
-
-    if (gctx.present() == .swap_chain_resized) {
-        // Release old depth texture.
-        gctx.releaseResource(demo.depth_texture_view);
-        gctx.destroyResource(demo.depth_texture);
-
-        // Create a new depth texture to match the new window size.
-        const depth = createDepthTexture(gctx);
-        demo.depth_texture = depth.texture;
-        demo.depth_texture_view = depth.view;
-    }
 }
 
-fn createDepthTexture(gctx: *zgpu.GraphicsContext) struct {
-    texture: zgpu.TextureHandle,
-    view: zgpu.TextureViewHandle,
-} {
-    const texture = gctx.createTexture(.{
-        .usage = .{ .render_attachment = true },
-        .dimension = .tdim_2d,
-        .size = .{
-            .width = gctx.swapchain_descriptor.width,
-            .height = gctx.swapchain_descriptor.height,
-            .depth_or_array_layers = 1,
-        },
-        .format = .depth32_float,
-        .mip_level_count = 1,
-        .sample_count = 1,
-    });
-    const view = gctx.createTextureView(texture, .{});
-    return .{ .texture = texture, .view = view };
+pub fn updateDepthTexture(demo: *Self, gctx: *zgpu.GraphicsContext) void {
+    // Release old depth texture.
+    gctx.releaseResource(demo.depth_texture_view);
+    gctx.destroyResource(demo.depth_texture);
+
+    // Create a new depth texture to match the new window size.
+    const depth = Wgpu.createDepthTexture(gctx);
+    demo.depth_texture = depth.texture;
+    demo.depth_texture_view = depth.view;
 }

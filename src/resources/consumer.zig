@@ -58,7 +58,7 @@ pub fn createRandomBulk(slice: []Self, params: Parameters, num: u32) usize {
         const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
         const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
         const aspect_home = [2]f32{
-            @as(f32, @floatFromInt(x)) * params.aspect,
+            @as(f32, @floatFromInt(x)) * params.aspect.*,
             @as(f32, @floatFromInt(y)),
         };
 
@@ -102,17 +102,18 @@ pub fn create(args: Args) Self {
 pub const AppendArgs = struct {
     consumer_args: Args,
     consumer_buf: zgpu.BufferHandle,
-    stat_obj: Wgpu.ObjectBuffer,
+    num_consumers: u32,
+    // stat_obj: Wgpu.ObjectBuffer,
 };
 pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
-    const num_consumers = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
+    // const num_consumers = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
     var consumers: [1]Self = .{
         create(args.consumer_args),
     };
     Wgpu.appendBuffer(gctx, Self, .{
-        .num_old_structs = num_consumers,
+        .num_old_structs = args.num_consumers,
         .buf = args.consumer_buf,
         .structs = consumers[0..],
     });
-    Statistics.setNumConsumers(gctx, args.stat_obj, num_consumers + 1);
+    // Statistics.setNumConsumers(gctx, args.stat_obj, num_consumers + 1);
 }

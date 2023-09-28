@@ -29,31 +29,32 @@ pub fn create(args: Consumer.Args) Self {
 pub const AppendArgs = struct {
     hover_args: Consumer.Args,
     hover_buf: zgpu.BufferHandle,
-    stat_obj: Wgpu.ObjectBuffer,
+    // stat_obj: Wgpu.ObjectBuffer,
+    num_consumer_hovers: u32,
 };
 pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
-    const num_structs = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
+    // const num_structs = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
     var hovers: [1]Self = .{
         create(args.hover_args),
     };
     Wgpu.appendBuffer(gctx, Self, .{
-        .num_old_structs = num_structs,
+        .num_old_structs = args.num_consumer_hovers,
         .buf = args.hover_buf,
         .structs = hovers[0..],
     });
-    Statistics.setNumConsumerHovers(gctx, args.stat_obj, num_structs + 1);
+    // Statistics.setNumConsumerHovers(gctx, args.stat_obj, num_structs + 1);
 }
 
 pub const hoverArgs = struct {
     consumer_hover: Wgpu.ObjectBuffer,
-    stats: Wgpu.ObjectBuffer,
+    num_structs: u32,
 };
 pub fn highlightConsumers(gctx: *zgpu.GraphicsContext, gui_id: usize, args: hoverArgs) void {
     Wgpu.setGroup(gctx, Self, .{
         .grouping_id = @as(u32, @intCast(gui_id)),
         .setArgs = .{
             .agents = args.consumer_hover,
-            .stats = args.stats,
+            .num_structs = args.num_structs,
             .parameter = .{
                 .color = .{ 0, 0.5, 1, 0 },
             },
@@ -64,7 +65,7 @@ pub fn highlightConsumers(gctx: *zgpu.GraphicsContext, gui_id: usize, args: hove
 pub fn clearHover(gctx: *zgpu.GraphicsContext, args: hoverArgs) void {
     Wgpu.setAll(gctx, Self, .{
         .agents = args.consumer_hover,
-        .stats = args.stats,
+        .num_structs = args.num_structs,
         .parameter = .{
             .color = .{ 0, 0, 0, 0 },
         },
