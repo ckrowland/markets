@@ -108,7 +108,10 @@ pub fn commonParameters(demo: *main.DemoState) void {
 
     if (zgui.combo("Select Demo", .{
         .current_item = &demo.current_demo,
-        .items_separated_by_zeros = "Resource Simulation\x00Resource Editor\x00Signal Explorer\x00Arithmetic Visualization\x00",
+        .items_separated_by_zeros = "Resource Simulation\x00" ++
+            "Resource Editor\x00" ++
+            "Signal Explorer\x00" ++
+            "Arithmetic Visualization\x00",
     })) {
         if (demo.current_demo != 0) {
             demo.demos.random.running = false;

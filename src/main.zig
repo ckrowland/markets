@@ -42,15 +42,6 @@ fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 }
 
-fn initDemos(demo: *DemoState) !Demos {
-    return Demos{
-        .random = try Random.init(demo),
-        .editor = try Editor.init(demo),
-        .signals = try Signals.init(demo),
-        .arithmetic = try Arithmetic.init(demo),
-    };
-}
-
 fn deinit(allocator: std.mem.Allocator, demo: *DemoState) void {
     demo.gctx.destroy(allocator);
     demo.demos.random.deinit();
