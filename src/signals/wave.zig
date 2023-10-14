@@ -128,7 +128,7 @@ pub const Wave = struct {
                 break;
             }
             const secondX = second.xv.items[secondIdx];
-            const diff = @fabs(firstX - secondX);
+            const diff = @abs(firstX - secondX);
             if (diff < 0.001) {
                 const firstY = first.yv.items[firstIdx];
                 const secondY = second.yv.items[secondIdx];
