@@ -1,7 +1,11 @@
+const std = @import("std");
 const zgpu = @import("zgpu");
 const zstbi = @import("zstbi");
 
 pub fn createTextureView(gctx: *zgpu.GraphicsContext, path: [:0]const u8) !zgpu.TextureViewHandle {
+    //const dir = std.fs.cwd();
+    //dir.access(path, .{}) catch unreachable;
+
     var image = try zstbi.Image.loadFromFile(path, 4);
     defer image.deinit();
 

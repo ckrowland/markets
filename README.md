@@ -1,13 +1,14 @@
 # Simulations
-GPU accelerated visual simulations. Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/). Coming soon to chrome.
+GPU accelerated visual simulations.
+Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
 
 ## Table of Contents
 * Current Simulations
-  * Resource Simulation - Generate economy via input parameters
+  * Random Resource Simulation - Generate economy via input parameters
   * Resource Editor - Manually create economy with individualized parameters
 * Build - Build and run a native application 
 
-## Resource Simulation
+## Random Resource Simulation
 
 [demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
 
@@ -47,5 +48,8 @@ GPU accelerated visual simulations. Built on [zig-gamedev](https://github.com/mi
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-zig build demos-run
+zig build random-run # Runs Natively
+zig build editor-run # Runs Natively
+zig build random-web # Generates web files
+zig build editor-web # Generates web files
 ```

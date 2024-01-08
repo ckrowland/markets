@@ -3,11 +3,14 @@ const std = @import("std");
 pub const Package = struct {
     zglfw: *std.Build.Module,
     zglfw_c_cpp: *std.Build.CompileStep,
+    options: Options,
 
     pub fn link(pkg: Package, exe: *std.Build.CompileStep) void {
         exe.addModule("zglfw", pkg.zglfw);
 
         const host = (std.zig.system.NativeTargetInfo.detect(exe.target) catch unreachable).target;
+
+        if (host.os.tag == .emscripten or host.os.tag == .freestanding) return; // emscripten
 
         switch (host.os.tag) {
             .windows => {},
@@ -49,13 +52,22 @@ pub fn package(
     const step = b.addOptions();
     step.addOption(bool, "shared", args.options.shared);
 
-    const zglfw = b.createModule(.{
+    const zglfw = b.addModule("zglfw", .{
         .source_file = .{ .path = thisDir() ++ "/src/zglfw.zig" },
     });
 
+    // currently at link stage freestanding target is assumed to be emscripten
+    // if non emscripten .freestanding target is being implemented then this needs to be changed
+    std.debug.assert(target.getOsTag() != .freestanding or target.getCpuArch() == .wasm32); 
+    if (target.getOsTag() == .emscripten) return .{
+        .zglfw = zglfw,
+        .zglfw_c_cpp = undefined,
+        .options = args.options,
+    };
+
     const zglfw_c_cpp = if (args.options.shared) blk: {
         const lib = b.addSharedLibrary(.{
-            .name = "zglfw",
+            .name = "libglfw",
             .target = target,
             .optimize = optimize,
         });
@@ -66,7 +78,7 @@ pub fn package(
 
         break :blk lib;
     } else b.addStaticLibrary(.{
-        .name = "zglfw",
+        .name = "libglfw",
         .target = target,
         .optimize = optimize,
     });
@@ -175,6 +187,7 @@ pub fn package(
     return .{
         .zglfw = zglfw,
         .zglfw_c_cpp = zglfw_c_cpp,
+        .options = args.options,
     };
 }
 
@@ -184,6 +197,9 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run zglfw tests");
     test_step.dependOn(runTests(b, optimize, target));
+
+    const pkg = package(b, target, optimize, .{});
+    b.installArtifact(pkg.zglfw_c_cpp);
 }
 
 pub fn runTests(

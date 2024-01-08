@@ -1,12 +1,6 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
-const wgpu = zgpu.wgpu;
-const Demo = @import("main.zig");
 const Wgpu = @import("../wgpu.zig");
-const Camera = @import("../../camera.zig");
-const Mouse = @import("mouse.zig");
-const Popups = @import("popups.zig");
-const Statistics = @import("../statistics.zig");
 const Consumer = @import("../consumer.zig");
 
 const Self = @This();
@@ -27,47 +21,46 @@ pub fn create(args: Consumer.Args) Self {
 }
 
 pub const AppendArgs = struct {
-    hover_args: Consumer.Args,
-    hover_buf: zgpu.BufferHandle,
-    // stat_obj: Wgpu.ObjectBuffer,
-    num_consumer_hovers: u32,
+    args: Consumer.Args,
+    buf: *Wgpu.ObjectBuffer(Self),
 };
 pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
-    // const num_structs = Wgpu.getNumStructs(gctx, Self, args.stat_obj);
     var hovers: [1]Self = .{
-        create(args.hover_args),
+        create(args.args),
     };
     Wgpu.appendBuffer(gctx, Self, .{
-        .num_old_structs = args.num_consumer_hovers,
-        .buf = args.hover_buf,
+        .num_old_structs = @as(u32, @intCast(args.buf.list.items.len)),
+        .buf = args.buf.buf,
         .structs = hovers[0..],
     });
-    // Statistics.setNumConsumerHovers(gctx, args.stat_obj, num_structs + 1);
+    args.buf.list.append(hovers[0]) catch unreachable;
 }
 
-pub const hoverArgs = struct {
-    consumer_hover: Wgpu.ObjectBuffer,
-    num_structs: u32,
-};
-pub fn highlightConsumers(gctx: *zgpu.GraphicsContext, gui_id: usize, args: hoverArgs) void {
-    Wgpu.setGroup(gctx, Self, .{
-        .grouping_id = @as(u32, @intCast(gui_id)),
-        .setArgs = .{
-            .agents = args.consumer_hover,
-            .num_structs = args.num_structs,
-            .parameter = .{
-                .color = .{ 0, 0.5, 1, 0 },
-            },
-        },
-    });
+pub fn highlightConsumers(
+    gctx: *zgpu.GraphicsContext,
+    gui_id: usize,
+    obj_buf: *Wgpu.ObjectBuffer(Self),
+) void {
+    for (obj_buf.list.items, 0..) |h, i| {
+        if (gui_id == h.grouping_id) {
+            Wgpu.writeToObjectBuffer(gctx, Self, [4]f32, "color", .{
+                .obj_buf = obj_buf.*,
+                .index = i,
+                .value = .{ 0, 0.5, 1, 0 },
+            });
+        }
+    }
 }
 
-pub fn clearHover(gctx: *zgpu.GraphicsContext, args: hoverArgs) void {
-    Wgpu.setAll(gctx, Self, .{
-        .agents = args.consumer_hover,
-        .num_structs = args.num_structs,
-        .parameter = .{
-            .color = .{ 0, 0, 0, 0 },
-        },
-    });
+pub fn clearHover(
+    gctx: *zgpu.GraphicsContext,
+    obj_buf: *Wgpu.ObjectBuffer(Self),
+) void {
+    for (obj_buf.list.items, 0..) |_, i| {
+        Wgpu.writeToObjectBuffer(gctx, Self, [4]f32, "color", .{
+            .obj_buf = obj_buf.*,
+            .index = i,
+            .value = .{ 0, 0, 0, 0 },
+        });
+    }
 }

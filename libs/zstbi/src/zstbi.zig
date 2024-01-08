@@ -116,6 +116,7 @@ pub const Image = struct {
             var x: c_int = undefined;
             var y: c_int = undefined;
             var ch: c_int = undefined;
+
             const is_16bit = is16bit(pathname);
             const ptr = if (is_16bit) @as(?[*]u8, @ptrCast(stbi_load_16(
                 pathname,

@@ -2,21 +2,13 @@ const std = @import("std");
 const array = std.ArrayList;
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
-const wgpu = zgpu.wgpu;
 const Wgpu = @import("wgpu.zig");
-const Consumer = @import("consumer.zig");
-const Producer = @import("producer.zig");
 const Self = @This();
 
 num_transactions: array(u32),
 second: f32 = 0,
 num_empty_consumers: array(u32),
 num_total_producer_inventory: array(u32),
-
-const StagingBuffer = struct {
-    slice: ?[]const u32 = null,
-    buffer: wgpu.Buffer = undefined,
-};
 
 pub const NUM_STATS = 8;
 pub const zero = [NUM_STATS]u32{ 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -43,82 +35,32 @@ pub fn generateAndFillRandomColor(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferH
         &.{ random.float(f32), random.float(f32), random.float(f32) },
     );
 }
-pub const updateBuffers = struct {
-    stats: Wgpu.ObjectBuffer,
-    consumers: Wgpu.ObjectBuffer,
-    producers: Wgpu.ObjectBuffer,
-};
-pub fn update(self: *Self, gctx: *zgpu.GraphicsContext, args: updateBuffers) void {
-    const gpu_stats = Wgpu.getAll(gctx, u32, .{
-        .structs = args.stats,
-        .num_structs = NUM_STATS,
-    }) catch unreachable;
-    self.num_transactions.append(gpu_stats[0]) catch unreachable;
-    clearNumTransactions(gctx, args.stats.data);
-
-    const consumers = Wgpu.getAll(gctx, Consumer, .{
-        .structs = args.consumers,
-        .num_structs = Wgpu.getNumStructs(gctx, Consumer, args.stats),
-    }) catch return;
-    var empty_consumers: u32 = 0;
-    for (consumers) |c| {
-        if (c.inventory == 0) {
-            empty_consumers += 1;
-        }
-    }
-    self.num_empty_consumers.append(empty_consumers) catch unreachable;
-
-    const producers = Wgpu.getAll(gctx, Producer, .{
-        .structs = args.producers,
-        .num_structs = Wgpu.getNumStructs(gctx, Producer, args.stats),
-    }) catch return;
-    var total_inventory: u32 = 0;
-    for (producers) |p| {
-        total_inventory += @as(u32, @intCast(p.inventory));
-    }
-    self.num_total_producer_inventory.append(total_inventory) catch unreachable;
-}
 
 pub fn clear(self: *Self) void {
     self.num_transactions.clearAndFree();
     self.num_empty_consumers.clearAndFree();
     self.num_total_producer_inventory.clearAndFree();
-    self.num_transactions.append(0) catch unreachable;
-    self.num_empty_consumers.append(0) catch unreachable;
-    self.num_total_producer_inventory.append(0) catch unreachable;
-    self.second = 0;
 }
 
 pub fn clearNumTransactions(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
     gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, u32, &.{0});
 }
 
-pub fn setNumConsumers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
+pub const setArgs = struct {
+    stat_obj: Wgpu.ObjectBuffer(u32),
+    num: u32,
+    param: enum(u32) {
+        num_transactions = 0,
+        consumers = 1,
+        producers = 2,
+        consumer_hovers = 3,
+    },
+};
+pub fn setNum(gctx: *zgpu.GraphicsContext, args: setArgs) void {
     gctx.queue.writeBuffer(
-        gctx.lookupResource(stat_obj.data).?,
-        @sizeOf(u32),
+        gctx.lookupResource(args.stat_obj.buf).?,
+        @intFromEnum(args.param) * @sizeOf(u32),
         u32,
-        &.{num},
+        &.{args.num},
     );
-    Wgpu.writeToMappedBuffer(gctx, stat_obj);
-}
-
-pub fn setNumProducers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(stat_obj.data).?,
-        2 * @sizeOf(u32),
-        u32,
-        &.{num},
-    );
-    Wgpu.writeToMappedBuffer(gctx, stat_obj);
-}
-
-pub fn setNumConsumerHovers(gctx: *zgpu.GraphicsContext, stat_obj: Wgpu.ObjectBuffer, num: u32) void {
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(stat_obj.data).?,
-        3 * @sizeOf(u32),
-        u32,
-        &.{num},
-    );
-    Wgpu.writeToMappedBuffer(gctx, stat_obj);
 }

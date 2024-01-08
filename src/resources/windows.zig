@@ -1,8 +1,6 @@
 const std = @import("std");
 const zgui = @import("zgui");
 const zgpu = @import("zgpu");
-const main = @import("main.zig");
-const DemoState = main.DemoState;
 
 pub const window_flags = .{
     .popen = null,
@@ -11,9 +9,9 @@ pub const window_flags = .{
 
 pub const ParametersWindow = PercentArgs{
     .x = 0.0,
-    .y = 0.13,
+    .y = 0.0,
     .w = 0.25,
-    .h = 0.62,
+    .h = 0.75,
     .margin = 0.02,
 };
 
@@ -40,6 +38,21 @@ pub const PercentArgs = struct {
     } = .{},
     // flags: zgui.WindowFlags = .{},
 };
+
+pub fn setNextWindowSize(
+    gctx: *zgpu.GraphicsContext,
+    p_width: f32,
+    p_height: f32,
+) void {
+    std.debug.assert(0.0 <= p_width and p_width <= 1.0);
+    std.debug.assert(0.0 <= p_height and p_height <= 1.0);
+    const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
+    const height = @as(f32, @floatFromInt(gctx.swapchain_descriptor.height));
+    zgui.setNextWindowSize(.{
+        .w = width * p_width,
+        .h = height * p_height,
+    });
+}
 
 pub fn setNextWindow(gctx: *zgpu.GraphicsContext, args: PercentArgs) void {
     std.debug.assert(0.0 <= args.x and args.x <= 1.0);
@@ -81,44 +94,4 @@ pub fn setNextWindow(gctx: *zgpu.GraphicsContext, args: PercentArgs) void {
         .w = w,
         .h = h,
     });
-}
-
-pub fn commonGui(demo: *main.DemoState) void {
-    setNextWindow(demo.gctx, PercentArgs{
-        .x = 0.0,
-        .y = 0.0,
-        .w = 0.25,
-        .h = 0.13,
-        .margin = 0.02,
-        .no_margin = .{ .bottom = true },
-    });
-    if (zgui.begin("Select Demo", window_flags)) {
-        zgui.pushIntId(1);
-        commonParameters(demo);
-        zgui.popId();
-    }
-    zgui.end();
-}
-
-pub fn commonParameters(demo: *main.DemoState) void {
-    zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-    zgui.bulletText("{d:.1} fps", .{demo.gctx.stats.fps});
-    zgui.spacing();
-    zgui.text("Select Demo", .{});
-
-    if (zgui.combo("Select Demo", .{
-        .current_item = &demo.current_demo,
-        .items_separated_by_zeros = "Resource Simulation\x00" ++
-            "Resource Editor\x00" ++
-            "Signal Explorer\x00" ++
-            "Arithmetic Visualization\x00",
-    })) {
-        if (demo.current_demo != 0) {
-            demo.demos.random.running = false;
-        }
-        if (demo.current_demo != 1) {
-            demo.demos.editor.running = false;
-        }
-    }
-    zgui.spacing();
 }

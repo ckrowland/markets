@@ -3,46 +3,33 @@ const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const zmath = @import("zmath");
 const Wgpu = @import("../wgpu.zig");
-const Windows = @import("../../windows.zig");
+const Windows = @import("../windows.zig");
 const Consumer = @import("../consumer.zig");
 const Producer = @import("../producer.zig");
 const Mouse = @import("mouse.zig");
-const Camera = @import("../../camera.zig");
+const Camera = @import("../camera.zig");
 const ConsumerHover = @import("consumer_hover.zig");
+const Callbacks = @import("../callbacks.zig");
 
-pub const HoverBox = struct {
-    min_x: i32,
-    max_x: i32,
-    min_y: i32,
-    max_y: i32,
-};
-const MIN_X = -70;
-const MIN_Y = -70;
-pub const CLOSED_SIZE = HoverBox{
-    .min_x = MIN_X,
-    .max_x = -MIN_X,
-    .min_y = MIN_Y,
-    .max_y = -MIN_Y,
-};
-pub const OPEN_SIZE = HoverBox{
-    .min_x = MIN_X,
-    .max_x = 600,
-    .min_y = -390,
-    .max_y = -MIN_Y,
-};
+pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 350, 150 };
+const HOVER_SIZE_GRID = 40;
 
 const HoverSquareID = struct {
     hs_id: u32,
     gui_id: u32,
 };
+pub const HoverSquare = struct {
+    id: HoverSquareID,
+    corners_grid: [4]i32,
+};
 pub const Popup = struct {
     id: HoverSquareID = undefined,
-    grid_agent_center: [2]i32,
-    grid_gui_center: [2]i32 = undefined,
-    grid_corners_closed: [4]i32 = undefined,
-    grid_corners_open: [4]i32 = undefined,
-    left_open: bool = false,
+    grid_center: [2]i32,
+    pixel_center: [2]f32 = undefined,
     open: bool = false,
+    pivot: bool = false,
+    open_grid: [4]i32 = undefined,
+    closed_grid: [4]i32 = undefined,
     type_popup: enum { consumers, producer },
     parameters: union {
         consumer: struct {
@@ -55,10 +42,6 @@ pub const Popup = struct {
         },
     },
 };
-pub const HoverSquare = struct {
-    id: HoverSquareID,
-    grid_corners: [4]i32,
-};
 
 const Self = @This();
 hover_square_len: u32,
@@ -70,8 +53,14 @@ pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .hover_square_len = 0,
         .popups = std.ArrayList(Popup).init(allocator),
-        .x_axis = std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)).init(allocator),
-        .y_axis = std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)).init(allocator),
+        .x_axis = std.AutoHashMap(
+            i32,
+            std.AutoHashMap(HoverSquareID, void),
+        ).init(allocator),
+        .y_axis = std.AutoHashMap(
+            i32,
+            std.AutoHashMap(HoverSquareID, void),
+        ).init(allocator),
     };
 }
 
@@ -111,47 +100,29 @@ pub fn appendPopup(self: *Self, popup: Popup) !void {
     var copy = popup;
     copy.id.gui_id = @as(u32, @intCast(self.popups.items.len));
     copy.id.hs_id = self.hover_square_len;
-
-    const closed_edges = getGridEdges(popup.grid_agent_center, CLOSED_SIZE);
-    copy.grid_corners_closed = closed_edges;
-
-    var open_edges = getGridEdges(popup.grid_agent_center, OPEN_SIZE);
-    var center = popup.grid_agent_center;
-    if (open_edges[1] >= Camera.MAX_X) {
-        const dist = open_edges[1] - open_edges[0];
-        open_edges[1] = open_edges[1] - dist + CLOSED_SIZE.max_x;
-        open_edges[0] = open_edges[0] - dist + CLOSED_SIZE.max_x;
-        center = .{
-            open_edges[0] + CLOSED_SIZE.max_x,
-            open_edges[3] + CLOSED_SIZE.min_y,
-        };
-    }
-    copy.grid_corners_open = open_edges;
-    copy.grid_gui_center = center;
-
     try self.popups.append(copy);
 }
 
-pub fn appendSquare(self: *Self, allocator: std.mem.Allocator, grid_pos: [2]i32) !void {
+pub fn appendSquare(
+    self: *Self,
+    allocator: std.mem.Allocator,
+    grid_pos: [2]i32,
+) !void {
     const gui_id = @as(u32, @intCast(self.popups.items.len));
-    var square = HoverSquare{
+    const square = HoverSquare{
         .id = .{
             .hs_id = self.hover_square_len,
             .gui_id = gui_id,
         },
-        .grid_corners = getGridEdges(grid_pos, CLOSED_SIZE),
+        .corners_grid = .{
+            grid_pos[0] - HOVER_SIZE_GRID,
+            grid_pos[0] + HOVER_SIZE_GRID,
+            grid_pos[1] - HOVER_SIZE_GRID,
+            grid_pos[1] + HOVER_SIZE_GRID,
+        },
     };
     try self.appendRange(allocator, square);
     self.hover_square_len += 1;
-}
-
-pub fn getGridEdges(grid_cursor: [2]i32, grid_hover_box: HoverBox) [4]i32 {
-    return .{
-        grid_cursor[0] + grid_hover_box.min_x,
-        grid_cursor[0] + grid_hover_box.max_x,
-        grid_cursor[1] + grid_hover_box.min_y,
-        grid_cursor[1] + grid_hover_box.max_y,
-    };
 }
 
 fn inBetween(bottom: i32, value: i32, top: i32) bool {
@@ -160,8 +131,8 @@ fn inBetween(bottom: i32, value: i32, top: i32) bool {
 
 fn resetCoords(
     axis: *std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
-    closed_grid: *const [2]i32,
-    open_grid: *const [2]i32,
+    closed_grid: *[2]i32,
+    open_grid: *[2]i32,
     hsid: HoverSquareID,
 ) void {
     var it = axis.iterator();
@@ -169,7 +140,11 @@ fn resetCoords(
         const coord = kv.key_ptr.*;
         const pixel_has_gui = kv.value_ptr.contains(hsid);
         const in_open_grid = inBetween(open_grid[0], coord, open_grid[1]);
-        const not_in_closed_grid = !inBetween(closed_grid[0], coord, closed_grid[1]);
+        const not_in_closed_grid = !inBetween(
+            closed_grid[0],
+            coord,
+            closed_grid[1],
+        );
         if (pixel_has_gui and in_open_grid and not_in_closed_grid) {
             _ = kv.value_ptr.remove(hsid);
             if (kv.value_ptr.count() == 0) {
@@ -188,7 +163,7 @@ fn addCoords(
 ) !void {
     var coord = range[0];
     while (coord <= range[1]) {
-        var set = axis.getPtr(coord);
+        const set = axis.getPtr(coord);
         if (set) |s| {
             if (!s.contains(hsid)) {
                 try s.put(hsid, {});
@@ -208,21 +183,8 @@ fn resetRange(self: *Self, edges: [4]i32, gui_id: u32) void {
 }
 
 fn appendRange(self: *Self, allocator: std.mem.Allocator, hs: HoverSquare) !void {
-    try addCoords(&self.x_axis, allocator, hs.grid_corners[0..2], hs.id);
-    try addCoords(&self.y_axis, allocator, hs.grid_corners[2..4], hs.id);
-}
-
-fn printAxis(axis: *std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void))) void {
-    var it = axis.iterator();
-    while (it.next()) |kv| {
-        std.debug.print("{any} -> ", .{kv.key_ptr.*});
-        var set_it = kv.value_ptr.keyIterator();
-        while (set_it.next()) |k| {
-            std.debug.print("{any} ", .{k.*});
-        }
-        std.debug.print("\n", .{});
-    }
-    std.debug.print("\n", .{});
+    try addCoords(&self.x_axis, allocator, hs.corners_grid[0..2], hs.id);
+    try addCoords(&self.y_axis, allocator, hs.corners_grid[2..4], hs.id);
 }
 
 pub fn anyOpen(self: *Self) bool {
@@ -231,17 +193,6 @@ pub fn anyOpen(self: *Self) bool {
         b = b or w.open;
     }
     return b;
-}
-
-fn getPopupSizePixels(gctx: *zgpu.GraphicsContext, pop_up: *Popup) [2]f32 {
-    const pixel_center = Camera.getPixelPosition(gctx, pop_up.grid_gui_center);
-    const edges = pop_up.grid_corners_open;
-    const top_right = Camera.getPixelPosition(gctx, .{ edges[1], edges[3] });
-    const bottom_left = Camera.getPixelPosition(gctx, .{ edges[0], edges[2] });
-    return .{
-        top_right[0] - pixel_center[0],
-        bottom_left[1] - pixel_center[1],
-    };
 }
 
 fn isPopupOpen(self: *Self, gui_id: u32) bool {
@@ -320,52 +271,90 @@ fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
 }
 
 pub const popupArgs = struct {
-    consumers: Wgpu.ObjectBuffer,
-    consumer_hover: Wgpu.ObjectBuffer,
-    consumer_hover_len: u32,
+    consumers: *Wgpu.ObjectBuffer(Consumer),
+    consumer_hovers: *Wgpu.ObjectBuffer(ConsumerHover),
     mouse: Mouse.MouseButton,
-    producers: Wgpu.ObjectBuffer,
-    stats: Wgpu.ObjectBuffer,
+    producers: Wgpu.ObjectBuffer(Producer),
+    stats: Wgpu.ObjectBuffer(u32),
     allocator: std.mem.Allocator,
 };
 pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) !void {
-    ConsumerHover.clearHover(gctx, .{
-        .consumer_hover = args.consumer_hover,
-        .num_structs = args.consumer_hover_len,
-    });
+    ConsumerHover.clearHover(gctx, args.consumer_hovers);
 
     const popup_idx = getPopupIndex(self, args.mouse.grid_pos) catch {
-        closeAllOpenPopups(self);
+        for (self.popups.items, 0..) |p, i| {
+            if (p.open) {
+                self.closePopup(&self.popups.items[i]);
+            }
+        }
         return;
     };
+
+    ConsumerHover.highlightConsumers(
+        gctx,
+        popup_idx,
+        args.consumer_hovers,
+    );
+
     const popup = &self.popups.items[popup_idx];
     if (!popup.open) {
-        try self.openPopup(args.allocator, popup);
+        popup.open = true;
+
+        var center = popup.grid_center;
+        const pixel_center = Camera.getPixelPosition(gctx, center);
+        const min_x_pixel = pixel_center[0] - HOVER_SIZE_GRID;
+        const max_x_pixel = pixel_center[0] + WINDOW_SIZE_PIXELS[0];
+        const min_y_pixel = pixel_center[1] - HOVER_SIZE_GRID;
+        const max_y_pixel = pixel_center[1] + WINDOW_SIZE_PIXELS[1];
+
+        var open_grid: [4]i32 = .{
+            popup.grid_center[0] - HOVER_SIZE_GRID,
+            Camera.getGridPosition(gctx, .{ max_x_pixel, min_y_pixel })[0],
+            Camera.getGridPosition(gctx, .{ min_x_pixel, max_y_pixel })[1],
+            popup.grid_center[1] + HOVER_SIZE_GRID,
+        };
+
+        if (open_grid[1] >= Camera.MAX_X) {
+            const len_x = open_grid[1] - open_grid[0] - (2 * HOVER_SIZE_GRID);
+            open_grid[1] = open_grid[0] + (2 * HOVER_SIZE_GRID);
+            open_grid[0] -= len_x;
+            center = .{
+                open_grid[1] - HOVER_SIZE_GRID,
+                open_grid[3] - HOVER_SIZE_GRID,
+            };
+            popup.pivot = true;
+        }
+
+        popup.pixel_center = pixel_center;
+        popup.open_grid = open_grid;
+
+        try self.appendRange(args.allocator, .{
+            .id = popup.id,
+            .corners_grid = popup.open_grid,
+        });
     }
-    ConsumerHover.highlightConsumers(gctx, popup_idx, .{
-        .consumer_hover = args.consumer_hover,
-        .num_structs = args.consumer_hover_len,
+
+    if (popup.pivot) {
+        zgui.setNextWindowPos(.{
+            .x = popup.pixel_center[0],
+            .y = popup.pixel_center[1],
+            .pivot_x = 1.0,
+        });
+    } else {
+        zgui.setNextWindowPos(.{
+            .x = popup.pixel_center[0],
+            .y = popup.pixel_center[1],
+        });
+    }
+
+    zgui.setNextWindowSize(.{
+        .w = WINDOW_SIZE_PIXELS[0],
+        .h = WINDOW_SIZE_PIXELS[1],
     });
-    setupPopupWindow(gctx, popup);
+
     switch (popup.type_popup) {
         .consumers => consumerGui(gctx, popup_idx, popup, args),
         .producer => producerGui(gctx, popup_idx, popup, args),
-    }
-}
-
-fn openPopup(self: *Self, allocator: std.mem.Allocator, popup: *Popup) !void {
-    popup.open = true;
-    try self.appendRange(allocator, .{
-        .id = popup.id,
-        .grid_corners = popup.grid_corners_open,
-    });
-}
-
-fn closeAllOpenPopups(self: *Self) void {
-    for (self.popups.items, 0..) |p, i| {
-        if (p.open) {
-            self.closePopup(&self.popups.items[i]);
-        }
     }
 }
 
@@ -373,43 +362,30 @@ fn closePopup(self: *Self, popup: *Popup) void {
     popup.open = false;
     resetCoords(
         &self.x_axis,
-        popup.grid_corners_closed[0..2],
-        popup.grid_corners_open[0..2],
+        popup.closed_grid[0..2],
+        popup.open_grid[0..2],
         popup.id,
     );
     resetCoords(
         &self.y_axis,
-        popup.grid_corners_closed[2..4],
-        popup.grid_corners_open[2..4],
+        popup.closed_grid[2..4],
+        popup.open_grid[2..4],
         popup.id,
     );
 }
 
-fn setupPopupWindow(gctx: *zgpu.GraphicsContext, pop_up: *Popup) void {
-    const pixel_center = Camera.getPixelPosition(gctx, pop_up.grid_gui_center);
-    const popup_size = getPopupSizePixels(gctx, pop_up);
-    zgui.setNextWindowPos(.{
-        .x = pixel_center[0],
-        .y = pixel_center[1],
-    });
-    zgui.setNextWindowSize(.{
-        .w = popup_size[0],
-        .h = popup_size[1],
-    });
-}
-
-fn consumerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
+fn consumerGui(gctx: *zgpu.GraphicsContext, idx: usize, popup: *Popup, args: popupArgs) void {
     if (zgui.begin("Test", Windows.window_flags)) {
         zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        demandRateButton(gctx, pop_up, args);
-        movingRateSlider(gctx, pop_up, args);
+        demandRateButton(gctx, popup, args);
+        movingRateSlider(gctx, popup, args);
         zgui.popId();
     }
     zgui.end();
 }
 
-fn demandRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+fn demandRateButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
     zgui.text("Demand Rate", .{});
     zgui.sameLine(.{});
     zgui.textDisabled("(?)", .{});
@@ -419,83 +395,83 @@ fn demandRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs
         zgui.endTooltip();
     }
 
-    const demand_rate_ptr = &pop_up.parameters.consumer.demand_rate;
+    const demand_rate_ptr = &popup.parameters.consumer.demand_rate;
     if (zgui.sliderScalar(
         "##dr",
         u32,
         .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },
     )) {
-        Wgpu.setGroup(gctx, Consumer, .{
-            .setArgs = .{
-                .agents = args.consumers,
-                .num_structs = args.consumer_hover_len,
-                .parameter = .{
-                    .demand_rate = demand_rate_ptr.*,
-                },
-            },
-            .grouping_id = pop_up.id.gui_id,
-        });
+        for (args.consumers.list.items, 0..) |c, i| {
+            if (popup.id.gui_id == c.grouping_id) {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(args.consumers.buf).?,
+                    i * @sizeOf(Consumer) + @offsetOf(Consumer, "demand_rate"),
+                    u32,
+                    &.{demand_rate_ptr.*},
+                );
+            }
+        }
     }
 }
 
-fn movingRateSlider(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+fn movingRateSlider(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
     zgui.text("Moving Rate", .{});
-    const moving_rate_ptr = &pop_up.parameters.consumer.moving_rate;
+    const moving_rate_ptr = &popup.parameters.consumer.moving_rate;
     if (zgui.sliderScalar("##mr", f32, .{ .v = moving_rate_ptr, .min = 1.0, .max = 20 })) {
-        Wgpu.setGroup(gctx, Consumer, .{
-            .setArgs = .{
-                .agents = args.consumers,
-                .num_structs = args.consumer_hover_len,
-                .parameter = .{
-                    .moving_rate = moving_rate_ptr.*,
-                },
-            },
-            .grouping_id = pop_up.id.gui_id,
-        });
+        for (args.consumers.list.items, 0..) |c, i| {
+            if (popup.id.gui_id == c.grouping_id) {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(args.consumers.buf).?,
+                    i * @sizeOf(Consumer) + @offsetOf(Consumer, "moving_rate"),
+                    f32,
+                    &.{moving_rate_ptr.*},
+                );
+            }
+        }
     }
 }
 
-fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, pop_up: *Popup, args: popupArgs) void {
+fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, popup: *Popup, args: popupArgs) void {
     if (zgui.begin("Test", Windows.window_flags)) {
         zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        productionRateButton(gctx, pop_up, args);
-        maxInventoryButton(gctx, pop_up, args);
+        productionRateButton(gctx, popup, args);
+        maxInventoryButton(gctx, popup, args);
         zgui.popId();
     }
     zgui.end();
 }
 
-fn productionRateButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+fn productionRateButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
     zgui.text("Production Rate", .{});
-    const production_rate_ptr = &pop_up.parameters.producer.production_rate;
+    const production_rate_ptr = &popup.parameters.producer.production_rate;
     if (zgui.sliderScalar("##pr", u32, .{ .v = production_rate_ptr, .min = 1, .max = 1000 })) {
-        Wgpu.setAgent(gctx, Producer, .{
-            .setArgs = .{
-                .agents = args.producers,
-                .num_structs = args.consumer_hover_len,
-                .parameter = .{
-                    .production_rate = production_rate_ptr.*,
-                },
-            },
-            .grid_pos = pop_up.grid_agent_center,
-        });
+        for (args.producers.list.items, 0..) |p, i| {
+            if (std.mem.eql(i32, popup.grid_center[0..2], p.absolute_home[0..2])) {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(args.producers.buf).?,
+                    i * @sizeOf(Producer) + @offsetOf(Producer, "production_rate"),
+                    u32,
+                    &.{production_rate_ptr.*},
+                );
+            }
+        }
     }
 }
 
-fn maxInventoryButton(gctx: *zgpu.GraphicsContext, pop_up: *Popup, args: popupArgs) void {
+fn maxInventoryButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
     zgui.text("Max Inventory", .{});
-    const max_inventory_ptr = &pop_up.parameters.producer.max_inventory;
+    const max_inventory_ptr = &popup.parameters.producer.max_inventory;
     if (zgui.sliderScalar("##mi", u32, .{ .v = max_inventory_ptr, .min = 10, .max = 10000 })) {
-        Wgpu.setAgent(gctx, Producer, .{
-            .setArgs = .{
-                .agents = args.producers,
-                .num_structs = args.consumer_hover_len,
-                .parameter = .{
-                    .max_inventory = max_inventory_ptr.*,
-                },
-            },
-            .grid_pos = pop_up.grid_agent_center,
-        });
+        for (args.producers.list.items, 0..) |p, i| {
+            if (std.mem.eql(i32, popup.grid_center[0..2], p.absolute_home[0..2])) {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(args.producers.buf).?,
+                    i * @sizeOf(Producer) + @offsetOf(Producer, "max_inventory"),
+                    u32,
+                    &.{max_inventory_ptr.*},
+                );
+            }
+        }
     }
 }

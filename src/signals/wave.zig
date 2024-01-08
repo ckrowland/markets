@@ -59,10 +59,11 @@ pub const Wave = struct {
             switch (self.waveType) {
                 .sin => self.yv.append(@sin(radians)) catch unreachable,
                 .cos => self.yv.append(@cos(radians)) catch unreachable,
-                .random => {
-                    const r = std.crypto.random.float(f32) * 2 - 1;
-                    self.yv.append(r) catch unreachable;
-                },
+                .random => self.yv.append(@cos(radians)) catch unreachable,
+                //.random => {
+                //    const r = std.crypto.random.float(f32) * 2 - 1;
+                //    self.yv.append(r) catch unreachable;
+                //},
                 .result => unreachable,
             }
         }

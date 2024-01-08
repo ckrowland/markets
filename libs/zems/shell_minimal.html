@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Resource Simulation</title>
+    <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+    <style>
+      /*  */
+      html, body {
+        height: 100%;
+        margin: 0;
+      }
+      /* make the canvas fill its container */
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+    /* * {
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: black;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-position: top;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    .touchcontrol {
+      display: none;
+    }
+
+    .touchcontrol-enabled {
+      display: block;
+    } */
+
+    /*  .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
+      textarea.emscripten { font-family: monospace; width: 80%; }
+      div.emscripten { text-align: center; }
+      div.emscripten_border { border: 1px solid black; } */
+      /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+      /* canvas.emscripten { border: 0px none; background-color: black; } */
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    
+    <script type='text/javascript'>
+      var Module = {
+        canvas: (() => {
+          var canvas = document.getElementById('canvas');
+
+          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
+          // application robust, you may want to override this behavior before shipping!
+          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+          canvas.addEventListener("webglcontextlost", (e) => { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
+          return canvas;
+        })(),
+        totalDependencies: 0,
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

@@ -2,8 +2,9 @@ const std = @import("std");
 const zglfw = @import("zglfw");
 const zm = @import("zmath");
 const zgpu = @import("zgpu");
-const main = @import("main.zig");
-const Camera = @import("../../camera.zig");
+const Camera = @import("../camera.zig");
+const zems = @import("zems");
+const emscripten = zems.is_emscripten;
 
 pub const MouseButton = struct {
     name: [:0]const u8 = "Primary",
@@ -11,7 +12,7 @@ pub const MouseButton = struct {
     state: bool = false,
     previousState: bool = false,
     grid_pos: [2]i32 = .{ 0, 0 },
-    pixel_pos: [2]f32 = .{ 0, 0 },
+    pixel_pos: [2]u32 = .{ 0, 0 },
     world_pos: [2]f32 = .{ 0, 0 },
 
     pub fn update(self: *MouseButton, gctx: *zgpu.GraphicsContext) void {
@@ -27,11 +28,13 @@ pub const MouseButton = struct {
         }
         self.world_pos = getWorldPosition(gctx);
         self.grid_pos = getGridPosition(gctx);
-        const content_scale = gctx.window.getContentScale();
-        const pixel_pos = gctx.window.getCursorPos();
+        const content_scale = if (emscripten) .{ 1, 1 } else gctx.window.getContentScale();
+        var pixel_pos = gctx.window.getCursorPos();
+        pixel_pos[0] = @abs(pixel_pos[0]);
+        pixel_pos[1] = @abs(pixel_pos[1]);
         self.pixel_pos = .{
-            @as(f32, @floatCast(pixel_pos[0] * content_scale[0])),
-            @as(f32, @floatCast(pixel_pos[1] * content_scale[1])),
+            @as(u32, @intFromFloat(pixel_pos[0] * content_scale[0])),
+            @as(u32, @intFromFloat(pixel_pos[1] * content_scale[1])),
         };
     }
 
@@ -62,17 +65,15 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
     const width = @as(f32, @floatFromInt(gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
     const cursor_pos = gctx.window.getCursorPos();
-    const content_scale = gctx.window.getContentScale();
-    const vp_cursor_pos = [2]f64{
-        cursor_pos[0] * content_scale[0] - xOffset,
-        cursor_pos[1] * content_scale[1],
+    const content_scale = if (emscripten) .{ 1, 1 } else gctx.window.getContentScale();
+    const vp_cursor_pos = [2]f32{
+        @as(f32, @floatCast(cursor_pos[0])) * content_scale[0] - xOffset,
+        @as(f32, @floatCast(cursor_pos[1])) * content_scale[1],
     };
 
     const rx = (vp_cursor_pos[0] * 2) / viewport_size[0] - 1;
     const ry = 1 - (vp_cursor_pos[1] * 2) / viewport_size[1];
-    const x = @as(f32, @floatCast(rx));
-    const y = @as(f32, @floatCast(ry));
-    const vec = zm.f32x4(x, y, 1, 1);
+    const vec = zm.f32x4(rx, ry, 1, 1);
     const inv = zm.inverse(Camera.getObjectToClipMat(gctx));
     const world_pos = zm.mul(vec, inv);
 
@@ -84,7 +85,7 @@ pub fn getWorldPosition(gctx: *zgpu.GraphicsContext) [2]f32 {
 
 pub fn getGridPosition(gctx: *zgpu.GraphicsContext) [2]i32 {
     const world_pos = getWorldPosition(gctx);
-    const full_grid_pos = Camera.getGridPosition(gctx, world_pos);
+    const full_grid_pos = Camera.getGridFromWorld(gctx, world_pos);
     return .{ full_grid_pos[0], full_grid_pos[1] };
 }
 

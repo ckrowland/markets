@@ -1,11 +1,21 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const zems = @import("libs/zems/build.zig");
 const zglfw = @import("libs/zglfw/build.zig");
 const zgpu = @import("libs/zgpu/build.zig");
 const zgui = @import("libs/zgui/build.zig");
 const zmath = @import("libs/zmath/build.zig");
 const zpool = @import("libs/zpool/build.zig");
 const zstbi = @import("libs/zstbi/build.zig");
+const editor = @import("src/resources/editor/build.zig");
+const random = @import("src/resources/random/build.zig");
+pub var zems_pkg: zems.Package = undefined;
+pub var zglfw_pkg: zglfw.Package = undefined;
+pub var zgpu_pkg: zgpu.Package = undefined;
+pub var zgui_glfw_wgpu_pkg: zgui.Package = undefined;
+pub var zmath_pkg: zmath.Package = undefined;
+pub var zpool_pkg: zpool.Package = undefined;
+pub var zstbi_pkg: zstbi.Package = undefined;
 var content_dir: []const u8 = "./content/";
 
 pub const Options = struct {
@@ -14,19 +24,54 @@ pub const Options = struct {
 };
 
 pub fn build(b: *std.build.Builder) void {
-    const target = b.standardTargetOptions(.{});
-
     var options = Options{
         .optimize = b.standardOptimizeOption(.{}),
-        .target = target,
+        .target = b.standardTargetOptions(.{}),
     };
 
-    const install_step = b.step("demos", "Build demos");
+    packagesCrossPlatform(b, options);
 
-    var exe = createExe(b, options);
+    if (options.target.getOsTag() == .emscripten) {
+        const editor_step = buildEmscripten(b, options, editor.build(b, options));
+        var install_step = b.step("editor-web", "Build editor webpage");
+        install_step.dependOn(&editor_step.link_step.?.step);
+        b.getInstallStep().dependOn(install_step);
+
+        const random_step = buildEmscripten(b, options, random.build(b, options));
+        install_step = b.step("random-web", "Build random webpage");
+        install_step.dependOn(&random_step.link_step.?.step);
+        b.getInstallStep().dependOn(install_step);
+    } else {
+        install(b, editor.build(b, options), "editor");
+        install(b, random.build(b, options), "random");
+    }
+}
+
+pub fn buildEmscripten(
+    b: *std.Build,
+    options: Options,
+    exe: *std.Build.CompileStep,
+) *zems.EmscriptenStep {
+    var ems_step = zems.EmscriptenStep.init(b);
+    ems_step.args.setDefault(options.optimize, false);
+    ems_step.args.setOrAssertOption("USE_GLFW", "3");
+    ems_step.args.setOrAssertOption("USE_WEBGPU", "");
+    ems_step.args.other_args.appendSlice(
+        &.{ "--preload-file", "content" },
+    ) catch unreachable;
+    ems_step.link(exe);
+    return ems_step;
+}
+
+fn install(
+    b: *std.Build,
+    exe: *std.Build.CompileStep,
+    comptime name: []const u8,
+) void {
+    const install_step = b.step(name, "Build '" ++ name ++ "' demo");
     install_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
 
-    const run_step = b.step("demos-run", "Run demos");
+    const run_step = b.step(name ++ "-run", "Run '" ++ name ++ "' demo");
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(install_step);
     run_step.dependOn(&run_cmd.step);
@@ -34,48 +79,22 @@ pub fn build(b: *std.build.Builder) void {
     b.getInstallStep().dependOn(install_step);
 }
 
-fn createExe(b: *std.build.Builder, options: Options) *std.build.LibExeObjStep {
+fn packagesCrossPlatform(b: *std.Build, options: Options) void {
     const target = options.target;
     const optimize = options.optimize;
 
-    const exe = b.addExecutable(.{
-        .name = "exe",
-        .root_source_file = .{ .path = thisDir() ++ "/src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    const zgui_pkg = zgui.package(b, target, optimize, .{
+    zmath_pkg = zmath.package(b, target, optimize, .{});
+    zpool_pkg = zpool.package(b, target, optimize, .{});
+    zglfw_pkg = zglfw.package(b, target, optimize, .{});
+    zstbi_pkg = zstbi.package(b, target, optimize, .{});
+    zgui_glfw_wgpu_pkg = zgui.package(b, target, optimize, .{
         .options = .{ .backend = .glfw_wgpu },
     });
-    zgui_pkg.link(exe);
-
-    const zglfw_pkg = zglfw.package(b, target, optimize, .{});
-    const zpool_pkg = zpool.package(b, target, optimize, .{});
-    const zgpu_pkg = zgpu.package(b, target, optimize, .{
+    zgpu_pkg = zgpu.package(b, target, optimize, .{
+        .options = .{ .uniforms_buffer_size = 4 * 1024 * 1024 },
         .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
     });
-    const zmath_pkg = zmath.package(b, target, optimize, .{
-        .options = .{ .enable_cross_platform_determinism = true },
-    });
-    const zstbi_pkg = zstbi.package(b, target, optimize, .{});
-
-    zglfw_pkg.link(exe);
-    zgpu_pkg.link(exe);
-    zmath_pkg.link(exe);
-    zstbi_pkg.link(exe);
-
-    const exe_options = b.addOptions();
-    exe.addOptions("build_options", exe_options);
-    exe_options.addOption([]const u8, "content_dir", content_dir);
-
-    const install_content_step = b.addInstallDirectory(.{
-        .source_dir = .{ .path = thisDir() ++ "/content" },
-        .install_dir = .{ .custom = "" },
-        .install_subdir = "bin/content",
-    });
-    exe.step.dependOn(&install_content_step.step);
-
-    return exe;
+    zems_pkg = zems.package(b, target, optimize, .{});
 }
 
 inline fn thisDir() []const u8 {

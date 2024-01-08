@@ -9,6 +9,7 @@ pub const version = @import("std").SemanticVersion{ .major = 1, .minor = 89, .pa
 pub const plot = @import("plot.zig");
 pub const backend = switch (@import("zgui_options").backend) {
     .glfw_wgpu => @import("backend_glfw_wgpu.zig"),
+    .glfw_opengl3 => @import("backend_glfw_opengl.zig"),
     .win32_dx12 => .{}, // TODO:
     .no_backend => .{},
 };
@@ -1476,7 +1477,7 @@ pub fn comboFromEnum(
             .Enum => |e| {
                 comptime var str: [:0]const u8 = "";
 
-                inline for (e.fields) |f| {
+                for (e.fields) |f| {
                     str = str ++ f.name ++ "\x00";
                 }
                 break :lbl str;
@@ -3117,12 +3118,12 @@ var temp_buffer: ?std.ArrayList(u8) = null;
 
 pub fn format(comptime fmt: []const u8, args: anytype) []const u8 {
     const len = std.fmt.count(fmt, args);
-    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(len + 64) catch unreachable;
+    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(@intCast(len + 64)) catch unreachable;
     return std.fmt.bufPrint(temp_buffer.?.items, fmt, args) catch unreachable;
 }
 pub fn formatZ(comptime fmt: []const u8, args: anytype) [:0]const u8 {
     const len = std.fmt.count(fmt ++ "\x00", args);
-    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(len + 64) catch unreachable;
+    if (len > temp_buffer.?.items.len) temp_buffer.?.resize(@intCast(len + 64)) catch unreachable;
     return std.fmt.bufPrintZ(temp_buffer.?.items, fmt, args) catch unreachable;
 }
 //--------------------------------------------------------------------------------------------------

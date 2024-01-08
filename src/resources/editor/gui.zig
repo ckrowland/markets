@@ -3,21 +3,20 @@ const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
 const zmath = @import("zmath");
-
-const Main = @import("main.zig");
-const Camera = @import("../../camera.zig");
-const Circle = @import("circle.zig");
+const Main = @import("../main-editor.zig");
+const DemoState = Main.DemoState;
+const Camera = @import("../camera.zig");
+const Circle = @import("../circle.zig");
 const Consumer = @import("../consumer.zig");
 const ConsumerHover = @import("consumer_hover.zig");
-const DemoState = @import("main.zig");
 const Hover = @import("hover.zig");
 const Producer = @import("../producer.zig");
-const Square = @import("square.zig");
 const Statistics = @import("../statistics.zig");
 const Wgpu = @import("../wgpu.zig");
-const Window = @import("../../windows.zig");
+const Window = @import("../windows.zig");
 const Mouse = @import("mouse.zig");
 const Popups = @import("popups.zig");
+const Callbacks = @import("../callbacks.zig");
 
 pub const State = struct {
     pub const Selection = enum {
@@ -26,14 +25,15 @@ pub const State = struct {
         consumers,
         producer,
     };
-    selection: Selection = .producer,
-    producer: zgpu.TextureViewHandle,
-    consumer: zgpu.TextureViewHandle,
-    consumers: zgpu.TextureViewHandle,
+    selection: Selection = .consumer,
+    producer: zgpu.TextureViewHandle = undefined,
+    consumer: zgpu.TextureViewHandle = undefined,
+    consumers: zgpu.TextureViewHandle = undefined,
     consumer_grouping_id: u32 = 0,
 };
 
-pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
+pub fn update(demo: *DemoState) !void {
+    const gctx = demo.gctx;
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
         zgui.pushIntId(2);
@@ -50,32 +50,22 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
     }
     zgui.end();
 
+    Wgpu.runCallbackIfReady(u32, &demo.buffers.data.stats.mapping);
+    Wgpu.runCallbackIfReady(Producer, &demo.buffers.data.producers.mapping);
+    Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
+    Wgpu.runCallbackIfReady(ConsumerHover, &demo.buffers.data.consumer_hovers.mapping);
+
     try demo.popups.display(gctx, .{
-        .consumers = demo.buffers.data.consumer,
-        .consumer_hover = demo.buffers.data.consumer_hover,
-        .consumer_hover_len = demo.params.num_consumer_hovers,
+        .consumers = &demo.buffers.data.consumers,
+        .consumer_hovers = &demo.buffers.data.consumer_hovers,
         .mouse = demo.mouse,
-        .producers = demo.buffers.data.producer,
+        .producers = demo.buffers.data.producers,
         .stats = demo.buffers.data.stats,
         .allocator = demo.allocator,
     });
 
-    if (demo.running) {
-        Statistics.generateAndFillRandomColor(gctx, demo.buffers.data.stats.data);
-        const current_time = @as(f32, @floatCast(gctx.stats.time));
-        const seconds_passed = current_time - demo.stats.second;
-        if (seconds_passed >= 1) {
-            demo.stats.second = current_time;
-            demo.stats.update(gctx, .{
-                .stats = demo.buffers.data.stats,
-                .consumers = demo.buffers.data.consumer,
-                .producers = demo.buffers.data.producer,
-            });
-        }
-    }
-
     hoverUpdate(gctx, demo);
-    if (!demo.popups.anyOpen()) {
+    if (!demo.popups.anyOpen() and Mouse.onGrid(gctx)) {
         _ = switch (demo.gui.selection) {
             .none => {},
             .consumer => {
@@ -88,6 +78,32 @@ pub fn update(demo: *DemoState, gctx: *zgpu.GraphicsContext) !void {
                 try addingProducer(gctx, demo);
             },
         };
+    }
+
+    if (demo.running) {
+        //Helpful for debugging shaders
+        //Statistics.generateAndFillRandomColor(gctx, demo.buffers.data.stats.data);
+
+        const current_time = @as(f32, @floatCast(gctx.stats.time));
+        const seconds_passed = current_time - demo.stats.second;
+        if (seconds_passed >= 1) {
+            demo.stats.second = current_time;
+            Wgpu.getAllAsync(u32, Callbacks.numTransactions, .{
+                .gctx = demo.gctx,
+                .buf = &demo.buffers.data.stats,
+                .stats = &demo.stats,
+            });
+            Wgpu.getAllAsync(Consumer, Callbacks.emptyConsumers, .{
+                .gctx = demo.gctx,
+                .buf = &demo.buffers.data.consumers,
+                .stats = &demo.stats,
+            });
+            Wgpu.getAllAsync(Producer, Callbacks.totalInventory, .{
+                .gctx = demo.gctx,
+                .buf = &demo.buffers.data.producers,
+                .stats = &demo.stats,
+            });
+        }
     }
 }
 
@@ -109,16 +125,13 @@ fn addingConsumer(
     ) std.mem.Allocator.Error!void,
 ) !void {
     const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
-    const on_grid = Mouse.onGrid(gctx);
-    if (demo.mouse.down() and !space_taken and on_grid) {
+    if (demo.mouse.down() and !space_taken) {
         try addFn(gctx, demo);
     } else if (demo.mouse.released()) {
-        const prev_consumer = Wgpu.getLast(gctx, Consumer, .{
-            .structs = demo.buffers.data.consumer,
-            .num_structs = demo.params.num_consumers,
-        }) catch return;
-        try demo.popups.appendPopup(.{
-            .grid_agent_center = prev_consumer.absolute_home[0..2].*,
+        const items = demo.buffers.data.consumers.list.items;
+        const last_consumer = items[items.len - 1];
+        demo.popups.appendPopup(.{
+            .grid_center = last_consumer.absolute_home[0..2].*,
             .type_popup = .consumers,
             .parameters = .{
                 .consumer = .{
@@ -126,34 +139,35 @@ fn addingConsumer(
                     .moving_rate = Consumer.defaults.moving_rate,
                 },
             },
-        });
+        }) catch unreachable;
     }
 }
 
 fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
     const consumer_args = Consumer.Args{
-        .absolute_home = Camera.getGridPosition(gctx, demo.mouse.world_pos),
+        .absolute_home = Camera.getGridFromWorld(gctx, demo.mouse.world_pos),
         .home = demo.mouse.world_pos,
         .grouping_id = gui_id,
     };
 
     Consumer.createAndAppend(gctx, .{
-        .consumer_args = consumer_args,
-        .consumer_buf = demo.buffers.data.consumer.data,
-        .num_consumers = demo.params.num_consumers,
+        .consumer = consumer_args,
+        .obj_buf = &demo.buffers.data.consumers,
     });
-    demo.params.num_consumers += 1;
-    Statistics.setNumConsumers(gctx, demo.buffers.data.stats, demo.params.num_consumers);
+    demo.buffers.data.consumers.mapping.staging.num_structs += 1;
+
+    Statistics.setNum(gctx, .{
+        .stat_obj = demo.buffers.data.stats,
+        .num = @as(u32, @intCast(demo.buffers.data.consumers.list.items.len)),
+        .param = .consumers,
+    });
 
     ConsumerHover.createAndAppend(gctx, .{
-        .hover_args = consumer_args,
-        .hover_buf = demo.buffers.data.consumer_hover.data,
-        .num_consumer_hovers = demo.params.num_consumer_hovers,
+        .args = consumer_args,
+        .buf = &demo.buffers.data.consumer_hovers,
     });
-    demo.params.num_consumer_hovers += 1;
-    Statistics.setNumConsumerHovers(gctx, demo.buffers.data.stats, demo.params.num_consumer_hovers);
-
+    demo.buffers.data.consumer_hovers.mapping.staging.num_structs += 1;
     demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos) catch unreachable;
 }
 
@@ -170,67 +184,56 @@ fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
     for (array_positions) |pos| {
         Consumer.createAndAppend(gctx, .{
-            .consumer_args = .{
-                .absolute_home = Camera.getGridPosition(gctx, pos),
+            .consumer = .{
+                .absolute_home = Camera.getGridFromWorld(gctx, pos),
                 .home = pos,
                 .grouping_id = gui_id,
             },
-            .consumer_buf = demo.buffers.data.consumer.data,
-            .num_consumers = demo.params.num_consumers,
+            .obj_buf = &demo.buffers.data.consumers,
         });
-        demo.params.num_consumers += 1;
-        Statistics.setNumConsumers(
-            gctx,
-            demo.buffers.data.stats,
-            demo.params.num_consumers,
-        );
+        demo.buffers.data.consumers.mapping.staging.num_structs += 1;
     }
+    Statistics.setNum(gctx, .{
+        .stat_obj = demo.buffers.data.stats,
+        .num = @as(u32, @intCast(demo.buffers.data.consumers.list.items.len)),
+        .param = .consumers,
+    });
     ConsumerHover.createAndAppend(gctx, .{
-        .hover_args = .{
-            .absolute_home = Camera.getGridPosition(gctx, world_pos),
+        .args = .{
+            .absolute_home = Camera.getGridFromWorld(gctx, world_pos),
             .home = world_pos,
             .grouping_id = gui_id,
         },
-        .hover_buf = demo.buffers.data.consumer_hover.data,
-        .num_consumer_hovers = demo.params.num_consumer_hovers,
+        .buf = &demo.buffers.data.consumer_hovers,
     });
-    demo.params.num_consumer_hovers += 1;
-    demo.popups.appendSquare(
-        demo.allocator,
-        demo.mouse.grid_pos,
-    ) catch unreachable;
+    demo.buffers.data.consumer_hovers.mapping.staging.num_structs += 1;
+    demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos) catch unreachable;
 }
 
 fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
     const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
-    const on_grid = Mouse.onGrid(gctx);
-
-    if (demo.mouse.pressed() and on_grid and !space_taken) {
-        var producer = Producer.create(.{
-            .home = demo.mouse.world_pos,
-            .absolute_home = demo.mouse.grid_pos,
+    if (demo.mouse.pressed() and !space_taken) {
+        Producer.createAndAppend(gctx, .{
+            .producer = .{
+                .home = demo.mouse.world_pos,
+                .absolute_home = demo.mouse.grid_pos,
+            },
+            .obj_buf = &demo.buffers.data.producers,
         });
-        var producers = [1]Producer{producer};
-        Wgpu.appendBuffer(gctx, Producer, .{
-            .num_old_structs = demo.params.num_producers,
-            .buf = demo.buffers.data.producer.data,
-            .structs = producers[0..],
+        Statistics.setNum(gctx, .{
+            .stat_obj = demo.buffers.data.stats,
+            .num = @as(u32, @intCast(demo.buffers.data.producers.list.items.len)),
+            .param = .producers,
         });
-        demo.params.num_producers += 1;
-        Statistics.setNumProducers(
-            gctx,
-            demo.buffers.data.stats,
-            demo.params.num_producers,
-        );
 
         try demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos);
         try demo.popups.appendPopup(.{
-            .grid_agent_center = demo.mouse.grid_pos,
+            .grid_center = demo.mouse.grid_pos,
             .type_popup = .producer,
             .parameters = .{
                 .producer = .{
-                    .production_rate = producer.production_rate,
-                    .max_inventory = producer.max_inventory,
+                    .production_rate = Producer.DEFAULT_PRODUCTION_RATE,
+                    .max_inventory = Producer.DEFAULT_MAX_INVENTORY,
                 },
             },
         });
@@ -238,7 +241,7 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
 }
 
 fn plots(demo: *DemoState) void {
-    const font_size = zgui.getFontSize();
+    const font_size = zgui.getFontSize() * 0.8;
     zgui.plot.pushStyleVar2f(.{
         .idx = .plot_padding,
         .v = .{ font_size, font_size },
@@ -268,6 +271,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     const size = 3 * zgui.getFontSize();
     const buttonSize = [2]f32{ size, size };
 
+    zgui.text("Consumers", .{});
     if (demo.gui.selection == .consumers) {
         coloredButton(
             gctx,
@@ -297,8 +301,9 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     if (zgui.arrowButton("right_button_id", .{ .dir = .right })) {
         demo.gui.selection = .consumers;
     }
-    zgui.spacing();
+    zgui.dummy(.{ .w = 1, .h = 10 });
 
+    zgui.text("Producers", .{});
     coloredButton(
         gctx,
         &demo.gui,
@@ -307,6 +312,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         pressedColor,
         buttonSize,
     );
+    zgui.dummy(.{ .w = 1, .h = 10 });
 
     zgui.text("Consumer Size", .{});
     if (zgui.sliderScalar("##cs", f32, .{ .v = &demo.params.consumer_radius, .min = 1, .max = 40 })) {
@@ -327,17 +333,18 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     if (zgui.button("Clear", .{})) {
         demo.running = true;
-        DemoState.restartSimulation(demo, gctx);
+        Main.clearSimulation(demo);
     }
 
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setAll(gctx, Producer, Wgpu.setArgs(Producer){
-            .agents = demo.buffers.data.producer,
-            .num_structs = demo.params.num_producers,
-            .parameter = .{
-                .inventory = 0,
-            },
-        });
+        for (demo.buffers.data.producers.list.items, 0..) |_, i| {
+            gctx.queue.writeBuffer(
+                gctx.lookupResource(demo.buffers.data.producers.buf).?,
+                i * @sizeOf(Producer) + @offsetOf(Producer, "inventory"),
+                i32,
+                &.{0},
+            );
+        }
     }
 
     zgui.sameLine(.{});

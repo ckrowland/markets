@@ -3,6 +3,7 @@ const std = @import("std");
 pub const Backend = enum {
     no_backend,
     glfw_wgpu,
+    glfw_opengl3,
     win32_dx12,
 };
 
@@ -39,6 +40,7 @@ pub fn package(
     step.addOption(Backend, "backend", args.options.backend);
     step.addOption(bool, "shared", args.options.shared);
 
+    const emscripten = target.getOsTag() == .emscripten;
     const zgui_options = step.createModule();
 
     const zgui = b.createModule(.{
@@ -69,13 +71,25 @@ pub fn package(
         .optimize = optimize,
     });
 
+    if (emscripten) {
+        zgui_c_cpp.defineCMacro("__EMSCRIPTEN__", null);
+        // TODO: read from enviroment or `emcc --version`
+        zgui_c_cpp.defineCMacro("__EMSCRIPTEN_major__", "3");
+        zgui_c_cpp.defineCMacro("__EMSCRIPTEN_minor__", "1");
+        zgui_c_cpp.stack_protector = false;
+        zgui_c_cpp.disable_stack_probing = true;
+    }
+
     zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/libs" });
     zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/libs/imgui" });
 
     const abi = (std.zig.system.NativeTargetInfo.detect(target) catch unreachable).target.abi;
-    zgui_c_cpp.linkLibC();
-    if (abi != .msvc)
-        zgui_c_cpp.linkLibCpp();
+    if (!emscripten) {
+        zgui_c_cpp.linkLibC();
+        if (abi != .msvc) {
+            zgui_c_cpp.linkLibCpp();
+        }
+    }
 
     const cflags = &.{"-fno-sanitize=undefined"};
 
@@ -110,14 +124,31 @@ pub fn package(
 
     switch (args.options.backend) {
         .glfw_wgpu => {
-            zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zglfw/libs/glfw/include" });
-            zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zgpu/libs/dawn/include" });
+            if (emscripten) {
+                const emsdk_path = b.env_map.get("EMSDK") orelse @panic("Failed to get emscripten SDK path, have you installed & sourced the SDK?");
+                const emscripten_include = b.pathJoin(&.{ emsdk_path, "upstream", "emscripten", "cache", "sysroot", "include" });
+                zgui_c_cpp.addSystemIncludePath(.{ .path = emscripten_include });
+            } else {
+                zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zglfw/libs/glfw/include" });
+                zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zgpu/libs/dawn/include" });
+            }
             zgui_c_cpp.addCSourceFiles(.{
                 .files = &.{
                     thisDir() ++ "/libs/imgui/backends/imgui_impl_glfw.cpp",
                     thisDir() ++ "/libs/imgui/backends/imgui_impl_wgpu.cpp",
                 },
                 .flags = cflags,
+            });
+        },
+        .glfw_opengl3 => {
+            zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zglfw/libs/glfw/include" });
+            zgui_c_cpp.addIncludePath(.{ .path = thisDir() ++ "/../zgpu/libs/dawn/include" });
+            zgui_c_cpp.addCSourceFiles(.{
+                .files = &.{
+                    thisDir() ++ "/libs/imgui/backends/imgui_impl_glfw.cpp",
+                    thisDir() ++ "/libs/imgui/backends/imgui_impl_opengl3.cpp",
+                },
+                .flags = &(cflags.* ++ .{"-DIMGUI_IMPL_OPENGL_LOADER_CUSTOM"}),
             });
         },
         .win32_dx12 => {
