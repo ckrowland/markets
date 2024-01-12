@@ -1096,7 +1096,7 @@ test "zglfw.basic" {
 }
 //--------------------------------------------------------------------------------------------------
 
-usingnamespace if (@import("builtin").target.os.tag == .emscripten or @import("builtin").target.os.tag == .freestanding) struct {
+usingnamespace if (@import("builtin").target.os.tag == .emscripten) struct {
     // GLFW - emscripten uses older version that doesn't have these functions - implement dummies
     var glfwGetGamepadStateWarnPrinted: bool = false;
     pub export fn glfwGetGamepadState(_: i32, _: ?*anyopaque) i32 {

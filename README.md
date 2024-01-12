@@ -1,15 +1,10 @@
 # Simulations
 GPU accelerated visual simulations.
 Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
-
-## Table of Contents
-* Current Simulations
-  * Random Resource Simulation - Generate economy via input parameters
-  * Resource Editor - Manually create economy with individualized parameters
-* Build - Build and run a native application 
+Web Demos only work on Chromium browsers.
 
 ## Random Resource Simulation
-
+[Web Demo](https://connorrowland.me/random/)
 [demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
 
 - Simulate market dynamics of consumers and producers.
@@ -31,6 +26,7 @@ Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
 - To remove a line from the graph, click it's title in the legend.
 
 ## Resource Editor
+[Web Demo](https://connorrowland.me/editor/)
 [editor.webm](https://github.com/ckrowland/simulations/assets/95145274/2c21762f-0dd2-4a00-8d2e-0aad38e83c78)
 
 - Manually place position of consumers and producers.
