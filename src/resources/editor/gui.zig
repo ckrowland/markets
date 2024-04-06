@@ -3,20 +3,20 @@ const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
 const zmath = @import("zmath");
-const Main = @import("../main-editor.zig");
+const Main = @import("main.zig");
 const DemoState = Main.DemoState;
-const Camera = @import("../camera.zig");
-const Circle = @import("../circle.zig");
-const Consumer = @import("../consumer.zig");
+const Camera = @import("camera.zig");
+const Circle = @import("circle.zig");
+const Consumer = @import("consumer.zig");
 const ConsumerHover = @import("consumer_hover.zig");
 const Hover = @import("hover.zig");
-const Producer = @import("../producer.zig");
-const Statistics = @import("../statistics.zig");
-const Wgpu = @import("../wgpu.zig");
-const Window = @import("../windows.zig");
+const Producer = @import("producer.zig");
+const Statistics = @import("statistics.zig");
+const Wgpu = @import("wgpu.zig");
+const Window = @import("windows.zig");
 const Mouse = @import("mouse.zig");
 const Popups = @import("popups.zig");
-const Callbacks = @import("../callbacks.zig");
+const Callbacks = @import("callbacks.zig");
 
 pub const State = struct {
     pub const Selection = enum {
@@ -248,7 +248,11 @@ fn plots(demo: *DemoState) void {
     });
 
     const window_size = zgui.getWindowSize();
-    if (zgui.plot.beginPlot("", .{ .w = window_size[0], .h = window_size[1], .flags = .{} })) {
+    const margin = 15;
+    const plot_width = window_size[0] - margin;
+    const plot_height = window_size[1] - margin;
+
+    if (zgui.plot.beginPlot("", .{ .w = plot_width, .h = plot_height, .flags = .{} })) {
         zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupAxis(.y1, .{ .label = "", .flags = .{ .auto_fit = true } });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});

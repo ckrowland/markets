@@ -50,8 +50,12 @@ Live web demos only work on Chromium browsers.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
+
 zig build random-run # Runs Natively
-zig build editor-run # Runs Natively
+zig build editor-run
+zig build income-run
+
 zig build random-web # Generates web files
-zig build editor-web # Generates web files
+zig build editor-web
+zig build income-web
 ```

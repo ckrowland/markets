@@ -3,15 +3,15 @@ const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const wgpu = zgpu.wgpu;
-const Main = @import("../main-random.zig");
+const Main = @import("main.zig");
 const DemoState = Main.DemoState;
-const Statistics = @import("../statistics.zig");
-const Consumer = @import("../consumer.zig");
-const Producer = @import("../producer.zig");
-const Wgpu = @import("../wgpu.zig");
-const Window = @import("../windows.zig");
-const Circle = @import("../circle.zig");
-const Callbacks = @import("../callbacks.zig");
+const Statistics = @import("statistics.zig");
+const Consumer = @import("consumer.zig");
+const Producer = @import("producer.zig");
+const Wgpu = @import("wgpu.zig");
+const Window = @import("windows.zig");
+const Circle = @import("circle.zig");
+const Callbacks = @import("callbacks.zig");
 
 pub fn update(demo: *DemoState) void {
     const gctx = demo.gctx;
@@ -66,7 +66,7 @@ pub fn update(demo: *DemoState) void {
 
 fn plots(demo: *DemoState) void {
     const window_size = zgui.getWindowSize();
-    const margin = 40;
+    const margin = 15;
     const plot_width = window_size[0] - margin;
     const plot_height = window_size[1] - margin;
 

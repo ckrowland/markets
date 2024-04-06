@@ -5,7 +5,7 @@ const content_dir = "content/";
 pub fn build(b: *std.Build, options: Options) *std.Build.CompileStep {
     const exe_desc = .{
         .name = "exe",
-        .root_source_file = .{ .path = thisDir() ++ "/../main-editor.zig" },
+        .root_source_file = .{ .path = thisDir() ++ "/main.zig" },
         .target = options.target,
         .optimize = options.optimize,
     };

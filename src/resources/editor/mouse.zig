@@ -2,7 +2,7 @@ const std = @import("std");
 const zglfw = @import("zglfw");
 const zm = @import("zmath");
 const zgpu = @import("zgpu");
-const Camera = @import("../camera.zig");
+const Camera = @import("camera.zig");
 const zems = @import("zems");
 const emscripten = zems.is_emscripten;
 

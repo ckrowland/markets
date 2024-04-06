@@ -1,7 +1,7 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
-const Wgpu = @import("../wgpu.zig");
-const Consumer = @import("../consumer.zig");
+const Wgpu = @import("wgpu.zig");
+const Consumer = @import("consumer.zig");
 
 const Self = @This();
 
