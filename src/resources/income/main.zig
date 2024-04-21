@@ -19,7 +19,7 @@ const Square = @import("square.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
 const content_dir = @import("build_options").content_dir;
-const window_title = "Random Resource Simulator";
+const window_title = "Income Resource Simulation";
 const emscripten = zems.is_emscripten;
 
 pub const std_options = struct {
@@ -93,11 +93,12 @@ pub const Parameters = struct {
     num_consumer_sides: u32 = 20,
     median_income: f32 = 0.01,
     plot_hovered: bool = false,
+    price: u32 = 1,
     consumer_incomes: [4]doubleXY(f64) = [_]doubleXY(f64){
-        doubleXY(f64).init(f64, 0.1, 0),
-        doubleXY(f64).init(f64, 0.2, 0),
-        doubleXY(f64).init(f64, 0.3, 0),
-        doubleXY(f64).init(f64, 0.4, 4000),
+        doubleXY(f64).init(f64, 100, 0),
+        doubleXY(f64).init(f64, 200, 0),
+        doubleXY(f64).init(f64, 300, 0),
+        doubleXY(f64).init(f64, 400, 4000),
     },
 
     pub fn doubleXY(comptime T: type) type {

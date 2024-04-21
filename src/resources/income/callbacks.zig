@@ -53,11 +53,10 @@ pub fn consumerStats(args: Args(Consumer)) void {
     var total_balance: u32 = 0;
     if (slice) |consumers| {
         for (consumers) |c| {
-            total_balance += @intFromFloat(c.balance);
+            total_balance += c.balance;
         }
     }
-    const len: u32 = @intCast(args.stats.avg_consumer_balance.items.len + 1);
+    const len: u32 = @intCast(args.buf.list.items.len + 1);
     const avg_balance = total_balance / len;
-
     args.stats.avg_consumer_balance.append(avg_balance) catch unreachable;
 }

@@ -3,21 +3,21 @@ const zgpu = @import("zgpu");
 const zmath = @import("zmath");
 
 // Camera Settings
-pub const POS: [3]f32 = .{ 0.0, 0.0, -6000.0 };
+pub const POS: [3]f32 = .{ 0.0, 0.0, -3000.0 };
 pub const FOCUS: [3]f32 = .{ 0.0, 0.0, 0.0 };
 pub const UP: [4]f32 = .{ 0.0, 1.0, 0.0, 0.0 };
 
 pub const FOV_Y: f32 = 0.22 * std.math.pi;
 pub const NEAR_PLANE: f32 = 0.01;
-pub const FAR_PLANE: f32 = 6100.0;
+pub const FAR_PLANE: f32 = 3100.0;
 
 // Grid limits for absolute positions (without aspect ratio)
-pub const MAX_X: i32 = 2000;
-pub const MIN_X: i32 = -2000;
-pub const MAX_Y: i32 = 2000;
-pub const MIN_Y: i32 = -2000;
-pub const TOTAL_X: i32 = 4000;
-pub const TOTAL_Y: i32 = 4000;
+pub const MAX_X: i32 = 1000;
+pub const MIN_X: i32 = -1000;
+pub const MAX_Y: i32 = 1000;
+pub const MIN_Y: i32 = -1000;
+pub const TOTAL_X: i32 = 2000;
+pub const TOTAL_Y: i32 = 2000;
 
 // Viewport size relative to total window size
 pub const VP_X_SIZE: f32 = 0.75;

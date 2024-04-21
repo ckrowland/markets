@@ -22,11 +22,11 @@ step_size: [2]f32 = .{ 0, 0 },
 moving_rate: f32 = 0,
 max_demand_rate: u32 = 0,
 income_quartile: u32 = 0,
-income: f32 = 0,
+income: u32 = 0,
 radius: f32 = 20.0,
 inventory: u32 = 0,
-balance: f32 = 0,
-max_balance: f32 = 100,
+balance: u32 = 0,
+max_balance: u32 = 100000,
 producer_id: i32 = -1,
 grouping_id: u32 = 0,
 
@@ -53,7 +53,7 @@ pub fn createNewConsumer(demo: *DemoState, i: u32) Self {
         .position = home,
         .home = home,
         .destination = home,
-        .income = @floatCast(demo.params.consumer_incomes[i].new.income),
+        .income = @intFromFloat(demo.params.consumer_incomes[i].new.income),
         .income_quartile = i,
         .moving_rate = demo.params.moving_rate,
         .max_demand_rate = demo.params.max_demand_rate,
@@ -92,7 +92,7 @@ pub fn setParamAll(
     }
 }
 
-pub fn setQuartileIncome(demo: *DemoState, quartile: u32, income: f32) void {
+pub fn setQuartileIncome(demo: *DemoState, quartile: u32, income: u32) void {
     const buf = demo.buffers.data.consumers.buf;
     const resource = demo.gctx.lookupResource(buf).?;
     const struct_offset = @offsetOf(Self, "income");
@@ -100,7 +100,7 @@ pub fn setQuartileIncome(demo: *DemoState, quartile: u32, income: f32) void {
     for (demo.buffers.data.consumers.list.items, 0..) |c, i| {
         if (c.income_quartile == quartile) {
             const offset = i * @sizeOf(Self) + struct_offset;
-            demo.gctx.queue.writeBuffer(resource, offset, f32, &.{income});
+            demo.gctx.queue.writeBuffer(resource, offset, u32, &.{income});
         }
     }
 }

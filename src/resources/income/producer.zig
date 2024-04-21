@@ -18,7 +18,7 @@ color: [4]f32 = .{ 0, 0, 0, 0 },
 production_rate: u32 = 0,
 inventory: i32 = 0,
 max_inventory: u32 = 0,
-_padding1: u32 = 0,
+price: u32 = 1,
 
 pub const z_pos = 0;
 pub const Parameter = enum {
@@ -36,6 +36,7 @@ pub const Args = struct {
     production_rate: u32 = DEFAULT_PRODUCTION_RATE,
     inventory: i32 = 0,
     max_inventory: u32 = DEFAULT_MAX_INVENTORY,
+    price: u32 = 1,
 };
 
 pub fn generateBulk(demo: *DemoState, num: u32) void {
@@ -54,6 +55,7 @@ pub fn generateBulk(demo: *DemoState, num: u32) void {
                 .production_rate = demo.params.production_rate,
                 .inventory = @as(i32, @intCast(demo.params.max_inventory)),
                 .max_inventory = demo.params.max_inventory,
+                .price = demo.params.price,
             },
         });
         i += 1;
@@ -75,6 +77,7 @@ pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
             .production_rate = args.producer.production_rate,
             .inventory = args.producer.inventory,
             .max_inventory = args.producer.max_inventory,
+            .price = args.producer.price,
         },
     };
     Wgpu.appendBuffer(gctx, Self, .{

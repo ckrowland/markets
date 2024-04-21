@@ -204,6 +204,7 @@ pub fn update(demo: *DemoState) void {
     if (demo.push_restart) restartSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
     gui.update(demo);
+    // zgui.showDemoWindow(null);
 }
 
 pub fn draw(demo: *DemoState) void {

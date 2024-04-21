@@ -8,11 +8,11 @@ struct Consumer {
   moving_rate: f32,
   max_demand_rate: u32,
   income_quartile: u32,
-  income: f32,
+  income: u32,
   radius: f32,
   inventory: u32,
-  balance: f32,
-  max_balance: f32,
+  balance: u32,
+  max_balance: u32,
   producer_id: i32,
   grouping_id: u32,
 }
@@ -23,6 +23,7 @@ struct Producer {
   production_rate: u32,
   inventory: atomic<i32>,
   max_inventory: u32,
+  price: u32,
 }
 struct Stats {
   transactions: u32,

@@ -30,7 +30,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             }
 	    consumers[index].color = vec4(1.0, 0.0, 0.0, 0.0);
 	    
-	    let demand_rate = min(u32(c.balance), c.max_demand_rate);
+	    let demand_rate = min(c.balance, c.max_demand_rate);
 	    if (demand_rate > 0) {
 	    	search_for_producer(index);
 	    }
@@ -39,7 +39,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
 	// At Producer
         let pid = c.producer_id;
-	let demand_rate = min(u32(c.balance), c.max_demand_rate);
+	let max_consumer_can_buy = c.balance / producers[pid].price;
+	let demand_rate = min(max_consumer_can_buy, c.max_demand_rate);
         let old_val = atomicSub(&producers[pid].inventory, i32(demand_rate));
 
 	// Went negative, revert inventory
@@ -51,7 +52,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         consumers[index].destination = c.home;
         consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, c.moving_rate);
         consumers[index].inventory += demand_rate;
-	consumers[index].balance -= f32(demand_rate);
+	consumers[index].balance -= demand_rate * producers[pid].price;
 	consumers[index].producer_id = -1;
         stats.transactions += u32(1);
     }
@@ -79,7 +80,7 @@ fn find_nearest_stocked_producer(c: Consumer, index: u32) -> i32 {
     for(var i: u32 = 0; i < stats.num_producers; i++){
         let dist = distance(c.home, producers[i].home);
         let inventory = u32(atomicLoad(&producers[i].inventory));
-	let demand_rate = min(u32(c.balance), c.max_demand_rate);
+	let demand_rate = min(c.balance, c.max_demand_rate);
         if (dist < shortest_distance && inventory > demand_rate) {
             shortest_distance = dist;
 	    pid = i32(i);
