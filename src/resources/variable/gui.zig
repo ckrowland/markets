@@ -16,6 +16,7 @@ pub const FullPos = struct {
     pos: Pos,
     size: Pos,
     id: GuiID,
+    visible: bool,
 };
 
 pub const GuiID = struct {
@@ -38,6 +39,9 @@ pub const Pos = struct {
 pub fn update(demo: *DemoState) void {
     setUpWindow(demo, parameters, demo.imgui_windows[0]);
     setUpWindow(demo, plots, demo.imgui_windows[1]);
+    if (demo.imgui_windows[2].visible) {
+        setUpWindow(demo, timeline, demo.imgui_windows[2]);
+    }
 }
 
 const gui_fn = *const fn (demo: *DemoState) void;
@@ -112,83 +116,85 @@ fn getMarginPixels(sd: wgpu.SwapChainDescriptor, margin_percent: f32) f32 {
 }
 
 fn parameters(demo: *DemoState) void {
-    income_quartiles(demo);
-    max_demand_rate(demo);
-    moving_rate(demo);
-    num_producers(demo);
-    production_rate(demo);
-    price(demo);
-    max_producer_inventory(demo);
-    consumer_size(demo);
+    if (zgui.beginTabBar("##tab_bar", .{})) {
+        defer zgui.endTabBar();
+
+        if (zgui.beginTabItem("Variables", .{})) {
+            defer zgui.endTabItem();
+
+            showTimeline(demo);
+            income(demo);
+            price(demo);
+            productionRate(demo);
+            numConsumers(demo);
+            numProducers(demo);
+        }
+
+        if (zgui.beginTabItem("Constants", .{})) {
+            defer zgui.endTabItem();
+
+            maxDemandRate(demo);
+            movingRate(demo);
+            maxProducerInventory(demo);
+            consumerSize(demo);
+        }
+    }
+
     buttons(demo);
 }
 
-fn income_quartiles(demo: *DemoState) void {
-    const width = zgui.getContentRegionAvail()[0];
-    const plot_flags = .{
-        .flags = zgui.plot.Flags.canvas_only,
-        .h = width,
-    };
-    if (zgui.plot.beginPlot("Consumer Income", plot_flags)) {
-        const x_flags = .{ .label = "Income Rate", .flags = .{} };
-        const y_flags = .{ .label = "Number of Consumers", .flags = .{} };
-        const x_limit_flags = .{ .min = 0, .max = 500, .cond = .always };
-        const y_limit_flags = .{ .min = 0, .max = 5000, .cond = .always };
-
-        zgui.plot.setupAxis(.x1, x_flags);
-        zgui.plot.setupAxis(.y1, y_flags);
-        zgui.plot.setupAxisLimits(.x1, x_limit_flags);
-        zgui.plot.setupAxisLimits(.y1, y_limit_flags);
-
-        const income_ptr = &demo.params.consumer_incomes;
-        inline for (income_ptr, 0..) |_, i| {
-            const ptr = &income_ptr[i].new;
-            zgui.plot.plotBars("Consumer Income Brackets", f64, .{
-                .xv = &.{ptr.income},
-                .yv = &.{ptr.num},
-                .bar_size = 50,
-            });
-            const red = .{ 1, 0, 0, 1 };
-            const flags = .{ .x = &ptr.income, .y = &ptr.num, .col = red };
-            if (zgui.plot.dragPoint(i, flags)) {
-                if (ptr.num <= 0) ptr.num = 0;
-                if (ptr.income > 500) ptr.income = 500;
-                if (ptr.income < 0) ptr.income = 0;
-
-                const point = &demo.params.consumer_incomes[i];
-                const new: u32 = @intFromFloat(point.new.num);
-                const old: u32 = @intFromFloat(point.old.num);
-
-                if (new > old) {
-                    Consumer.expandQuartile(demo, i, new - old);
-                } else if (new < old) {
-                    Consumer.shrinkQuartile(demo, i, old - new);
-                }
-
-                if (point.new.income != point.old.income) {
-                    const u_income: u32 = @intFromFloat(point.new.income);
-                    Consumer.setQuartileIncome(demo, i, u_income);
-                }
-
-                point.old.income = point.new.income;
-                point.old.num = point.new.num;
-            }
-        }
-        zgui.plot.endPlot();
+fn showTimeline(demo: *DemoState) void {
+    if (zgui.button("Show Timeline", .{})) {
+        demo.imgui_windows[2].visible = !demo.imgui_windows[2].visible;
     }
 }
 
-fn max_demand_rate(demo: *DemoState) void {
-    zgui.text("Max Demand Rate", .{});
-    zgui.sameLine(.{});
-    zgui.textDisabled("(?)", .{});
-    if (zgui.isItemHovered(.{})) {
-        _ = zgui.beginTooltip();
-        zgui.textUnformatted(
-            "The maximum amount consumers will buy from producers if they have enough money.",
-        );
-        zgui.endTooltip();
+fn timeline(demo: *DemoState) void {
+    const size = zgui.getWindowSize();
+    const margin = 15;
+    const plot_size = .{ .w = size[0] - margin, .h = size[1] - margin };
+
+    if (zgui.plot.beginPlot("", plot_size)) {
+        defer zgui.plot.endPlot();
+
+        zgui.plot.setupAxis(.x1, .{
+            .label = "",
+            .flags = .{ .auto_fit = true },
+        });
+        zgui.plot.setupAxis(.y1, .{
+            .label = "",
+            .flags = .{ .auto_fit = true },
+        });
+        zgui.plot.plotLine("Number of Consumers", f32, .{
+            .xv = demo.params.num_consumers.xv.items,
+            .yv = demo.params.num_consumers.yv.items,
+        });
+
+        const rad = demo.params.current_radian;
+        zgui.plot.plotLine("Vertical Line", f32, .{
+            .xv = &.{ rad, rad },
+            .yv = &.{ 1, 10000 },
+        });
     }
+}
+
+fn income(demo: *DemoState) void {
+    const title = "Consumer Income";
+    const help = "How much consumers earn each frame of the simulation";
+    infoButton(title, help);
+
+    const ci = &demo.params.consumer_income;
+    const flags = .{ .v = ci, .min = 1, .max = 500 };
+    if (zgui.sliderScalar("##ci", u32, flags)) {
+        Consumer.setParamAll(demo, "income", u32, ci.*);
+    }
+}
+
+fn maxDemandRate(demo: *DemoState) void {
+    const title = "Max Demand Rate";
+    const help = "The maximum amount consumers will buy from producers " ++
+        "if they have enough money.";
+    infoButton(title, help);
 
     const mdr = &demo.params.max_demand_rate;
     const flags = .{ .v = mdr, .min = 1, .max = 200 };
@@ -197,17 +203,11 @@ fn max_demand_rate(demo: *DemoState) void {
     }
 }
 
-fn moving_rate(demo: *DemoState) void {
-    zgui.text("Moving Rate", .{});
-    zgui.sameLine(.{});
-    zgui.textDisabled("(?)", .{});
-    if (zgui.isItemHovered(.{})) {
-        _ = zgui.beginTooltip();
-        zgui.textUnformatted(
-            "How fast consumers move to and from producers.",
-        );
-        zgui.endTooltip();
-    }
+fn movingRate(demo: *DemoState) void {
+    const title = "Moving Rate";
+    const help = "How fast consumers move to and from producers.";
+    infoButton(title, help);
+
     const mr = &demo.params.moving_rate;
     const flags = .{ .v = mr, .min = 1.0, .max = 20 };
     if (zgui.sliderScalar("##mr", f32, flags)) {
@@ -215,7 +215,7 @@ fn moving_rate(demo: *DemoState) void {
     }
 }
 
-fn consumer_size(demo: *DemoState) void {
+fn consumerSize(demo: *DemoState) void {
     zgui.text("Consumer Size", .{});
     const cr = &demo.params.consumer_radius;
     const flags = .{ .v = cr, .min = 1, .max = 3 };
@@ -228,7 +228,27 @@ fn consumer_size(demo: *DemoState) void {
     }
 }
 
-fn num_producers(demo: *DemoState) void {
+fn numConsumers(demo: *DemoState) void {
+    zgui.text("Number Of Consumers", .{});
+    const new = &demo.params.num_consumers;
+    const flags = .{ .min = new.min, .max = new.max, .v = &new.val };
+    const value_changed = demo.buffers.data.consumers.list.items.len != new.val;
+    if (zgui.sliderScalar("##nc", u32, flags) or value_changed) {
+        Statistics.setNum(demo, new.val, .consumers);
+
+        const old: u32 = @intCast(demo.buffers.data.consumers.list.items.len);
+        if (old >= new.val) {
+            const buf = demo.buffers.data.consumers.buf;
+            Wgpu.shrinkBuffer(demo.gctx, buf, Consumer, new.val);
+            demo.buffers.data.consumers.list.resize(new.val) catch unreachable;
+            demo.buffers.data.consumers.mapping.num_structs = new.val;
+        } else {
+            Consumer.generateBulk(demo, new.val - old);
+        }
+    }
+}
+
+fn numProducers(demo: *DemoState) void {
     zgui.text("Number Of Producers", .{});
     const new = &demo.params.num_producers;
     const old: u32 = @intCast(demo.buffers.data.producers.list.items.len);
@@ -247,17 +267,11 @@ fn num_producers(demo: *DemoState) void {
     }
 }
 
-fn production_rate(demo: *DemoState) void {
-    zgui.text("Production Rate", .{});
-    zgui.sameLine(.{});
-    zgui.textDisabled("(?)", .{});
-    if (zgui.isItemHovered(.{})) {
-        _ = zgui.beginTooltip();
-        zgui.textUnformatted(
-            "How many resources a producer creates each cycle.",
-        );
-        zgui.endTooltip();
-    }
+fn productionRate(demo: *DemoState) void {
+    const title = "Production Rate";
+    const help = "How many resources a producer creates each cycle.";
+    infoButton(title, help);
+
     const pr = &demo.params.production_rate;
     const flags = .{ .v = pr, .min = 1, .max = 1000 };
     if (zgui.sliderScalar("##pr", u32, flags)) {
@@ -277,7 +291,7 @@ fn price(demo: *DemoState) void {
     }
 }
 
-fn max_producer_inventory(demo: *DemoState) void {
+fn maxProducerInventory(demo: *DemoState) void {
     zgui.text("Max Producer Inventory", .{});
     const mi = &demo.params.max_inventory;
     const flags = .{ .v = mi, .min = 10, .max = 10000 };

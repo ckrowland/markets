@@ -30,6 +30,7 @@ pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 40000;
 pub const NUM_CONSUMER_SIDES = 40;
 pub const PRODUCER_WIDTH = 40;
+pub const CONSUMER_RADIUS: f32 = 1.0;
 
 pub fn GPA(comptime ems: bool) type {
     if (ems) {
@@ -47,9 +48,24 @@ pub const DemoState = struct {
     push_coord_update: bool = false,
     push_restart: bool = false,
     content_scale: f32,
-    params: Parameters,
+    params: struct {
+        aspect: f32,
+        current_radian: f32 = 0,
+        max_num_stats: u32 = 3,
+        num_producers: u32 = 6,
+        num_consumers: Parameter,
+        production_rate: u32 = 300,
+        max_demand_rate: u32 = 100,
+        max_inventory: u32 = 10000,
+        moving_rate: f32 = 5.0,
+        consumer_radius: f32 = 1.0,
+        num_consumer_sides: u32 = 20,
+        consumer_income: u32 = 100,
+        plot_hovered: bool = false,
+        price: u32 = 1,
+    },
     stats: Statistics,
-    imgui_windows: [2]gui.FullPos,
+    imgui_windows: [3]gui.FullPos,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
         square: zgpu.RenderPipelineHandle,
@@ -80,54 +96,55 @@ pub const DemoState = struct {
     depth_texture_view: zgpu.TextureViewHandle,
 };
 
-pub const Parameters = struct {
-    aspect: f32,
-    max_num_stats: u32 = 3,
-    num_producers: u32 = 6,
-    num_consumers: u32 = 5000,
-    production_rate: u32 = 300,
-    max_demand_rate: u32 = 100,
-    max_inventory: u32 = 10000,
-    moving_rate: f32 = 5.0,
-    consumer_radius: f32 = 1.0,
-    num_consumer_sides: u32 = 20,
-    median_income: f32 = 0.01,
-    plot_hovered: bool = false,
-    price: u32 = 1,
-    consumer_incomes: [4]doubleXY(f64) = [_]doubleXY(f64){
-        doubleXY(f64).init(f64, 100, 0),
-        doubleXY(f64).init(f64, 200, 0),
-        doubleXY(f64).init(f64, 300, 0),
-        doubleXY(f64).init(f64, 400, 4000),
-    },
+pub const RADIAN_INCREMENT = 0.01;
+pub const RADIAN_END = 8 * std.math.pi;
+pub const Parameter = struct {
+    min: u32,
+    max: u32,
+    val: u32,
+    xv: std.ArrayList(f32),
+    yv: std.ArrayList(f32),
 
-    pub fn doubleXY(comptime T: type) type {
-        return struct {
-            old: struct { income: T, num: T },
-            new: struct { income: T, num: T },
-            num: u32 = 0,
+    pub fn init(alloc: std.mem.Allocator, min: u32, max: u32, val: u32) Parameter {
+        var xv = std.ArrayList(f32).init(alloc);
+        var yv = std.ArrayList(f32).init(alloc);
 
-            pub fn init(comptime Ti: type, income: Ti, num: Ti) doubleXY(Ti) {
-                return doubleXY(Ti){
-                    .old = .{ .income = income, .num = num },
-                    .new = .{ .income = income, .num = num },
-                };
-            }
+        const diff: f32 = @floatFromInt(max - min);
+        const middle = @ceil(diff / 2);
+        var radian: f32 = 0.0;
+        while (radian <= RADIAN_END) {
+            const y = middle + (middle * @sin(radian));
+            xv.append(radian) catch unreachable;
+            yv.append(y) catch unreachable;
+            radian += RADIAN_INCREMENT;
+        }
+
+        return .{
+            .min = min,
+            .max = max,
+            .val = val,
+            .xv = xv,
+            .yv = yv,
         };
     }
 
-    pub fn clearConsumerIncomesNum(self: *Parameters) void {
-        for (&self.consumer_incomes) |*ci| {
-            ci.num = 0;
-        }
+    pub fn getValueFromRadian(self: Parameter, radian: f32) u32 {
+        const diff: f32 = @floatFromInt(self.max - self.min);
+        const middle = @ceil(diff / 2);
+        return @intFromFloat(middle + (middle * @sin(radian)));
     }
 };
 
+pub fn updateRadian(rad: f32) f32 {
+    var next_radian = rad + RADIAN_INCREMENT;
+    if (next_radian > RADIAN_END) {
+        next_radian = @mod(next_radian, RADIAN_END);
+    }
+    return next_radian;
+}
+
 pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
-    const params = Parameters{
-        .aspect = Camera.getAspectRatio(gctx),
-    };
 
     const consumer_object = Wgpu.createObjectBuffer(
         allocator,
@@ -170,6 +187,7 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                     .num = 0,
                     .str = "0",
                 },
+                .visible = true,
             },
             .{
                 .pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } },
@@ -178,6 +196,16 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                     .num = 1,
                     .str = "1",
                 },
+                .visible = true,
+            },
+            .{
+                .pos = .{ .x = 0.25, .y = 0, .margin = .{ .left = false } },
+                .size = .{ .x = 0.75, .y = 0.75, .margin = .{ .left = false } },
+                .id = .{
+                    .num = 2,
+                    .str = "2",
+                },
+                .visible = true,
             },
         },
         .render_pipelines = .{
@@ -205,7 +233,7 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
                 .circle = Circle.createVertexBuffer(
                     gctx,
                     NUM_CONSUMER_SIDES,
-                    params.consumer_radius,
+                    CONSUMER_RADIUS,
                 ),
                 .square = Square.createVertexBuffer(gctx, PRODUCER_WIDTH),
             },
@@ -213,7 +241,10 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .depth_texture = depth.texture,
         .depth_texture_view = depth.view,
         .allocator = allocator,
-        .params = params,
+        .params = .{
+            .aspect = Camera.getAspectRatio(gctx),
+            .num_consumers = Parameter.init(allocator, 1, 10000, 5000),
+        },
         .stats = Statistics.init(allocator),
     };
 }
@@ -228,10 +259,14 @@ pub fn update(demo: *DemoState) void {
     Wgpu.runCallbackIfReady(Producer, &demo.buffers.data.producers.mapping);
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
 
-    // zgui.plot.showDemoWindow(null);
+    //zgui.plot.showDemoWindow(null);
     gui.update(demo);
 
     if (demo.running) {
+        const cr = demo.params.current_radian;
+        demo.params.current_radian = updateRadian(cr);
+        demo.params.num_consumers.val = demo.params.num_consumers.getValueFromRadian(cr);
+
         Statistics.generateAndFillRandomColor(demo);
         const current_time = @as(f32, @floatCast(demo.gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
@@ -409,9 +444,8 @@ pub fn restartSimulation(demo: *DemoState) void {
     Wgpu.clearObjBuffer(demo.gctx, Producer, &demo.buffers.data.producers);
     Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
-    demo.params.clearConsumerIncomesNum();
 
-    Statistics.setNum(demo, demo.params.num_consumers, .consumers);
+    Statistics.setNum(demo, demo.params.num_consumers.val, .consumers);
     Statistics.setNum(demo, demo.params.num_producers, .producers);
     Consumer.generateFromParams(demo);
     Producer.generateBulk(demo, demo.params.num_producers);
@@ -512,7 +546,7 @@ pub fn main() !void {
     errdefer stateDeinit(&state);
     defer if (!emscripten) deinit(&state);
 
-    Statistics.setNum(&state, state.params.num_consumers, .consumers);
+    Statistics.setNum(&state, state.params.num_consumers.val, .consumers);
     Statistics.setNum(&state, state.params.num_producers, .producers);
     Consumer.generateFromParams(&state);
     Producer.generateBulk(&state, state.params.num_producers);

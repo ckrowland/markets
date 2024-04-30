@@ -7,7 +7,6 @@ struct Consumer {
   step_size: vec2<f32>,
   moving_rate: f32,
   max_demand_rate: u32,
-  income_quartile: u32,
   income: u32,
   radius: f32,
   inventory: u32,

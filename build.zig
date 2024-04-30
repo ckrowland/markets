@@ -10,6 +10,7 @@ const zstbi = @import("libs/zstbi/build.zig");
 const editor = @import("src/resources/editor/build.zig");
 const random = @import("src/resources/random/build.zig");
 const income = @import("src/resources/income/build.zig");
+const variable = @import("src/resources/variable/build.zig");
 pub var zems_pkg: zems.Package = undefined;
 pub var zglfw_pkg: zglfw.Package = undefined;
 pub var zgpu_pkg: zgpu.Package = undefined;
@@ -47,10 +48,16 @@ pub fn build(b: *std.build.Builder) void {
         install_step = b.step("income-web", "Build income webpage");
         install_step.dependOn(&income_step.link_step.?.step);
         b.getInstallStep().dependOn(install_step);
+
+        const variable_step = buildEmscripten(b, options, variable.build(b, options));
+        install_step = b.step("income-web", "Build income webpage");
+        install_step.dependOn(&variable_step.link_step.?.step);
+        b.getInstallStep().dependOn(install_step);
     } else {
         install(b, editor.build(b, options), "editor");
         install(b, random.build(b, options), "random");
         install(b, income.build(b, options), "income");
+        install(b, variable.build(b, options), "variable");
     }
 }
 
