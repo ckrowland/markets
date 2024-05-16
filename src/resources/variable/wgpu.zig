@@ -15,18 +15,9 @@ pub const MAX_NUM_STRUCTS = 10000;
 
 // A mishmash of Wgpu initialization functions and buffer helpers for an array of generic structs
 // Data Types
-pub const GraphicsObject = struct {
-    render_pipeline: zgpu.RenderPipelineHandle,
-    attribute_buffer: zgpu.BufferHandle,
-    vertex_buffer: zgpu.BufferHandle,
-    index_buffer: zgpu.BufferHandle,
-    size_of_struct: u32,
-};
-
 pub fn ObjectBuffer(comptime T: type) type {
     return struct {
         buf: zgpu.BufferHandle,
-        list: std.ArrayList(T),
         mapping: MappingBuffer(T),
     };
 }
@@ -144,8 +135,8 @@ pub fn runCallbackIfReady(comptime T: type, buf: *MappingBuffer(T)) void {
     const request = buf.requests[buf.remove_idx];
     if (buf.waiting and buf.staging.ready) {
         buf.remove_idx = (buf.remove_idx + 1) % callback_queue_len;
-        request.func.?(request.args);
         buf.staging.buffer.unmap();
+        request.func.?(request.args);
         buf.staging.slice = null;
         buf.waiting = false;
         buf.staging.ready = false;
@@ -183,16 +174,6 @@ pub fn setArgs(comptime T: type) type {
         parameter: agentParameters(T),
     };
 }
-// pub fn setAll(gctx: *zgpu.GraphicsContext, comptime T: type, args: setArgs(T)) void {
-//     var agents = getAllAsync(T, Callbacks.clearConsumerHovers, .{
-//         .gctx = gctx,
-//         .buf = args.agents,
-//     });
-//     for (agents, 0..) |_, i| {
-//         setAgentParameter(T, &agents[i], args.parameter);
-//     }
-//     writeBuffer(gctx, args.agents.data, T, agents);
-// }
 
 pub fn writeBuffer(
     gctx: *zgpu.GraphicsContext,
@@ -201,110 +182,6 @@ pub fn writeBuffer(
     structs: []T,
 ) void {
     gctx.queue.writeBuffer(gctx.lookupResource(buf).?, 0, T, structs);
-}
-
-pub fn setAgentParameter(
-    comptime T: type,
-    agent: *T,
-    parameter: agentParameters(T),
-) void {
-    switch (T) {
-        Consumer => {
-            switch (parameter) {
-                .moving_rate => |v| agent.moving_rate = v,
-                .demand_rate => |v| agent.demand_rate = v,
-            }
-        },
-        Producer => {
-            switch (parameter) {
-                .production_rate => |v| agent.production_rate = v,
-                .inventory => |v| agent.inventory = v,
-                .max_inventory => |v| agent.max_inventory = v,
-            }
-        },
-        else => unreachable,
-    }
-}
-
-pub fn setGroupingArgs(comptime T: type) type {
-    return struct {
-        setArgs: setArgs(T),
-        grouping_id: u32,
-    };
-}
-//pub fn setGroup(gctx: *zgpu.GraphicsContext, comptime T: type, args: setGroupingArgs(T)) void {
-//    var agents = getAll(gctx, T, .{
-//        .structs = args.setArgs.agents,
-//        .num_structs = args.setArgs.num_structs,
-//    }) catch return;
-//    for (agents, 0..) |agent, i| {
-//        if (args.grouping_id == agent.grouping_id) {
-//            setAgentParameter(T, &agents[i], args.setArgs.parameter);
-//        }
-//    }
-//    writeBuffer(gctx, args.setArgs.agents.data, T, agents);
-//}
-
-pub fn updateCoords(gctx: *zgpu.GraphicsContext, comptime T: type, obj_buf: ObjectBuffer(T)) void {
-    for (obj_buf.list.items, 0..) |obj, i| {
-        const args: bufArgs(T, [4]f32) = .{
-            .obj_buf = obj_buf,
-            .index = i,
-            .value = Camera.getWorldPosition(gctx, obj.absolute_home),
-        };
-        writeToObjectBuffer(gctx, T, [4]f32, "home", args);
-
-        if (T == Consumer) {
-            writeToObjectBuffer(gctx, T, [4]f32, "position", args);
-            writeToObjectBuffer(gctx, T, [4]f32, "destination", args);
-        }
-    }
-}
-
-pub fn bufArgs(comptime T: type, comptime V: type) type {
-    return struct {
-        obj_buf: ObjectBuffer(T),
-        index: usize,
-        value: V,
-    };
-}
-pub fn writeToObjectBuffer(
-    gctx: *Gctx,
-    comptime T: type,
-    comptime V: type,
-    comptime field: []const u8,
-    args: bufArgs(T, V),
-) void {
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(args.obj_buf.buf).?,
-        args.index * @sizeOf(T) + @offsetOf(T, field),
-        V,
-        &.{args.value},
-    );
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(args.obj_buf.mapping.buf).?,
-        args.index * @sizeOf(T) + @offsetOf(T, field),
-        V,
-        &.{args.value},
-    );
-}
-
-pub fn writeToMappedBuffer(gctx: *Gctx, buf: zgpu.BufferHandle, mapped: zgpu.BufferHandle) void {
-    const commands = commands: {
-        const encoder = gctx.device.createCommandEncoder(null);
-        defer encoder.release();
-
-        pass: {
-            const p = gctx.lookupResource(buf) orelse break :pass;
-            const p_info = gctx.lookupResourceInfo(buf) orelse break :pass;
-            const pm = gctx.lookupResource(mapped) orelse break :pass;
-            const p_size = @as(usize, @intCast(p_info.size));
-            encoder.copyBufferToBuffer(p, 0, pm, 0, p_size);
-        }
-        break :commands encoder.finish(null);
-    };
-    defer commands.release();
-    gctx.submit(&.{commands});
 }
 
 pub fn shrinkBuffer(
@@ -375,7 +252,6 @@ pub fn clearObjBuffer(gctx: *Gctx, comptime T: type, obj_buf: *ObjectBuffer(T)) 
         all_zero[0..m_size],
     );
 
-    obj_buf.list.clearAndFree();
     obj_buf.mapping.insert_idx = 0;
     obj_buf.mapping.remove_idx = 0;
     obj_buf.mapping.waiting = false;
@@ -409,7 +285,6 @@ pub fn createMappedBuffer(
 }
 
 pub fn createObjectBuffer(
-    allocator: std.mem.Allocator,
     gctx: *Gctx,
     comptime T: type,
     len: u32,
@@ -417,7 +292,6 @@ pub fn createObjectBuffer(
 ) ObjectBuffer(T) {
     return .{
         .buf = createBuffer(gctx, T, len),
-        .list = std.ArrayList(T).init(allocator),
         .mapping = .{
             .buf = createMappedBuffer(gctx, T, len),
             .num_structs = num_structs,

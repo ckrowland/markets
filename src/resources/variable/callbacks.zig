@@ -1,10 +1,11 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const Wgpu = @import("wgpu.zig");
+const Camera = @import("camera.zig");
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
 const Statistics = @import("statistics.zig");
+const Wgpu = @import("wgpu.zig");
 
 pub fn Args(comptime T: type) type {
     return struct {
@@ -56,7 +57,39 @@ pub fn consumerStats(args: Args(Consumer)) void {
             total_balance += c.balance;
         }
     }
-    const len: u32 = @intCast(args.buf.list.items.len + 1);
+    const len: u32 = @intCast(args.buf.mapping.num_structs + 1);
     const avg_balance = total_balance / len;
     args.stats.avg_consumer_balance.append(avg_balance) catch unreachable;
+}
+
+pub fn updateProducerCoords(args: Args(Producer)) void {
+    const slice = args.buf.mapping.staging.slice;
+
+    if (slice) |producers| {
+        for (producers, 0..) |p, i| {
+            const new_coord = Camera.getWorldPosition(args.gctx, p.absolute_home);
+            const buf = args.gctx.lookupResource(args.buf.buf).?;
+            const offset = i * @sizeOf(Producer) + @offsetOf(Producer, "home");
+            args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
+        }
+    }
+}
+
+pub fn updateConsumerCoords(args: Args(Consumer)) void {
+    const slice = args.buf.mapping.staging.slice;
+
+    if (slice) |consumers| {
+        for (consumers, 0..) |c, i| {
+            const new_coord = Camera.getWorldPosition(args.gctx, c.absolute_home);
+            const buf = args.gctx.lookupResource(args.buf.buf).?;
+            var offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "home");
+            args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
+
+            offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "position");
+            args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
+
+            offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "destination");
+            args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
+        }
+    }
 }

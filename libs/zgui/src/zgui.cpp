@@ -2483,6 +2483,14 @@ ZGUI_API void zguiPlot_PlotText(
     ImPlot::PlotText(text, x, y, p, flags);
 }
 
+ZGUI_API void zguiPlot_GetLastItemColor(float color[4]) {
+  const ImVec4 col = ImPlot::GetLastItemColor();
+  color[0] = col.x;
+  color[1] = col.y;
+  color[2] = col.z;
+  color[3] = col.w;
+}
+
 ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
     ImPlot::ShowDemoWindow(p_open);
 }

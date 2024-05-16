@@ -1578,6 +1578,7 @@ void PlotLineEx(const char* label_id, const _Getter& getter, ImPlotLineFlags fla
             }
             if (s.RenderLine) {
                 const ImU32 col_line = ImGui::GetColorU32(s.Colors[ImPlotCol_Line]);
+                ImVec4 col = GetLastItemColor();
                 if (ImHasFlag(flags,ImPlotLineFlags_Segments)) {
                     RenderPrimitives1<RendererLineSegments1>(getter,col_line,s.LineWeight);
                 }

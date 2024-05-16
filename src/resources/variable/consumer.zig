@@ -31,14 +31,6 @@ grouping_id: u32 = 0,
 _padding0: u32 = 0,
 
 pub const z_pos = 0;
-pub fn generateFromParams(demo: *DemoState) void {
-    const num = demo.params.num_consumers.val;
-    for (0..num) |_| {
-        const c = createNewConsumer(demo);
-        appendConsumer(demo, c);
-    }
-}
-
 pub fn generateBulk(demo: *DemoState, num: u32) void {
     for (0..num) |_| {
         const c = createNewConsumer(demo);
@@ -48,7 +40,7 @@ pub fn generateBulk(demo: *DemoState, num: u32) void {
 pub fn createNewConsumer(demo: *DemoState) Self {
     const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
     const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
-    const f_x = @as(f32, @floatFromInt(x)) * demo.params.aspect;
+    const f_x = @as(f32, @floatFromInt(x)) * demo.aspect;
     const f_y = @as(f32, @floatFromInt(y));
     const home = [4]f32{ f_x, f_y, z_pos, 1 };
     return .{
@@ -56,9 +48,9 @@ pub fn createNewConsumer(demo: *DemoState) Self {
         .position = home,
         .home = home,
         .destination = home,
-        .income = demo.params.consumer_income,
-        .moving_rate = demo.params.moving_rate,
-        .max_demand_rate = demo.params.max_demand_rate,
+        .income = demo.params.income.val,
+        .moving_rate = demo.params.moving_rate.val,
+        .max_demand_rate = demo.params.max_demand_rate.val,
     };
 }
 
@@ -66,11 +58,10 @@ pub fn appendConsumer(demo: *DemoState, c: Self) void {
     const obj_buf = &demo.buffers.data.consumers;
     var consumers: [1]Self = .{c};
     Wgpu.appendBuffer(demo.gctx, Self, .{
-        .num_old_structs = @as(u32, @intCast(obj_buf.list.items.len)),
+        .num_old_structs = obj_buf.mapping.num_structs,
         .buf = obj_buf.buf,
         .structs = consumers[0..],
     });
-    obj_buf.list.append(c) catch unreachable;
     obj_buf.mapping.num_structs += 1;
 }
 
@@ -87,7 +78,8 @@ pub fn setParamAll(
     std.debug.assert(field_type == T);
 
     const struct_offset = @offsetOf(Self, tag);
-    for (demo.buffers.data.consumers.list.items, 0..) |_, i| {
+    const num_structs = demo.buffers.data.consumers.mapping.num_structs;
+    for (0..num_structs) |i| {
         const offset = i * @sizeOf(Self) + struct_offset;
         demo.gctx.queue.writeBuffer(resource, offset, field_type, &.{num});
     }

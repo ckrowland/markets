@@ -9,9 +9,9 @@ const zm = @import("zmath");
 const zstbi = @import("zstbi");
 const zems = @import("zems");
 const Statistics = @import("statistics.zig");
-const gui = @import("gui.zig");
+const Gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
-const config = @import("config.zig");
+const Config = @import("config.zig");
 const Consumer = @import("consumer.zig");
 const Producer = @import("producer.zig");
 const Camera = @import("camera.zig");
@@ -40,32 +40,62 @@ pub fn GPA(comptime ems: bool) type {
     }
 }
 
+pub const Parameters = struct {
+    sample_idx: usize = 0,
+    radian: f64 = 0,
+    num_consumers: Gui.Variable(u32),
+    num_producers: Gui.Variable(u32),
+
+    max_num_stats: u32 = 3,
+    production_rate: Gui.Slider(u32) = Gui.Slider(u32).init(1, 300, 1000),
+    max_demand_rate: Gui.Slider(u32) = Gui.Slider(u32).init(1, 100, 1000),
+    max_inventory: Gui.Slider(u32) = Gui.Slider(u32).init(100, 10000, 10000),
+    moving_rate: Gui.Slider(f32) = Gui.Slider(f32).init(1, 5, 20),
+    consumer_size: Gui.Slider(f32) = Gui.Slider(f32).init(1, 1, 3),
+    num_consumer_sides: u32 = 20,
+    income: Gui.Slider(u32) = Gui.Slider(u32).init(1, 100, 500),
+    plot_hovered: bool = false,
+    price: Gui.Slider(u32) = Gui.Slider(u32).init(1, 1, 1000),
+};
+
 pub var state: DemoState = undefined;
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
+    aspect: f32,
     allocator: std.mem.Allocator,
     running: bool = false,
     push_coord_update: bool = false,
     push_restart: bool = false,
     content_scale: f32,
-    params: struct {
-        aspect: f32,
-        current_radian: f32 = 0,
-        max_num_stats: u32 = 3,
-        num_producers: u32 = 6,
-        num_consumers: Parameter,
-        production_rate: u32 = 300,
-        max_demand_rate: u32 = 100,
-        max_inventory: u32 = 10000,
-        moving_rate: f32 = 5.0,
-        consumer_radius: f32 = 1.0,
-        num_consumer_sides: u32 = 20,
-        consumer_income: u32 = 100,
-        plot_hovered: bool = false,
-        price: u32 = 1,
+    imgui_windows: [3]Gui.Window = .{
+        .{
+            .pos = .{ .x = 0, .y = 0 },
+            .size = .{ .x = 0.25, .y = 0.75 },
+            .num_id = 0,
+            .str_id = "0",
+            .visible = true,
+            .func = Gui.parameters,
+        },
+        .{
+            .pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } },
+            .size = .{ .x = 1, .y = 0.25, .margin = .{ .top = false } },
+            .num_id = 1,
+            .str_id = "1",
+            .visible = true,
+            .func = Gui.plots,
+        },
+        .{
+            .pos = .{ .x = 0.25, .y = 0, .margin = .{ .left = false } },
+            .size = .{ .x = 0.75, .y = 0.75, .margin = .{ .left = false } },
+            .num_id = 2,
+            .str_id = "2",
+            .visible = true,
+            .func = Gui.timeline,
+        },
     },
+    comptime sliders: Gui.SlidersInfo = .{},
+    params: Parameters,
     stats: Statistics,
-    imgui_windows: [3]gui.FullPos,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
         square: zgpu.RenderPipelineHandle,
@@ -96,58 +126,10 @@ pub const DemoState = struct {
     depth_texture_view: zgpu.TextureViewHandle,
 };
 
-pub const RADIAN_INCREMENT = 0.01;
-pub const RADIAN_END = 8 * std.math.pi;
-pub const Parameter = struct {
-    min: u32,
-    max: u32,
-    val: u32,
-    xv: std.ArrayList(f32),
-    yv: std.ArrayList(f32),
-
-    pub fn init(alloc: std.mem.Allocator, min: u32, max: u32, val: u32) Parameter {
-        var xv = std.ArrayList(f32).init(alloc);
-        var yv = std.ArrayList(f32).init(alloc);
-
-        const diff: f32 = @floatFromInt(max - min);
-        const middle = @ceil(diff / 2);
-        var radian: f32 = 0.0;
-        while (radian <= RADIAN_END) {
-            const y = middle + (middle * @sin(radian));
-            xv.append(radian) catch unreachable;
-            yv.append(y) catch unreachable;
-            radian += RADIAN_INCREMENT;
-        }
-
-        return .{
-            .min = min,
-            .max = max,
-            .val = val,
-            .xv = xv,
-            .yv = yv,
-        };
-    }
-
-    pub fn getValueFromRadian(self: Parameter, radian: f32) u32 {
-        const diff: f32 = @floatFromInt(self.max - self.min);
-        const middle = @ceil(diff / 2);
-        return @intFromFloat(middle + (middle * @sin(radian)));
-    }
-};
-
-pub fn updateRadian(rad: f32) f32 {
-    var next_radian = rad + RADIAN_INCREMENT;
-    if (next_radian > RADIAN_END) {
-        next_radian = @mod(next_radian, RADIAN_END);
-    }
-    return next_radian;
-}
-
 pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
 
     const consumer_object = Wgpu.createObjectBuffer(
-        allocator,
         gctx,
         Consumer,
         MAX_NUM_CONSUMERS,
@@ -155,7 +137,6 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     );
 
     const producer_object = Wgpu.createObjectBuffer(
-        allocator,
         gctx,
         Producer,
         MAX_NUM_PRODUCERS,
@@ -163,7 +144,6 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     );
 
     const stats_object = Wgpu.createObjectBuffer(
-        allocator,
         gctx,
         u32,
         Statistics.NUM_STATS,
@@ -178,43 +158,15 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     return DemoState{
         .gctx = gctx,
+        .aspect = Camera.getAspectRatio(gctx),
         .content_scale = getContentScale(gctx),
-        .imgui_windows = .{
-            .{
-                .pos = .{ .x = 0, .y = 0 },
-                .size = .{ .x = 0.25, .y = 0.75 },
-                .id = .{
-                    .num = 0,
-                    .str = "0",
-                },
-                .visible = true,
-            },
-            .{
-                .pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } },
-                .size = .{ .x = 1, .y = 0.25, .margin = .{ .top = false } },
-                .id = .{
-                    .num = 1,
-                    .str = "1",
-                },
-                .visible = true,
-            },
-            .{
-                .pos = .{ .x = 0.25, .y = 0, .margin = .{ .left = false } },
-                .size = .{ .x = 0.75, .y = 0.75, .margin = .{ .left = false } },
-                .id = .{
-                    .num = 2,
-                    .str = "2",
-                },
-                .visible = true,
-            },
-        },
         .render_pipelines = .{
-            .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
-            .square = Wgpu.createRenderPipeline(gctx, config.ppi),
+            .circle = Wgpu.createRenderPipeline(gctx, Config.cpi),
+            .square = Wgpu.createRenderPipeline(gctx, Config.ppi),
         },
         .compute_pipelines = .{
-            .producer = Wgpu.createComputePipeline(gctx, config.pcpi),
-            .consumer = Wgpu.createComputePipeline(gctx, config.ccpi),
+            .producer = Wgpu.createComputePipeline(gctx, Config.pcpi),
+            .consumer = Wgpu.createComputePipeline(gctx, Config.ccpi),
         },
         .bind_groups = .{
             .render = Wgpu.createUniformBindGroup(gctx),
@@ -242,8 +194,14 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .depth_texture_view = depth.view,
         .allocator = allocator,
         .params = .{
-            .aspect = Camera.getAspectRatio(gctx),
-            .num_consumers = Parameter.init(allocator, 1, 10000, 5000),
+            .num_consumers = .{
+                .slider = Gui.Slider(u32).init(0, 5000, 10000),
+                .wave = Gui.Wave.init(allocator, 5000, 8000, 10),
+            },
+            .num_producers = .{
+                .slider = Gui.Slider(u32).init(1, 6, 100),
+                .wave = Gui.Wave.init(allocator, 30, 50, 0.1),
+            },
         },
         .stats = Statistics.init(allocator),
     };
@@ -260,12 +218,10 @@ pub fn update(demo: *DemoState) void {
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
 
     //zgui.plot.showDemoWindow(null);
-    gui.update(demo);
+    Gui.update(demo);
 
     if (demo.running) {
-        const cr = demo.params.current_radian;
-        demo.params.current_radian = updateRadian(cr);
-        demo.params.num_consumers.val = demo.params.num_consumers.getValueFromRadian(cr);
+        Gui.updateWaves(demo);
 
         Statistics.generateAndFillRandomColor(demo);
         const current_time = @as(f32, @floatCast(demo.gctx.stats.time));
@@ -291,8 +247,8 @@ pub fn draw(demo: *DemoState) void {
         defer encoder.release();
 
         const data = demo.buffers.data;
-        const num_consumers = @as(u32, @intCast(data.consumers.list.items.len));
-        const num_producers = @as(u32, @intCast(data.producers.list.items.len));
+        const num_consumers = data.consumers.mapping.num_structs;
+        const num_producers = data.producers.mapping.num_structs;
 
         // Compute shaders
         if (demo.running) {
@@ -445,10 +401,12 @@ pub fn restartSimulation(demo: *DemoState) void {
     Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
 
-    Statistics.setNum(demo, demo.params.num_consumers.val, .consumers);
-    Statistics.setNum(demo, demo.params.num_producers, .producers);
-    Consumer.generateFromParams(demo);
-    Producer.generateBulk(demo, demo.params.num_producers);
+    const num_consumers = state.params.num_consumers.slider.val;
+    const num_producers = state.params.num_producers.slider.val;
+    Statistics.setNum(demo, num_consumers, .consumers);
+    Statistics.setNum(demo, num_producers, .producers);
+    Consumer.generateBulk(demo, num_consumers);
+    Producer.generateBulk(demo, num_producers);
     demo.stats.clear();
     demo.push_restart = false;
 }
@@ -472,10 +430,14 @@ pub fn updateAspectRatio(demo: *DemoState) void {
         demo.push_coord_update = true;
         return;
     }
-    Wgpu.updateCoords(demo.gctx, Consumer, demo.buffers.data.consumers);
-    Wgpu.updateCoords(demo.gctx, Producer, demo.buffers.data.producers);
+    //Wgpu.updateCoords(demo.gctx, Consumer, demo.buffers.data.consumers);
+    //Wgpu.updateCoords(demo.gctx, Producer, demo.buffers.data.producers);
+
+    Wgpu.getAllAsync(demo, Consumer, Callbacks.updateConsumerCoords);
+    //Wgpu.getAllAsync(demo, Producer, Callbacks.updateProducerCoords);
+
     demo.push_coord_update = false;
-    demo.params.aspect = Camera.getAspectRatio(demo.gctx);
+    demo.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
 fn getContentScale(gctx: *zgpu.GraphicsContext) f32 {
@@ -492,9 +454,6 @@ fn setImguiContentScale(scale: f32) void {
 pub fn stateDeinit(demo: *DemoState) void {
     demo.gctx.destroy(demo.allocator);
     demo.stats.deinit();
-    demo.buffers.data.consumers.list.deinit();
-    demo.buffers.data.producers.list.deinit();
-    demo.buffers.data.stats.list.deinit();
     demo.* = undefined;
 }
 
@@ -508,10 +467,7 @@ fn deinit(demo: *DemoState) void {
 }
 
 pub fn main() !void {
-    zglfw.init() catch {
-        std.log.err("Failed to initialize GLFW library.", .{});
-        return;
-    };
+    try zglfw.init();
     errdefer zglfw.terminate();
 
     // Change current working directory to where the executable is located.
@@ -546,10 +502,27 @@ pub fn main() !void {
     errdefer stateDeinit(&state);
     defer if (!emscripten) deinit(&state);
 
-    Statistics.setNum(&state, state.params.num_consumers.val, .consumers);
-    Statistics.setNum(&state, state.params.num_producers, .producers);
-    Consumer.generateFromParams(&state);
-    Producer.generateBulk(&state, state.params.num_producers);
+    const num_consumers = state.params.num_consumers.slider.val;
+    const num_producers = state.params.num_producers.slider.val;
+    Statistics.setNum(&state, num_consumers, .consumers);
+    Statistics.setNum(&state, num_producers, .producers);
+    Consumer.generateBulk(&state, num_consumers);
+    Producer.generateBulk(&state, num_producers);
+
+    const params = &state.params;
+    inline for (@typeInfo(@TypeOf(params.*)).Struct.fields) |field| {
+        switch (field.type) {
+            Gui.Slider(u32), Gui.Slider(f32) => {
+                const f = &@field(params, field.name);
+                f.ptr = &f.val;
+            },
+            Gui.Variable(u32), Gui.Variable(f32) => {
+                const f = &@field(params, field.name).slider;
+                f.ptr = &f.val;
+            },
+            else => {},
+        }
+    }
 
     zgui.init(allocator);
     errdefer zgui.deinit();

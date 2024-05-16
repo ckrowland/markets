@@ -210,6 +210,13 @@ extern fn zguiPlot_PushStyleVar1f(idx: StyleVar, v: f32) void;
 extern fn zguiPlot_PushStyleVar2f(idx: StyleVar, v: *const [2]f32) void;
 extern fn zguiPlot_PopStyleVar(count: i32) void;
 //--------------------------------------------------------------------------------------------------
+pub fn getLastItemColor() [4]f32 {
+    var color: [4]f32 = undefined;
+    zguiPlot_GetLastItemColor(&color);
+    return color;
+}
+extern fn zguiPlot_GetLastItemColor(color: *[4]f32) void;
+//----------------------------------------------------------------------------------------------
 pub const PlotLocation = packed struct(u32) {
     north: bool = false,
     south: bool = false,

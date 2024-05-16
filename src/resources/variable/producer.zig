@@ -49,13 +49,13 @@ pub fn generateBulk(demo: *DemoState, num: u32) void {
             .producer = .{
                 .absolute_home = .{ x, y },
                 .home = [2]f32{
-                    @as(f32, @floatFromInt(x)) * demo.params.aspect,
+                    @as(f32, @floatFromInt(x)) * demo.aspect,
                     @as(f32, @floatFromInt(y)),
                 },
-                .production_rate = demo.params.production_rate,
-                .inventory = @as(i32, @intCast(demo.params.max_inventory)),
-                .max_inventory = demo.params.max_inventory,
-                .price = demo.params.price,
+                .production_rate = demo.params.production_rate.val,
+                .inventory = @as(i32, @intCast(demo.params.max_inventory.val)),
+                .max_inventory = demo.params.max_inventory.val,
+                .price = demo.params.price.val,
             },
         });
         i += 1;
@@ -81,11 +81,10 @@ pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
         },
     };
     Wgpu.appendBuffer(gctx, Self, .{
-        .num_old_structs = @as(u32, @intCast(args.obj_buf.list.items.len)),
+        .num_old_structs = args.obj_buf.mapping.num_structs,
         .buf = args.obj_buf.buf,
         .structs = producers[0..],
     });
-    args.obj_buf.list.append(producers[0]) catch unreachable;
     args.obj_buf.mapping.num_structs += 1;
 }
 
@@ -102,7 +101,8 @@ pub fn setParamAll(
     std.debug.assert(field_type == T);
 
     const struct_offset = @offsetOf(Self, tag);
-    for (demo.buffers.data.producers.list.items, 0..) |_, i| {
+    const num_structs = demo.buffers.data.producers.mapping.num_structs;
+    for (0..num_structs) |i| {
         const offset = i * @sizeOf(Self) + struct_offset;
         demo.gctx.queue.writeBuffer(resource, offset, field_type, &.{num});
     }
