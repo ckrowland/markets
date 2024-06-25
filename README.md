@@ -26,7 +26,6 @@ Mac and Windows apps coming soon.
 
 ## Resource Editor
 [editor.webm](https://github.com/ckrowland/simulations/assets/95145274/2c21762f-0dd2-4a00-8d2e-0aad38e83c78)
-
 - Manually place position of consumers and producers.
 - Each producer and consumer grouping has individual parameters.
 
@@ -35,6 +34,7 @@ Mac and Windows apps coming soon.
 - Controls consumer incomes with four distinct groups.
 
 ## Variable Parameters
+[variable.webm](https://github.com/ckrowland/simulations/assets/95145274/b7e97f85-6828-42fe-827d-af6ee2bdb049)
 - Very similiar to the random simulation.
 - Have input parameters controlled via a wave timeline.
 
