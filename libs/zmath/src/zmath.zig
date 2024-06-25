@@ -792,7 +792,7 @@ pub inline fn min(v0: anytype, v1: anytype) @TypeOf(v0, v1) {
 }
 test "zmath.min" {
     // Calling math.inf causes test to fail!
-    if (builtin.target.os.tag == .macos) return error.SkipZigTest;
+    if (builtin.target.os.tag == .macos and builtin.target.cpu.arch == .aarch64) return error.SkipZigTest;
     {
         const v0 = f32x4(1.0, 3.0, 2.0, 7.0);
         const v1 = f32x4(2.0, 1.0, 4.0, math.inf(f32));
@@ -836,7 +836,7 @@ pub inline fn max(v0: anytype, v1: anytype) @TypeOf(v0, v1) {
 }
 test "zmath.max" {
     // Calling math.inf causes test to fail!
-    if (builtin.target.os.tag == .macos) return error.SkipZigTest;
+    if (builtin.target.os.tag == .macos and builtin.target.cpu.arch == .aarch64) return error.SkipZigTest;
     {
         const v0 = f32x4(1.0, 3.0, 2.0, 7.0);
         const v1 = f32x4(2.0, 1.0, 4.0, math.inf(f32));
@@ -1250,7 +1250,7 @@ pub inline fn clamp(v: anytype, vmin: anytype, vmax: anytype) @TypeOf(v, vmin, v
 }
 test "zmath.clamp" {
     // Calling math.inf causes test to fail!
-    if (builtin.target.os.tag == .macos) return error.SkipZigTest;
+    if (builtin.target.os.tag == .macos and builtin.target.cpu.arch == .aarch64) return error.SkipZigTest;
     {
         const v0 = f32x4(-1.0, 0.2, 1.1, -0.3);
         const v = clamp(v0, splat(F32x4, -0.5), splat(F32x4, 0.5));
@@ -1294,7 +1294,7 @@ pub inline fn saturate(v: anytype) @TypeOf(v) {
 }
 test "zmath.saturate" {
     // Calling math.inf causes test to fail!
-    if (builtin.target.os.tag == .macos) return error.SkipZigTest;
+    if (builtin.target.os.tag == .macos and builtin.target.cpu.arch == .aarch64) return error.SkipZigTest;
     {
         const v0 = f32x4(-1.0, 0.2, 1.1, -0.3);
         const v = saturate(v0);
@@ -2265,12 +2265,12 @@ pub fn lookToLh(eyepos: Vec, eyedir: Vec, updir: Vec) Mat {
     const az = normalize3(eyedir);
     const ax = normalize3(cross3(updir, az));
     const ay = normalize3(cross3(az, ax));
-    return transpose(.{
-        f32x4(ax[0], ax[1], ax[2], -dot3(ax, eyepos)[0]),
-        f32x4(ay[0], ay[1], ay[2], -dot3(ay, eyepos)[0]),
-        f32x4(az[0], az[1], az[2], -dot3(az, eyepos)[0]),
-        f32x4(0.0, 0.0, 0.0, 1.0),
-    });
+    return .{
+        f32x4(ax[0], ay[0], az[0], 0),
+        f32x4(ax[1], ay[1], az[1], 0),
+        f32x4(ax[2], ay[2], az[2], 0),
+        f32x4(-dot3(ax, eyepos)[0], -dot3(ay, eyepos)[0], -dot3(az, eyepos)[0], 1.0),
+    };
 }
 pub fn lookToRh(eyepos: Vec, eyedir: Vec, updir: Vec) Mat {
     return lookToLh(eyepos, -eyedir, updir);
@@ -3089,11 +3089,11 @@ pub fn quatToRollPitchYaw(q: Quat) [3]f32 {
     const singularity = p[0] * p[2] + sign * p[1] * p[3];
     if (singularity > 0.499) {
         angles[0] = math.pi * 0.5;
-        angles[1] = 2.0 * math.atan2(f32, p[1], p[0]);
+        angles[1] = 2.0 * math.atan2(p[1], p[0]);
         angles[2] = 0.0;
     } else if (singularity < -0.499) {
         angles[0] = -math.pi * 0.5;
-        angles[1] = 2.0 * math.atan2(f32, p[1], p[0]);
+        angles[1] = 2.0 * math.atan2(p[1], p[0]);
         angles[2] = 0.0;
     } else {
         const sq = p * p;

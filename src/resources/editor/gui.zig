@@ -65,7 +65,7 @@ pub fn update(demo: *DemoState) !void {
     });
 
     hoverUpdate(gctx, demo);
-    if (!demo.popups.anyOpen() and Mouse.onGrid(gctx)) {
+    if (!demo.popups.anyOpen() and Mouse.onGrid(demo)) {
         _ = switch (demo.gui.selection) {
             .none => {},
             .consumer => {

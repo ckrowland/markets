@@ -1,47 +1,55 @@
 const std = @import("std");
 const Options = @import("../../../build.zig").Options;
-const content_dir = "./content/";
 
-pub fn build(b: *std.Build, options: Options) *std.Build.CompileStep {
-    const exe_desc = .{
-        .name = "exe",
-        .root_source_file = .{ .path = thisDir() ++ "/main.zig" },
+pub fn build(b: *std.Build, options: Options) *std.Build.Step.Compile {
+    const exe = b.addExecutable(.{
+        .name = "Simulations",
+        .root_source_file = b.path("src/resources/random/main.zig"),
         .target = options.target,
         .optimize = options.optimize,
-    };
+    });
+    @import("system_sdk").addLibraryPathsTo(exe);
 
-    const emscripten = options.target.getOsTag() == .emscripten;
-    var exe: *std.Build.CompileStep = undefined;
-    if (emscripten) {
-        exe = b.addStaticLibrary(exe_desc);
-    } else {
-        exe = b.addExecutable(exe_desc);
-    }
+    const zglfw = b.dependency("zglfw", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zglfw", zglfw.module("root"));
+    exe.linkLibrary(zglfw.artifact("glfw"));
 
-    const zems_pkg = @import("../../../build.zig").zems_pkg;
-    const zglfw_pkg = @import("../../../build.zig").zglfw_pkg;
-    const zgpu_pkg = @import("../../../build.zig").zgpu_pkg;
-    const zgui_pkg = @import("../../../build.zig").zgui_glfw_wgpu_pkg;
-    const zmath_pkg = @import("../../../build.zig").zmath_pkg;
-    const zpool_pkg = @import("../../../build.zig").zpool_pkg;
-    const zstbi_pkg = @import("../../../build.zig").zstbi_pkg;
+    @import("zgpu").addLibraryPathsTo(exe);
+    const zgpu = b.dependency("zgpu", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zgpu", zgpu.module("root"));
+    exe.linkLibrary(zgpu.artifact("zdawn"));
 
-    zems_pkg.link(exe);
-    zglfw_pkg.link(exe);
-    zgpu_pkg.link(exe);
-    zgui_pkg.link(exe);
-    zmath_pkg.link(exe);
-    zpool_pkg.link(exe);
-    zstbi_pkg.link(exe);
+    const zmath = b.dependency("zmath", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zmath", zmath.module("root"));
 
-    const exe_options = b.addOptions();
-    exe.addOptions("build_options", exe_options);
-    exe_options.addOption([]const u8, "content_dir", content_dir);
+    const zgui = b.dependency("zgui", .{
+        .target = options.target,
+        .backend = .glfw_wgpu,
+    });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
+
+    const zpool = b.dependency("zpool", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zpool", zpool.module("root"));
+
+    const zstbi = b.dependency("zstbi", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zstbi", zstbi.module("root"));
+    exe.linkLibrary(zstbi.artifact("zstbi"));
 
     const install_content_step = b.addInstallDirectory(.{
-        .source_dir = .{ .path = thisDir() ++ "/../../../" ++ content_dir },
+        .source_dir = b.path("content"),
         .install_dir = .{ .custom = "" },
-        .install_subdir = "bin/" ++ content_dir,
+        .install_subdir = "bin/content",
     });
     exe.step.dependOn(&install_content_step.step);
 

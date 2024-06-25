@@ -30,6 +30,12 @@ pub fn getTranslationVec(m: zm.Mat) zm.Vec {
     return translation;
 }
 
+pub fn setTranslationVec(m: *zm.Mat, translation: zm.Vec) void {
+    const w = m[3][3];
+    m[3] = translation;
+    m[3][3] = w;
+}
+
 pub fn getScaleVec(m: zm.Mat) zm.Vec {
     const scale_x = zm.length3(zm.f32x4(m[0][0], m[1][0], m[2][0], 0))[0];
     const scale_y = zm.length3(zm.f32x4(m[0][1], m[1][1], m[2][1], 0))[0];
@@ -105,7 +111,7 @@ test "zmath.util.mat.z_vec" {
     var identity = zm.identity();
     var z_vec = getAxisZ(identity);
     try expect(zm.approxEqAbs(z_vec, zm.f32x4(0.0, 0.0, 1.0, 0), 0.0001));
-    const rot_yaw = zm.rotationY(degToRad(f32, 90));
+    const rot_yaw = zm.rotationY(degToRad(90));
     identity = zm.mul(identity, rot_yaw);
     z_vec = getAxisZ(identity);
     try expect(zm.approxEqAbs(z_vec, zm.f32x4(1.0, 0.0, 0.0, 0), 0.0001));
@@ -116,11 +122,11 @@ test "zmath.util.mat.y_vec" {
     var identity = zm.identity();
     var y_vec = getAxisY(identity);
     try expect(zm.approxEqAbs(y_vec, zm.f32x4(0.0, 1.0, 0.0, 0), 0.01));
-    const rot_yaw = zm.rotationY(degToRad(f32, 90));
+    const rot_yaw = zm.rotationY(degToRad(90));
     identity = zm.mul(identity, rot_yaw);
     y_vec = getAxisY(identity);
     try expect(zm.approxEqAbs(y_vec, zm.f32x4(0.0, 1.0, 0.0, 0), 0.01));
-    const rot_pitch = zm.rotationX(degToRad(f32, 90));
+    const rot_pitch = zm.rotationX(degToRad(90));
     identity = zm.mul(identity, rot_pitch);
     y_vec = getAxisY(identity);
     try expect(zm.approxEqAbs(y_vec, zm.f32x4(0.0, 0.0, 1.0, 0), 0.01));
@@ -131,11 +137,11 @@ test "zmath.util.mat.right" {
     var identity = zm.identity();
     var right = getAxisX(identity);
     try expect(zm.approxEqAbs(right, zm.f32x4(1.0, 0.0, 0.0, 0), 0.01));
-    const rot_yaw = zm.rotationY(degToRad(f32, 90));
+    const rot_yaw = zm.rotationY(degToRad(90));
     identity = zm.mul(identity, rot_yaw);
     right = getAxisX(identity);
     try expect(zm.approxEqAbs(right, zm.f32x4(0.0, 0.0, -1.0, 0), 0.01));
-    const rot_pitch = zm.rotationX(degToRad(f32, 90));
+    const rot_pitch = zm.rotationX(degToRad(90));
     identity = zm.mul(identity, rot_pitch);
     right = getAxisX(identity);
     try expect(zm.approxEqAbs(right, zm.f32x4(0.0, 1.0, 0.0, 0), 0.01));

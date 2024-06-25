@@ -1,116 +1,42 @@
 const builtin = @import("builtin");
 const std = @import("std");
-const zems = @import("libs/zems/build.zig");
-const zglfw = @import("libs/zglfw/build.zig");
-const zgpu = @import("libs/zgpu/build.zig");
-const zgui = @import("libs/zgui/build.zig");
-const zmath = @import("libs/zmath/build.zig");
-const zpool = @import("libs/zpool/build.zig");
-const zstbi = @import("libs/zstbi/build.zig");
-const editor = @import("src/resources/editor/build.zig");
-const random = @import("src/resources/random/build.zig");
-const income = @import("src/resources/income/build.zig");
-const variable = @import("src/resources/variable/build.zig");
-pub var zems_pkg: zems.Package = undefined;
-pub var zglfw_pkg: zglfw.Package = undefined;
-pub var zgpu_pkg: zgpu.Package = undefined;
-pub var zgui_glfw_wgpu_pkg: zgui.Package = undefined;
-pub var zmath_pkg: zmath.Package = undefined;
-pub var zpool_pkg: zpool.Package = undefined;
-pub var zstbi_pkg: zstbi.Package = undefined;
-var content_dir: []const u8 = "./content/";
 
 pub const Options = struct {
     optimize: std.builtin.Mode,
-    target: std.zig.CrossTarget,
+    target: std.Build.ResolvedTarget,
 };
 
-pub fn build(b: *std.build.Builder) void {
-    var options = Options{
+const demos = struct {
+    pub const editor = @import("src/resources/editor/build.zig");
+    pub const income = @import("src/resources/income/build.zig");
+    pub const random = @import("src/resources/random/build.zig");
+    pub const variable = @import("src/resources/variable/build.zig");
+};
+
+pub fn build(b: *std.Build) void {
+    const options = Options{
         .optimize = b.standardOptimizeOption(.{}),
         .target = b.standardTargetOptions(.{}),
     };
 
-    packagesCrossPlatform(b, options);
+    inline for (comptime std.meta.declarations(demos)) |d| {
+        const exe = @field(demos, d.name).build(b, options);
 
-    if (options.target.getOsTag() == .emscripten) {
-        const editor_step = buildEmscripten(b, options, editor.build(b, options));
-        var install_step = b.step("editor-web", "Build editor webpage");
-        install_step.dependOn(&editor_step.link_step.?.step);
-        b.getInstallStep().dependOn(install_step);
+        // TODO: Problems with LTO on Windows.
+        if (exe.rootModuleTarget().os.tag == .windows) {
+            exe.want_lto = false;
+        }
 
-        const random_step = buildEmscripten(b, options, random.build(b, options));
-        install_step = b.step("random-web", "Build random webpage");
-        install_step.dependOn(&random_step.link_step.?.step);
-        b.getInstallStep().dependOn(install_step);
+        if (exe.root_module.optimize == .ReleaseFast) {
+            exe.root_module.strip = true;
+        }
 
-        const income_step = buildEmscripten(b, options, income.build(b, options));
-        install_step = b.step("income-web", "Build income webpage");
-        install_step.dependOn(&income_step.link_step.?.step);
-        b.getInstallStep().dependOn(install_step);
+        const install_exe = b.addInstallArtifact(exe, .{});
+        b.getInstallStep().dependOn(&install_exe.step);
+        b.step(d.name, "Build '" ++ d.name ++ "' demo").dependOn(&install_exe.step);
 
-        const variable_step = buildEmscripten(b, options, variable.build(b, options));
-        install_step = b.step("income-web", "Build income webpage");
-        install_step.dependOn(&variable_step.link_step.?.step);
-        b.getInstallStep().dependOn(install_step);
-    } else {
-        install(b, editor.build(b, options), "editor");
-        install(b, random.build(b, options), "random");
-        install(b, income.build(b, options), "income");
-        install(b, variable.build(b, options), "variable");
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_exe.step);
+        b.step(d.name ++ "-run", "Run '" ++ d.name ++ "' demo").dependOn(&run_cmd.step);
     }
-}
-
-pub fn buildEmscripten(
-    b: *std.Build,
-    options: Options,
-    exe: *std.Build.CompileStep,
-) *zems.EmscriptenStep {
-    var ems_step = zems.EmscriptenStep.init(b);
-    ems_step.args.setDefault(options.optimize, false);
-    ems_step.args.setOrAssertOption("USE_GLFW", "3");
-    ems_step.args.setOrAssertOption("USE_WEBGPU", "");
-    ems_step.args.other_args.appendSlice(
-        &.{ "--preload-file", "content" },
-    ) catch unreachable;
-    ems_step.link(exe);
-    return ems_step;
-}
-
-fn install(
-    b: *std.Build,
-    exe: *std.Build.CompileStep,
-    comptime name: []const u8,
-) void {
-    const install_step = b.step(name, "Build '" ++ name ++ "' demo");
-    install_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
-
-    const run_step = b.step(name ++ "-run", "Run '" ++ name ++ "' demo");
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(install_step);
-    run_step.dependOn(&run_cmd.step);
-
-    b.getInstallStep().dependOn(install_step);
-}
-
-fn packagesCrossPlatform(b: *std.Build, options: Options) void {
-    const target = options.target;
-    const optimize = options.optimize;
-
-    zmath_pkg = zmath.package(b, target, optimize, .{});
-    zpool_pkg = zpool.package(b, target, optimize, .{});
-    zglfw_pkg = zglfw.package(b, target, optimize, .{});
-    zstbi_pkg = zstbi.package(b, target, optimize, .{});
-    zgui_glfw_wgpu_pkg = zgui.package(b, target, optimize, .{
-        .options = .{ .backend = .glfw_wgpu },
-    });
-    zgpu_pkg = zgpu.package(b, target, optimize, .{
-        .options = .{ .uniforms_buffer_size = 4 * 1024 * 1024 },
-        .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
-    });
-    zems_pkg = zems.package(b, target, optimize, .{});
-}
-
-inline fn thisDir() []const u8 {
-    return comptime std.fs.path.dirname(@src().file) orelse ".";
 }

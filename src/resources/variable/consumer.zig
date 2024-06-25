@@ -19,16 +19,18 @@ home: [4]f32 = .{ 0, 0, 0, 0 },
 destination: [4]f32 = .{ 0, 0, 0, 0 },
 color: [4]f32 = .{ 1, 0, 0, 0 },
 step_size: [2]f32 = .{ 0, 0 },
-moving_rate: f32 = 0,
-max_demand_rate: u32 = 0,
-income: u32 = 0,
 radius: f32 = 20.0,
 inventory: u32 = 0,
 balance: u32 = 0,
 max_balance: u32 = 100000,
 producer_id: i32 = -1,
 grouping_id: u32 = 0,
-_padding0: u32 = 0,
+
+pub const Params = struct {
+    moving_rate: f32 = 0,
+    max_demand_rate: u32 = 0,
+    income: u32 = 0,
+};
 
 pub const z_pos = 0;
 pub fn generateBulk(demo: *DemoState, num: u32) void {
@@ -48,9 +50,6 @@ pub fn createNewConsumer(demo: *DemoState) Self {
         .position = home,
         .home = home,
         .destination = home,
-        .income = demo.params.income.val,
-        .moving_rate = demo.params.moving_rate.val,
-        .max_demand_rate = demo.params.max_demand_rate.val,
     };
 }
 
@@ -65,22 +64,8 @@ pub fn appendConsumer(demo: *DemoState, c: Self) void {
     obj_buf.mapping.num_structs += 1;
 }
 
-pub fn setParamAll(
-    demo: *DemoState,
-    comptime tag: []const u8,
-    comptime T: type,
-    num: T,
-) void {
-    const buf = demo.buffers.data.consumers.buf;
-    const resource = demo.gctx.lookupResource(buf).?;
-    const field_enum = @field(std.meta.FieldEnum(Self), tag);
-    const field_type = std.meta.FieldType(Self, field_enum);
-    std.debug.assert(field_type == T);
-
-    const struct_offset = @offsetOf(Self, tag);
-    const num_structs = demo.buffers.data.consumers.mapping.num_structs;
-    for (0..num_structs) |i| {
-        const offset = i * @sizeOf(Self) + struct_offset;
-        demo.gctx.queue.writeBuffer(resource, offset, field_type, &.{num});
-    }
+pub fn setParamsBuf(demo: *DemoState, mr: f32, mdr: u32, income: u32) void {
+    const r = demo.gctx.lookupResource(demo.buffers.data.consumer_params).?;
+    demo.gctx.queue.writeBuffer(r, 0, f32, &.{mr});
+    demo.gctx.queue.writeBuffer(r, 4, u32, &.{ mdr, income });
 }

@@ -7,7 +7,6 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
 const zstbi = @import("zstbi");
-const zems = @import("zems");
 const Statistics = @import("statistics.zig");
 const Gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
@@ -18,13 +17,6 @@ const Camera = @import("camera.zig");
 const Square = @import("square.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
-const content_dir = @import("build_options").content_dir;
-const window_title = "Income Resource Simulation";
-const emscripten = zems.is_emscripten;
-
-pub const std_options = struct {
-    pub const logFn = if (emscripten) zems.emscriptenLog else std.log.defaultLog;
-};
 
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 40000;
@@ -32,35 +24,9 @@ pub const NUM_CONSUMER_SIDES = 40;
 pub const PRODUCER_WIDTH = 40;
 pub const CONSUMER_RADIUS: f32 = 1.0;
 
-pub fn GPA(comptime ems: bool) type {
-    if (ems) {
-        return zems.EmmalocAllocator;
-    } else {
-        return std.heap.GeneralPurposeAllocator(.{});
-    }
-}
-
-pub const Parameters = struct {
-    sample_idx: usize = 0,
-    radian: f64 = 0,
-    num_consumers: Gui.Variable(u32),
-    num_producers: Gui.Variable(u32),
-
-    max_num_stats: u32 = 3,
-    production_rate: Gui.Slider(u32) = Gui.Slider(u32).init(1, 300, 1000),
-    max_demand_rate: Gui.Slider(u32) = Gui.Slider(u32).init(1, 100, 1000),
-    max_inventory: Gui.Slider(u32) = Gui.Slider(u32).init(100, 10000, 10000),
-    moving_rate: Gui.Slider(f32) = Gui.Slider(f32).init(1, 5, 20),
-    consumer_size: Gui.Slider(f32) = Gui.Slider(f32).init(1, 1, 3),
-    num_consumer_sides: u32 = 20,
-    income: Gui.Slider(u32) = Gui.Slider(u32).init(1, 100, 500),
-    plot_hovered: bool = false,
-    price: Gui.Slider(u32) = Gui.Slider(u32).init(1, 1, 1000),
-};
-
-pub var state: DemoState = undefined;
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
+    window: *zglfw.Window,
     aspect: f32,
     allocator: std.mem.Allocator,
     running: bool = false,
@@ -93,8 +59,23 @@ pub const DemoState = struct {
             .func = Gui.timeline,
         },
     },
-    comptime sliders: Gui.SlidersInfo = .{},
-    params: Parameters,
+    comptime sliders: Gui.Variables = .{},
+    params: struct {
+        sample_idx: usize,
+        radian: f64,
+        max_num_stats: u32,
+        num_consumer_sides: u32,
+        plot_hovered: bool,
+        production_rate: Gui.Variable(u32),
+        max_inventory: Gui.Variable(u32),
+        consumer_size: Gui.Variable(f32),
+        price: Gui.Variable(u32),
+        num_consumers: Gui.Variable(u32),
+        num_producers: Gui.Variable(u32),
+        max_demand_rate: Gui.Variable(u32),
+        moving_rate: Gui.Variable(f32),
+        income: Gui.Variable(u32),
+    },
     stats: Statistics,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
@@ -110,7 +91,9 @@ pub const DemoState = struct {
     },
     buffers: struct {
         data: struct {
+            //ObjectBuffer field name must be ObjectBuffer Type + "s".
             consumers: Wgpu.ObjectBuffer(Consumer),
+            consumer_params: zgpu.BufferHandle,
             producers: Wgpu.ObjectBuffer(Producer),
             stats: Wgpu.ObjectBuffer(u32),
         },
@@ -127,7 +110,21 @@ pub const DemoState = struct {
 };
 
 pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
+    const gctx = try zgpu.GraphicsContext.create(
+        allocator,
+        .{
+            .window = window,
+            .fn_getTime = @ptrCast(&zglfw.getTime),
+            .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
+            .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
+            .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
+            .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
+            .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
+            .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
+            .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
+        },
+        .{},
+    );
 
     const consumer_object = Wgpu.createObjectBuffer(
         gctx,
@@ -135,7 +132,7 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         MAX_NUM_CONSUMERS,
         0,
     );
-
+    const consumer_params_buf = Wgpu.createBuffer(gctx, u32, 3);
     const producer_object = Wgpu.createObjectBuffer(
         gctx,
         Producer,
@@ -151,6 +148,7 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     );
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
         .consumer = consumer_object.buf,
+        .consumer_params = consumer_params_buf,
         .producer = producer_object.buf,
         .stats = stats_object.buf,
     });
@@ -158,8 +156,9 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     return DemoState{
         .gctx = gctx,
+        .window = window,
         .aspect = Camera.getAspectRatio(gctx),
-        .content_scale = getContentScale(gctx),
+        .content_scale = getContentScale(window),
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, Config.cpi),
             .square = Wgpu.createRenderPipeline(gctx, Config.ppi),
@@ -175,6 +174,7 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .buffers = .{
             .data = .{
                 .consumers = consumer_object,
+                .consumer_params = consumer_params_buf,
                 .producers = producer_object,
                 .stats = stats_object,
             },
@@ -194,14 +194,20 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         .depth_texture_view = depth.view,
         .allocator = allocator,
         .params = .{
-            .num_consumers = .{
-                .slider = Gui.Slider(u32).init(0, 5000, 10000),
-                .wave = Gui.Wave.init(allocator, 5000, 8000, 10),
-            },
-            .num_producers = .{
-                .slider = Gui.Slider(u32).init(1, 6, 100),
-                .wave = Gui.Wave.init(allocator, 30, 50, 0.1),
-            },
+            .sample_idx = 0,
+            .radian = 0,
+            .max_num_stats = 3,
+            .plot_hovered = false,
+            .num_consumer_sides = 20,
+            .production_rate = Gui.Variable(u32).init(allocator, 0, 300, 1000, 100, 1, false),
+            .max_inventory = Gui.Variable(u32).init(allocator, 100, 7000, 10000, 100, 1, false),
+            .consumer_size = Gui.Variable(f32).init(allocator, 0, 1, 3, 100, 0.5, false),
+            .price = Gui.Variable(u32).init(allocator, 0, 10, 1000, 100, 0.9, false),
+            .num_consumers = Gui.Variable(u32).init(allocator, 0, 5000, 10000, 100, 1, true),
+            .num_producers = Gui.Variable(u32).init(allocator, 1, 20, 100, 100, 0.7, true),
+            .max_demand_rate = Gui.Variable(u32).init(allocator, 1, 100, 300, 100, 0.9, false),
+            .moving_rate = Gui.Variable(f32).init(allocator, 1, 5, 20, 100, 1, false),
+            .income = Gui.Variable(u32).init(allocator, 1, 100, 500, 100, 1.3, true),
         },
         .stats = Statistics.init(allocator),
     };
@@ -217,7 +223,7 @@ pub fn update(demo: *DemoState) void {
     Wgpu.runCallbackIfReady(Producer, &demo.buffers.data.producers.mapping);
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
 
-    //zgui.plot.showDemoWindow(null);
+    //zgui.showDemoWindow(null);
     Gui.update(demo);
 
     if (demo.running) {
@@ -381,7 +387,7 @@ pub fn draw(demo: *DemoState) void {
     gctx.submit(&.{commands});
 
     if (demo.gctx.present() == .swap_chain_resized) {
-        demo.content_scale = getContentScale(demo.gctx);
+        demo.content_scale = getContentScale(demo.window);
         setImguiContentScale(demo.content_scale);
         updateAspectRatio(demo);
     }
@@ -401,8 +407,8 @@ pub fn restartSimulation(demo: *DemoState) void {
     Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
 
-    const num_consumers = state.params.num_consumers.slider.val;
-    const num_producers = state.params.num_producers.slider.val;
+    const num_consumers = demo.params.num_consumers.slider.val;
+    const num_producers = demo.params.num_producers.slider.val;
     Statistics.setNum(demo, num_consumers, .consumers);
     Statistics.setNum(demo, num_producers, .producers);
     Consumer.generateBulk(demo, num_consumers);
@@ -430,145 +436,102 @@ pub fn updateAspectRatio(demo: *DemoState) void {
         demo.push_coord_update = true;
         return;
     }
-    //Wgpu.updateCoords(demo.gctx, Consumer, demo.buffers.data.consumers);
-    //Wgpu.updateCoords(demo.gctx, Producer, demo.buffers.data.producers);
-
     Wgpu.getAllAsync(demo, Consumer, Callbacks.updateConsumerCoords);
-    //Wgpu.getAllAsync(demo, Producer, Callbacks.updateProducerCoords);
+    Wgpu.getAllAsync(demo, Producer, Callbacks.updateProducerCoords);
 
     demo.push_coord_update = false;
     demo.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
-fn getContentScale(gctx: *zgpu.GraphicsContext) f32 {
-    if (emscripten) return 1;
-    const content_scale = gctx.window.getContentScale();
+fn getContentScale(window: *zglfw.Window) f32 {
+    const content_scale = window.getContentScale();
     return @max(content_scale[0], content_scale[1]);
 }
 
 fn setImguiContentScale(scale: f32) void {
     zgui.getStyle().* = zgui.Style.init();
     zgui.getStyle().scaleAllSizes(scale);
-}
-
-pub fn stateDeinit(demo: *DemoState) void {
-    demo.gctx.destroy(demo.allocator);
-    demo.stats.deinit();
-    demo.* = undefined;
+    zgui.plot.getStyle().plot_padding = .{ 20 * scale, 20 * scale };
+    zgui.plot.getStyle().line_weight = 2 * scale;
 }
 
 fn deinit(demo: *DemoState) void {
-    stateDeinit(demo);
-    zstbi.deinit();
-    zgui.backend.deinit();
-    zgui.plot.deinit();
-    zgui.deinit();
-    zglfw.terminate();
+    demo.params.num_consumers.wave.deinit();
+    demo.params.num_producers.wave.deinit();
+    demo.params.max_demand_rate.wave.deinit();
+    demo.params.moving_rate.wave.deinit();
+    demo.params.income.wave.deinit();
+    demo.params.consumer_size.wave.deinit();
+    demo.params.price.wave.deinit();
+    demo.params.production_rate.wave.deinit();
+    demo.params.max_inventory.wave.deinit();
+    demo.stats.deinit();
+    demo.gctx.destroy(demo.allocator);
 }
 
 pub fn main() !void {
     try zglfw.init();
-    errdefer zglfw.terminate();
+    defer zglfw.terminate();
 
     // Change current working directory to where the executable is located.
-    if (!emscripten) {
-        var buffer: [1024]u8 = undefined;
-        const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
-        std.os.chdir(path) catch {};
-    }
+    var buffer: [1024]u8 = undefined;
+    const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
+    std.posix.chdir(path) catch {};
 
-    if (emscripten) {
-        // by default emscripten initializes on window creation WebGL context
-        // this flag skips context creation. otherwise we later can't create webgpu surface
-        zglfw.WindowHint.set(.client_api, @intFromEnum(zglfw.ClientApi.no_api));
-    }
+    zglfw.windowHintTyped(.client_api, .no_api);
 
-    const window = zglfw.Window.create(1600, 1000, window_title, null) catch |err| {
-        std.log.err("Failed to create demo window. {}", .{err});
-        return;
-    };
-    errdefer window.destroy();
+    const window = try zglfw.Window.create(1600, 1000, "Simulations", null);
+    defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
     window.setPos(0, 0);
 
-    var gpa = GPA(emscripten){};
-    errdefer _ = if (!emscripten) gpa.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     zstbi.init(allocator);
-    errdefer zstbi.deinit();
+    defer zstbi.deinit();
 
-    state = try init(allocator, window);
-    errdefer stateDeinit(&state);
-    defer if (!emscripten) deinit(&state);
+    var demo = try init(allocator, window);
+    defer deinit(&demo);
 
-    const num_consumers = state.params.num_consumers.slider.val;
-    const num_producers = state.params.num_producers.slider.val;
-    Statistics.setNum(&state, num_consumers, .consumers);
-    Statistics.setNum(&state, num_producers, .producers);
-    Consumer.generateBulk(&state, num_consumers);
-    Producer.generateBulk(&state, num_producers);
-
-    const params = &state.params;
-    inline for (@typeInfo(@TypeOf(params.*)).Struct.fields) |field| {
-        switch (field.type) {
-            Gui.Slider(u32), Gui.Slider(f32) => {
-                const f = &@field(params, field.name);
-                f.ptr = &f.val;
-            },
-            Gui.Variable(u32), Gui.Variable(f32) => {
-                const f = &@field(params, field.name).slider;
-                f.ptr = &f.val;
-            },
-            else => {},
-        }
-    }
+    const num_consumers = demo.params.num_consumers.slider.val;
+    const num_producers = demo.params.num_producers.slider.val;
+    Statistics.setNum(&demo, num_consumers, .consumers);
+    Statistics.setNum(&demo, num_producers, .producers);
+    Consumer.generateBulk(&demo, num_consumers);
+    Consumer.setParamsBuf(
+        &demo,
+        demo.params.moving_rate.slider.val,
+        demo.params.max_demand_rate.slider.val,
+        demo.params.income.slider.val,
+    );
+    Producer.generateBulk(&demo, num_producers);
 
     zgui.init(allocator);
-    errdefer zgui.deinit();
+    defer zgui.deinit();
     zgui.plot.init();
-    errdefer zgui.plot.deinit();
+    defer zgui.plot.deinit();
 
     zgui.io.setIniFilename(null);
 
     _ = zgui.io.addFontFromFile(
-        content_dir ++ "/fonts/Roboto-Medium.ttf",
-        26.0 * state.content_scale,
+        "content/fonts/Roboto-Medium.ttf",
+        26.0 * demo.content_scale,
     );
-    setImguiContentScale(state.content_scale);
+    setImguiContentScale(demo.content_scale);
 
     zgui.backend.init(
         window,
-        state.gctx.device,
+        demo.gctx.device,
         @intFromEnum(zgpu.GraphicsContext.swapchain_format),
+        @intFromEnum(wgpu.TextureFormat.undef),
     );
-    errdefer zgui.backend.deinit();
+    defer zgui.backend.deinit();
 
-    zgui.plot.getStyle().plot_padding = .{ 20, 20 };
-
-    if (comptime !emscripten) {
-        while (!window.shouldClose()) {
-            tick();
-        }
-    } else {
-        const id = zems.emscripten_request_animation_frame_loop(&tickCB, null);
-        _ = id;
+    while (!window.shouldClose() and window.getKey(.escape) != .press) {
+        zglfw.pollEvents();
+        update(&demo);
+        draw(&demo);
     }
-}
-
-pub fn tick() void {
-    if (!state.gctx.canRender()) {
-        std.log.err("can't render!", .{});
-        return;
-    }
-    zglfw.pollEvents();
-    update(&state);
-    draw(&state);
-}
-
-pub export fn tickCB(time: f64, user_data: ?*anyopaque) c_int {
-    _ = user_data;
-    _ = time;
-    tick();
-    return 1; // return 0 to stop emscripten_request_animation_frame_loop
 }

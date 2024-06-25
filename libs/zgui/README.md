@@ -1,4 +1,4 @@
-# zgui v1.89.6 - dear imgui bindings
+# zgui v0.2.0 - dear imgui bindings
 
 Easy to use, hand-crafted API with default arguments, named parameters and Zig style text formatting. [Here](https://github.com/michal-z/zig-gamedev/tree/main/samples/minimal_zgpu_zgui) is a simple sample application, and [here](https://github.com/michal-z/zig-gamedev/tree/main/samples/gui_test_wgpu) is a full one.
 
@@ -8,45 +8,53 @@ Easy to use, hand-crafted API with default arguments, named parameters and Zig s
 * All memory allocations go through user provided Zig allocator
 * [DrawList API](#drawlist-api) for vector graphics, text rendering and custom widgets
 * [Plot API](#plot-api) for advanced data visualizations
+* [Test engine API](#test-engine-api) for automatic testing
+
+## Versions
+
+* [ImGui](https://github.com/ocornut/imgui/tree/v1.90.4-docking) `1.90.4-docking`
+* [ImGui test engine](https://github.com/ocornut/imgui_test_engine/tree/v1.90.4)  `1.90.4`
+* [ImPlot](https://github.com/epezent/implot) `O.17`
 
 ## Getting started
 
-Copy `zgui` folder to a `libs` subdirectory of the root of your project.
+Copy `zgui` to a subdirectory in your project and add the following to your `build.zig.zon` .dependencies:
+```zig
+    .zgui = .{ .path = "libs/zgui" },
+```
 
-To get glfw/wgpu rendering backend working also copy `zgpu`, `zglfw`, `zpool` and `system-sdk` folders (see [zgpu](https://github.com/michal-z/zig-gamedev/tree/main/libs/zgpu) for the details). Alternatively, you can provide your own rendering backend, see: [backend_glfw_wgpu.zig](src/backend_glfw_wgpu.zig) for an example.
+To get glfw/wgpu rendering backend working also copy `zglfw`, `system-sdk`, `zgpu` and `zpool` folders and add the depenency paths (see [zgpu](https://github.com/zig-gamedev/zig-gamedev/tree/main/libs/zgpu) for the details).
 
 Then in your `build.zig` add:
 ```zig
-const zgui = @import("libs/zgui/build.zig");
-
-// Needed for glfw/wgpu rendering backend
-const zglfw = @import("libs/zglfw/build.zig");
-const zgpu = @import("libs/zgpu/build.zig");
-const zpool = @import("libs/zpool/build.zig");
 
 pub fn build(b: *std.Build) void {
-    ...
-    const optimize = b.standardOptimizeOption(.{});
-    const target = b.standardTargetOptions(.{});
+    const exe = b.addExecutable(.{ ... });
 
-    const zgui_pkg = zgui.package(b, target, optimize, .{
-        .options = .{ .backend = .glfw_wgpu },
+    const zgui = b.dependency("zgui", .{
+        .shared = false,
+        .with_implot = true,
     });
-
-    zgui_pkg.link(exe);
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
     
-    // Needed for glfw/wgpu rendering backend
-    const zglfw_pkg = zglfw.package(b, target, optimize, .{});
-    const zpool_pkg = zpool.package(b, target, optimize, .{});
-    const zgpu_pkg = zgpu.package(b, target, optimize, .{
-        .deps = .{ .zpool = zpool_pkg.zpool, .zglfw = zglfw_pkg.zglfw },
-    });
+    { // Needed for glfw/wgpu rendering backend
+        const zglfw = b.dependency("zglfw", .{});
+        exe.root_module.addImport("zglfw", zglfw.module("root"));
+        exe.linkLibrary(zglfw.artifact("glfw"));
 
-    zglfw_pkg.link(exe);
-    zgpu_pkg.link(exe);
+        const zpool = b.dependency("zpool", .{});
+        exe.root_module.addImport("zpool", zpool.module("root"));
+
+        const zgpu = b.dependency("zgpu", .{});
+        exe.root_module.addImport("zgpu", zgpu.module("root"));
+        exe.linkLibrary(zgpu.artifact("zdawn"));
+    }
 }
 ```
+
 Now in your code you may import and use `zgui`:
+
 ```zig
 const zgui = @import("zgui");
 
@@ -58,6 +66,7 @@ zgui.backend.init(
     window,
     demo.gctx.device,
     @enumToInt(swapchain_format),
+    @enumToInt(depth_format),
 );
 ```
 
@@ -143,5 +152,50 @@ if (zgui.plot.beginPlot("Line Plot", .{ .h = -1.0 })) {
         .yv = &.{ 0.1, 0.3, 0.5, 0.9 },
     });
     zgui.plot.endPlot();
+}
+```
+
+### Test Engine API
+Zig wraper for [ImGUI test engine](https://github.com/ocornut/imgui_test_engine).
+
+```zig
+var check_b = false;
+var _te: *zgui.te.TestEngine = zgui.te.getTestEngine().?;
+fn registerTests() void {
+    _ = _te.registerTest(
+        "Awesome",
+        "should_do_some_another_magic",
+        @src(),
+        struct {
+            pub fn gui(ctx: *zgui.te.TestContext) !void {
+                _ = ctx; // autofix
+                _ = zgui.begin("Test Window", .{ .flags = .{ .no_saved_settings = true } });
+                defer zgui.end();
+
+                zgui.text("Hello, automation world", .{});
+                _ = zgui.button("Click Me", .{});
+                if (zgui.treeNode("Node")) {
+                    defer zgui.treePop();
+
+                    _ = zgui.checkbox("Checkbox", .{ .v = &check_b });
+                }
+            }
+
+            pub fn run(ctx: *zgui.te.TestContext) !void {
+                ctx.setRef("/Test Window");
+                ctx.windowFocus("");
+
+                ctx.itemAction(.click, "Click Me", .{}, null);
+                ctx.itemAction(.open, "Node", .{}, null);
+                ctx.itemAction(.check, "Node/Checkbox", .{}, null);
+                ctx.itemAction(.uncheck, "Node/Checkbox", .{}, null);
+
+                std.testing.expect(true) catch |err| {
+                    zgui.te.checkTestError(@src(), err);
+                    return;
+                };
+            }
+        },
+    );
 }
 ```

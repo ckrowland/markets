@@ -69,6 +69,23 @@ pub const ComputePipelineInfo = struct {
     entry_point: [:0]const u8,
 };
 
+pub fn setObjBufField(
+    demo: *DemoState,
+    comptime Object: type,
+    comptime Field: type,
+    comptime tag: []const u8,
+    value: Field,
+) void {
+    const object_name = @typeName(Object) ++ "s";
+    const obj_buf = &@field(demo.buffers.data, object_name);
+    const resource = demo.gctx.lookupResource(obj_buf.buf).?;
+    const field_offset = @offsetOf(Object, tag);
+    for (0..obj_buf.mapping.num_structs) |i| {
+        const offset = i * @sizeOf(Object) + field_offset;
+        demo.gctx.queue.writeBuffer(resource, offset, Field, &.{value});
+    }
+}
+
 pub fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
     return struct {
         fn callback(
@@ -336,6 +353,7 @@ pub fn createComputeBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
         zgpu.bufferEntry(0, .{ .compute = true }, .storage, false, 0),
         zgpu.bufferEntry(1, .{ .compute = true }, .storage, false, 0),
         zgpu.bufferEntry(2, .{ .compute = true }, .storage, false, 0),
+        zgpu.bufferEntry(3, .{ .compute = true }, .storage, false, 0),
     });
 }
 
@@ -351,6 +369,7 @@ pub fn createUniformBindGroup(gctx: *Gctx) zgpu.BindGroupHandle {
 
 pub const computeBindGroup = struct {
     consumer: zgpu.BufferHandle,
+    consumer_params: zgpu.BufferHandle,
     producer: zgpu.BufferHandle,
     stats: zgpu.BufferHandle,
 };
@@ -360,6 +379,7 @@ pub fn createComputeBindGroup(gctx: *Gctx, args: computeBindGroup) zgpu.BindGrou
     defer gctx.releaseResource(compute_bgl);
 
     const c_info = gctx.lookupResourceInfo(args.consumer) orelse unreachable;
+    const cp_info = gctx.lookupResourceInfo(args.consumer_params) orelse unreachable;
     const p_info = gctx.lookupResourceInfo(args.producer) orelse unreachable;
     const s_info = gctx.lookupResourceInfo(args.stats) orelse unreachable;
 
@@ -372,12 +392,18 @@ pub fn createComputeBindGroup(gctx: *Gctx, args: computeBindGroup) zgpu.BindGrou
         },
         .{
             .binding = 1,
+            .buffer_handle = args.consumer_params,
+            .offset = 0,
+            .size = cp_info.size,
+        },
+        .{
+            .binding = 2,
             .buffer_handle = args.producer,
             .offset = 0,
             .size = p_info.size,
         },
         .{
-            .binding = 2,
+            .binding = 3,
             .buffer_handle = args.stats,
             .offset = 0,
             .size = s_info.size,

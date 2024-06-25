@@ -52,10 +52,10 @@ pub fn generateBulk(demo: *DemoState, num: u32) void {
                     @as(f32, @floatFromInt(x)) * demo.aspect,
                     @as(f32, @floatFromInt(y)),
                 },
-                .production_rate = demo.params.production_rate.val,
-                .inventory = @as(i32, @intCast(demo.params.max_inventory.val)),
-                .max_inventory = demo.params.max_inventory.val,
-                .price = demo.params.price.val,
+                .production_rate = demo.params.production_rate.slider.val,
+                .inventory = @as(i32, @intCast(demo.params.max_inventory.slider.val)),
+                .max_inventory = demo.params.max_inventory.slider.val,
+                .price = demo.params.price.slider.val,
             },
         });
         i += 1;
@@ -86,24 +86,4 @@ pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
         .structs = producers[0..],
     });
     args.obj_buf.mapping.num_structs += 1;
-}
-
-pub fn setParamAll(
-    demo: *DemoState,
-    comptime tag: []const u8,
-    comptime T: type,
-    num: T,
-) void {
-    const buf = demo.buffers.data.producers.buf;
-    const resource = demo.gctx.lookupResource(buf).?;
-    const field_enum = @field(std.meta.FieldEnum(Self), tag);
-    const field_type = std.meta.FieldType(Self, field_enum);
-    std.debug.assert(field_type == T);
-
-    const struct_offset = @offsetOf(Self, tag);
-    const num_structs = demo.buffers.data.producers.mapping.num_structs;
-    for (0..num_structs) |i| {
-        const offset = i * @sizeOf(Self) + struct_offset;
-        demo.gctx.queue.writeBuffer(resource, offset, field_type, &.{num});
-    }
 }

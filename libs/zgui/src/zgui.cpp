@@ -1,5 +1,18 @@
-#include "./imgui/imgui.h"
-#include "./imgui/implot.h"
+#include "imgui.h"
+
+#if ZGUI_IMPLOT
+#include "implot.h"
+#endif
+
+#if ZGUI_TE
+#include "imgui_te_engine.h"
+#include "imgui_te_context.h"
+#include "imgui_te_ui.h"
+#include "imgui_te_utils.h"
+#include "imgui_te_exporters.h"
+#endif
+
+#include "imgui_internal.h"
 
 #ifndef ZGUI_API
 #define ZGUI_API
@@ -48,6 +61,10 @@ ZGUI_API void zguiSetNextWindowBgAlpha(float alpha) {
     ImGui::SetNextWindowBgAlpha(alpha);
 }
 
+ZGUI_API void zguiSetWindowFocus(const char* name) {
+    ImGui::SetWindowFocus(name);
+}
+
 ZGUI_API void zguiSetKeyboardFocusHere(int offset) {
     ImGui::SetKeyboardFocusHere(offset);
 }
@@ -60,12 +77,12 @@ ZGUI_API void zguiEnd(void) {
     ImGui::End();
 }
 
-ZGUI_API bool zguiBeginChild(const char* str_id, float w, float h, bool border, ImGuiWindowFlags flags) {
-    return ImGui::BeginChild(str_id, { w, h }, border, flags);
+ZGUI_API bool zguiBeginChild(const char* str_id, float w, float h, ImGuiChildFlags child_flags, ImGuiWindowFlags window_flags) {
+    return ImGui::BeginChild(str_id, { w, h }, child_flags, window_flags);
 }
 
-ZGUI_API bool zguiBeginChildId(ImGuiID id, float w, float h, bool border, ImGuiWindowFlags flags) {
-    return ImGui::BeginChild(id, { w, h }, border, flags);
+ZGUI_API bool zguiBeginChildId(ImGuiID id, float w, float h, ImGuiChildFlags child_flags, ImGuiWindowFlags window_flags) {
+    return ImGui::BeginChild(id, { w, h }, child_flags, window_flags);
 }
 
 ZGUI_API void zguiEndChild(void) {
@@ -206,6 +223,12 @@ ZGUI_API void zguiGetItemRectMax(float rect[2]) {
 
 ZGUI_API void zguiGetItemRectMin(float rect[2]) {
     const ImVec2 r = ImGui::GetItemRectMin();
+    rect[0] = r.x;
+    rect[1] = r.y;
+}
+
+ZGUI_API void zguiGetItemRectSize(float rect[2]) {
+    const ImVec2 r = ImGui::GetItemRectSize();
     rect[0] = r.x;
     rect[1] = r.y;
 }
@@ -456,6 +479,51 @@ ZGUI_API bool zguiDragScalarN(
 ) {
     return ImGui::DragScalarN(label, data_type, p_data, components, v_speed, p_min, p_max, format, flags);
 }
+
+ZGUI_API bool zguiBeginDragDropSource(ImGuiDragDropFlags flags = 0) {
+  return ImGui::BeginDragDropSource(flags);
+}
+ZGUI_API bool zguiSetDragDropPayload(
+    const char* type,
+    const void* data,
+    size_t sz,
+    ImGuiCond cond = 0
+) {
+  return ImGui::SetDragDropPayload(type, data, sz, cond);
+}
+ZGUI_API void zguiEndDragDropSource() {
+  return ImGui::EndDragDropSource();
+}
+ZGUI_API bool zguiBeginDragDropTarget() {
+  return ImGui::BeginDragDropTarget();
+}
+ZGUI_API const ImGuiPayload* zguiAcceptDragDropPayload(
+    const char* type,
+    ImGuiDragDropFlags flags = 0
+) {
+  return ImGui::AcceptDragDropPayload(type);
+}
+ZGUI_API void zguiEndDragDropTarget() {
+  return ImGui::EndDragDropTarget();
+}
+ZGUI_API const ImGuiPayload* zguiGetDragDropPayload() {
+  return ImGui::GetDragDropPayload();
+}
+
+ZGUI_API void zguiImGuiPayload_Clear(ImGuiPayload* payload) { payload->Clear(); }
+
+ZGUI_API bool zguiImGuiPayload_IsDataType(const ImGuiPayload* payload, const char* type) {
+  return payload->IsDataType(type);
+}
+
+ZGUI_API bool zguiImGuiPayload_IsPreview(const ImGuiPayload* payload) {
+  return payload->IsPreview();
+}
+
+ZGUI_API bool zguiImGuiPayload_IsDelivery(const ImGuiPayload* payload) {
+  return payload->IsDelivery();
+}
+
 
 ZGUI_API bool zguiCombo(
     const char* label,
@@ -1022,7 +1090,7 @@ ZGUI_API void zguiPushStyleColor4f(ImGuiCol idx, const float col[4]) {
     ImGui::PushStyleColor(idx, { col[0], col[1], col[2], col[3] });
 }
 
-ZGUI_API void zguiPushStyleColor1u(ImGuiCol idx, unsigned int col) {
+ZGUI_API void zguiPushStyleColor1u(ImGuiCol idx, ImU32 col) {
     ImGui::PushStyleColor(idx, col);
 }
 
@@ -1254,6 +1322,10 @@ ZGUI_API bool zguiIoGetWantCaptureKeyboard(void) {
     return ImGui::GetIO().WantCaptureKeyboard;
 }
 
+ZGUI_API bool zguiIoGetWantTextInput(void) {
+    return ImGui::GetIO().WantTextInput;
+}
+
 ZGUI_API void zguiIoSetIniFilename(const char* filename) {
     ImGui::GetIO().IniFilename = filename;
 }
@@ -1308,7 +1380,7 @@ ZGUI_API void zguiIoSetKeyEventNativeData(ImGuiKey key, int keycode, int scancod
     ImGui::GetIO().SetKeyEventNativeData(key, keycode, scancode);
 }
 
-ZGUI_API void zguiIoAddCharacterEvent(int c) {
+ZGUI_API void zguiIoAddCharacterEvent(unsigned int c) {
     ImGui::GetIO().AddInputCharacter(c);
 }
 
@@ -1576,7 +1648,7 @@ ZGUI_API void zguiTableSetColumnEnabled(int column_n, bool v) {
     ImGui::TableSetColumnEnabled(column_n, v);
 }
 
-ZGUI_API void zguiTableSetBgColor(ImGuiTableBgTarget target, unsigned int color, int column_n) {
+ZGUI_API void zguiTableSetBgColor(ImGuiTableBgTarget target, ImU32 color, int column_n) {
     ImGui::TableSetBgColor(target, color, column_n);
 }
 //--------------------------------------------------------------------------------------------------
@@ -1724,7 +1796,7 @@ ZGUI_API void zguiDrawList_AddLine(
     ImDrawList* draw_list,
     const float p1[2],
     const float p2[2],
-    unsigned int col,
+    ImU32 col,
     float thickness
 ) {
     draw_list->AddLine({ p1[0], p1[1] }, { p2[0], p2[1] }, col, thickness);
@@ -1734,7 +1806,7 @@ ZGUI_API void zguiDrawList_AddRect(
     ImDrawList* draw_list,
     const float pmin[2],
     const float pmax[2],
-    unsigned int col,
+    ImU32 col,
     float rounding,
     ImDrawFlags flags,
     float thickness
@@ -1746,7 +1818,7 @@ ZGUI_API void zguiDrawList_AddRectFilled(
     ImDrawList* draw_list,
     const float pmin[2],
     const float pmax[2],
-    unsigned int col,
+    ImU32 col,
     float rounding,
     ImDrawFlags flags
 ) {
@@ -1757,10 +1829,10 @@ ZGUI_API void zguiDrawList_AddRectFilledMultiColor(
     ImDrawList* draw_list,
     const float pmin[2],
     const float pmax[2],
-    unsigned int col_upr_left,
-    unsigned int col_upr_right,
-    unsigned int col_bot_right,
-    unsigned int col_bot_left
+    ImU32 col_upr_left,
+    ImU32 col_upr_right,
+    ImU32 col_bot_right,
+    ImU32 col_bot_left
 ) {
     draw_list->AddRectFilledMultiColor(
         { pmin[0], pmin[1] },
@@ -1778,7 +1850,7 @@ ZGUI_API void zguiDrawList_AddQuad(
     const float p2[2],
     const float p3[2],
     const float p4[2],
-    unsigned int col,
+    ImU32 col,
     float thickness
 ) {
     draw_list->AddQuad({ p1[0], p1[1] }, { p2[0], p2[1] }, { p3[0], p3[1] }, { p4[0], p4[1] }, col, thickness);
@@ -1790,7 +1862,7 @@ ZGUI_API void zguiDrawList_AddQuadFilled(
     const float p2[2],
     const float p3[2],
     const float p4[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->AddQuadFilled({ p1[0], p1[1] }, { p2[0], p2[1] }, { p3[0], p3[1] }, { p4[0], p4[1] }, col);
 }
@@ -1800,7 +1872,7 @@ ZGUI_API void zguiDrawList_AddTriangle(
     const float p1[2],
     const float p2[2],
     const float p3[2],
-    unsigned int col,
+    ImU32 col,
     float thickness
 ) {
     draw_list->AddTriangle({ p1[0], p1[1] }, { p2[0], p2[1] }, { p3[0], p3[1] }, col, thickness);
@@ -1811,7 +1883,7 @@ ZGUI_API void zguiDrawList_AddTriangleFilled(
     const float p1[2],
     const float p2[2],
     const float p3[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->AddTriangleFilled({ p1[0], p1[1] }, { p2[0], p2[1] }, { p3[0], p3[1] }, col);
 }
@@ -1820,7 +1892,7 @@ ZGUI_API void zguiDrawList_AddCircle(
     ImDrawList* draw_list,
     const float center[2],
     float radius,
-    unsigned int col,
+    ImU32 col,
     int num_segments,
     float thickness
 ) {
@@ -1831,7 +1903,7 @@ ZGUI_API void zguiDrawList_AddCircleFilled(
     ImDrawList* draw_list,
     const float center[2],
     float radius,
-    unsigned int col,
+    ImU32 col,
     int num_segments
 ) {
     draw_list->AddCircleFilled({ center[0], center[1] }, radius, col, num_segments);
@@ -1841,7 +1913,7 @@ ZGUI_API void zguiDrawList_AddNgon(
     ImDrawList* draw_list,
     const float center[2],
     float radius,
-    unsigned int col,
+    ImU32 col,
     int num_segments,
     float thickness
 ) {
@@ -1852,7 +1924,7 @@ ZGUI_API void zguiDrawList_AddNgonFilled(
     ImDrawList* draw_list,
     const float center[2],
     float radius,
-    unsigned int col,
+    ImU32 col,
     int num_segments
 ) {
     draw_list->AddNgonFilled({ center[0], center[1] }, radius, col, num_segments);
@@ -1861,7 +1933,7 @@ ZGUI_API void zguiDrawList_AddNgonFilled(
 ZGUI_API void zguiDrawList_AddText(
     ImDrawList* draw_list,
     const float pos[2],
-    unsigned int col,
+    ImU32 col,
     const char* text_begin,
     const char* text_end
 ) {
@@ -1872,7 +1944,7 @@ ZGUI_API void zguiDrawList_AddPolyline(
     ImDrawList* draw_list,
     const float points[][2],
     int num_points,
-    unsigned int col,
+    ImU32 col,
     ImDrawFlags flags,
     float thickness
 ) {
@@ -1883,7 +1955,7 @@ ZGUI_API void zguiDrawList_AddConvexPolyFilled(
     ImDrawList* draw_list,
     const float points[][2],
     int num_points,
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->AddConvexPolyFilled((const ImVec2*)&points[0][0], num_points, col);
 }
@@ -1894,7 +1966,7 @@ ZGUI_API void zguiDrawList_AddBezierCubic(
     const float p2[2],
     const float p3[2],
     const float p4[2],
-    unsigned int col,
+    ImU32 col,
     float thickness,
     int num_segments
 ) {
@@ -1908,7 +1980,7 @@ ZGUI_API void zguiDrawList_AddBezierQuadratic(
     const float p1[2],
     const float p2[2],
     const float p3[2],
-    unsigned int col,
+    ImU32 col,
     float thickness,
     int num_segments
 ) {
@@ -1924,7 +1996,7 @@ ZGUI_API void zguiDrawList_AddImage(
     const float pmax[2],
     const float uvmin[2],
     const float uvmax[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->AddImage(
         user_texture_id,
@@ -1947,7 +2019,7 @@ ZGUI_API void zguiDrawList_AddImageQuad(
     const float uv2[2],
     const float uv3[2],
     const float uv4[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->AddImageQuad(
         user_texture_id,
@@ -1970,7 +2042,7 @@ ZGUI_API void zguiDrawList_AddImageRounded(
     const float pmax[2],
     const float uvmin[2],
     const float uvmax[2],
-    unsigned int col,
+    ImU32 col,
     float rounding,
     ImDrawFlags flags
 ) {
@@ -1998,11 +2070,11 @@ ZGUI_API void zguiDrawList_PathLineToMergeDuplicate(ImDrawList* draw_list, const
     draw_list->PathLineToMergeDuplicate({ pos[0], pos[1] });
 }
 
-ZGUI_API void zguiDrawList_PathFillConvex(ImDrawList* draw_list, unsigned int col) {
+ZGUI_API void zguiDrawList_PathFillConvex(ImDrawList* draw_list, ImU32 col) {
     draw_list->PathFillConvex(col);
 }
 
-ZGUI_API void zguiDrawList_PathStroke(ImDrawList* draw_list, unsigned int col, ImDrawFlags flags, float thickness) {
+ZGUI_API void zguiDrawList_PathStroke(ImDrawList* draw_list, ImU32 col, ImDrawFlags flags, float thickness) {
     draw_list->PathStroke(col, flags, thickness);
 }
 
@@ -2068,7 +2140,7 @@ ZGUI_API void zguiDrawList_PrimRect(
     ImDrawList* draw_list,
     const float a[2],
     const float b[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->PrimRect({ a[0], a[1] }, { b[0], b[1] }, col);
 }
@@ -2079,7 +2151,7 @@ ZGUI_API void zguiDrawList_PrimRectUV(
     const float b[2],
     const float uv_a[2],
     const float uv_b[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->PrimRectUV({ a[0], a[1] }, { b[0], b[1] }, { uv_a[0], uv_a[1] }, { uv_b[0], uv_b[1] }, col);
 }
@@ -2094,7 +2166,7 @@ ZGUI_API void zguiDrawList_PrimQuadUV(
     const float uv_b[2],
     const float uv_c[2],
     const float uv_d[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->PrimQuadUV(
         { a[0], a[1] }, { b[0], b[1] }, { c[0], c[1] }, { d[0], d[1] },
@@ -2107,7 +2179,7 @@ ZGUI_API void zguiDrawList_PrimWriteVtx(
     ImDrawList* draw_list,
     const float pos[2],
     const float uv[2],
-    unsigned int col
+    ImU32 col
 ) {
     draw_list->PrimWriteVtx({ pos[0], pos[1] }, { uv[0], uv[1] }, col);
 }
@@ -2155,6 +2227,68 @@ ZGUI_API void zguiViewport_GetWorkSize(ImGuiViewport* viewport, float p[2]) {
     p[0] = sz.x;
     p[1] = sz.y;
 }
+
+//--------------------------------------------------------------------------------------------------
+//
+// Docking
+//
+//--------------------------------------------------------------------------------------------------
+ZGUI_API ImGuiID zguiDockSpace(const char* str_id, float size[2], ImGuiDockNodeFlags flags) {
+    return ImGui::DockSpace(ImGui::GetID(str_id), {size[0], size[1]}, flags);
+}
+
+ZGUI_API ImGuiID zguiDockSpaceOverViewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags) {
+    return ImGui::DockSpaceOverViewport(viewport, dockspace_flags);
+}
+
+
+//--------------------------------------------------------------------------------------------------
+//
+// DockBuilder (Unstable internal imgui API, subject to change, use at own risk)
+//
+//--------------------------------------------------------------------------------------------------
+ZGUI_API void zguiDockBuilderDockWindow(const char* window_name, ImGuiID node_id) {
+    ImGui::DockBuilderDockWindow(window_name, node_id);
+}
+
+ZGUI_API ImGuiID zguiDockBuilderAddNode(ImGuiID node_id, ImGuiDockNodeFlags flags) {
+    return ImGui::DockBuilderAddNode(node_id, flags);
+}
+
+ZGUI_API void zguiDockBuilderRemoveNode(ImGuiID node_id) {
+    ImGui::DockBuilderRemoveNode(node_id);
+}
+
+ZGUI_API void zguiDockBuilderSetNodePos(ImGuiID node_id, float pos[2]) {
+    ImGui::DockBuilderSetNodePos(node_id, {pos[0], pos[1]});
+}
+
+ZGUI_API void zguiDockBuilderSetNodeSize(ImGuiID node_id, float size[2]) {
+    ImGui::DockBuilderSetNodeSize(node_id, {size[0], size[1]});
+}
+
+ZGUI_API ImGuiID zguiDockBuilderSplitNode(
+    ImGuiID node_id,
+    ImGuiDir split_dir,
+    float size_ratio_for_node_at_dir,
+    ImGuiID* out_id_at_dir,
+    ImGuiID* out_id_at_opposite_dir
+) {
+    return ImGui::DockBuilderSplitNode(
+        node_id,
+        split_dir,
+        size_ratio_for_node_at_dir,
+        out_id_at_dir,
+        out_id_at_opposite_dir
+    );
+}
+
+ZGUI_API void zguiDockBuilderFinish(ImGuiID node_id) {
+    ImGui::DockBuilderFinish(node_id);
+}
+
+
+#if ZGUI_IMPLOT
 //--------------------------------------------------------------------------------------------------
 //
 // ImPlot
@@ -2184,7 +2318,7 @@ ZGUI_API void zguiPlot_PushStyleColor4f(ImPlotCol idx, const float col[4]) {
     ImPlot::PushStyleColor(idx, { col[0], col[1], col[2], col[3] });
 }
 
-ZGUI_API void zguiPlot_PushStyleColor1u(ImPlotCol idx, unsigned int col) {
+ZGUI_API void zguiPlot_PushStyleColor1u(ImPlotCol idx, ImU32 col) {
     ImPlot::PushStyleColor(idx, col);
 }
 
@@ -2218,14 +2352,6 @@ ZGUI_API void zguiPlot_SetupAxis(ImAxis axis, const char* label, ImPlotAxisFlags
 
 ZGUI_API void zguiPlot_SetupAxisLimits(ImAxis axis, double v_min, double v_max, ImPlotCond cond) {
     ImPlot::SetupAxisLimits(axis, v_min, v_max, cond);
-}
-
-ZGUI_API void zguiPlot_SetupAxisLimitsConstraints(ImAxis axis, double v_min, double v_max) {
-    ImPlot::SetupAxisLimitsConstraints(axis, v_min, v_max);
-}
-
-ZGUI_API void zguiPlot_SetupAxisZoomConstraints(ImAxis axis, double z_min, double z_max) {
-    ImPlot::SetupAxisZoomConstraints(axis, z_min, z_max);
 }
 
 ZGUI_API void zguiPlot_SetupFinish(void) {
@@ -2388,7 +2514,6 @@ ZGUI_API void zguiPlot_PlotShaded(
     else
         assert(false);
 }
-  
 ZGUI_API void zguiPlot_PlotBars(
     const char* label_id,
     ImGuiDataType data_type,
@@ -2451,6 +2576,18 @@ ZGUI_API void zguiPlot_PlotBarsValues(
         assert(false);
 }
 
+ZGUI_API bool zguiPlot_IsPlotHovered() {
+    return ImPlot::IsPlotHovered();
+}
+ZGUI_API void zguiPlot_GetLastItemColor(float color[4]) {
+  const ImVec4 col = ImPlot::GetLastItemColor();
+  color[0] = col.x;
+  color[1] = col.y;
+  color[2] = col.z;
+  color[3] = col.w;
+}
+
+
 ZGUI_API bool zguiPlot_DragPoint(
         int id,
         double* x,
@@ -2469,10 +2606,6 @@ ZGUI_API bool zguiPlot_DragPoint(
     );
 }
 
-ZGUI_API bool zguiPlot_IsPlotHovered() {
-    return ImPlot::IsPlotHovered();
-}
-
 ZGUI_API void zguiPlot_PlotText(
         const char* text,
         double x, double y,
@@ -2483,14 +2616,6 @@ ZGUI_API void zguiPlot_PlotText(
     ImPlot::PlotText(text, x, y, p, flags);
 }
 
-ZGUI_API void zguiPlot_GetLastItemColor(float color[4]) {
-  const ImVec4 col = ImPlot::GetLastItemColor();
-  color[0] = col.x;
-  color[1] = col.y;
-  color[2] = col.z;
-  color[3] = col.w;
-}
-
 ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
     ImPlot::ShowDemoWindow(p_open);
 }
@@ -2498,5 +2623,160 @@ ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
 ZGUI_API void zguiPlot_EndPlot(void) {
     ImPlot::EndPlot();
 }
+#endif /* #ifdef ZGUI_IMPLOT */
+
 //--------------------------------------------------------------------------------------------------
 } /* extern "C" */
+
+
+#if ZGUI_TE
+//--------------------------------------------------------------------------------------------------
+//
+// ImGUI Test Engine
+//
+//--------------------------------------------------------------------------------------------------
+extern "C"
+{
+
+    ZGUI_API void *zguiTe_CreateContext(void)
+    {
+        ImGuiTestEngine *e = ImGuiTestEngine_CreateContext();
+
+        ImGuiTestEngine_Start(e, ImGui::GetCurrentContext());
+        ImGuiTestEngine_InstallDefaultCrashHandler();
+
+        return e;
+    }
+
+    ZGUI_API void zguiTe_DestroyContext(ImGuiTestEngine *engine)
+    {
+        ImGuiTestEngine_DestroyContext(engine);
+    }
+
+    ZGUI_API void zguiTe_EngineSetRunSpeed(ImGuiTestEngine *engine, ImGuiTestRunSpeed speed)
+    {
+        ImGuiTestEngine_GetIO(engine).ConfigRunSpeed = speed;
+    }
+
+    ZGUI_API void zguiTe_EngineExportJunitResult(ImGuiTestEngine *engine, const char *filename)
+    {
+        ImGuiTestEngine_GetIO(engine).ExportResultsFilename = filename;
+        ImGuiTestEngine_GetIO(engine).ExportResultsFormat = ImGuiTestEngineExportFormat_JUnitXml;
+    }
+
+    ZGUI_API void zguiTe_TryAbortEngine(ImGuiTestEngine *engine)
+    {
+        ImGuiTestEngine_TryAbortEngine(engine);
+    }
+
+    ZGUI_API void zguiTe_Stop(ImGuiTestEngine *engine)
+    {
+        ImGuiTestEngine_Stop(engine);
+    }
+
+    ZGUI_API void zguiTe_PostSwap(ImGuiTestEngine *engine)
+    {
+        ImGuiTestEngine_PostSwap(engine);
+    }
+
+    ZGUI_API bool zguiTe_IsTestQueueEmpty(ImGuiTestEngine *engine)
+    {
+        return ImGuiTestEngine_IsTestQueueEmpty(engine);
+    }
+
+    ZGUI_API void zguiTe_GetResult(ImGuiTestEngine *engine, int *count_tested, int *count_success)
+    {
+        int ct = 0;
+        int cs = 0;
+        ImGuiTestEngine_GetResult(engine, ct, cs);
+        *count_tested = ct;
+        *count_success = cs;
+    }
+
+    ZGUI_API void zguiTe_PrintResultSummary(ImGuiTestEngine *engine)
+    {
+        ImGuiTestEngine_PrintResultSummary(engine);
+    }
+
+    ZGUI_API void zguiTe_QueueTests(ImGuiTestEngine *engine, ImGuiTestGroup group, const char *filter_str, ImGuiTestRunFlags run_flags)
+    {
+        ImGuiTestEngine_QueueTests(engine, group, filter_str, run_flags);
+    }
+
+    ZGUI_API void zguiTe_ShowTestEngineWindows(ImGuiTestEngine *engine, bool *p_open)
+    {
+        ImGuiTestEngine_ShowTestEngineWindows(engine, p_open);
+    }
+
+    ZGUI_API void *zguiTe_RegisterTest(ImGuiTestEngine *engine, const char *category, const char *name, const char *src_file, int src_line, ImGuiTestGuiFunc *gui_fce, ImGuiTestTestFunc *gui_test_fce)
+    {
+        auto t = ImGuiTestEngine_RegisterTest(engine, category, name, src_file, src_line);
+        t->GuiFunc = gui_fce;
+        t->TestFunc = gui_test_fce;
+        return t;
+    }
+
+    ZGUI_API bool zguiTe_Check(const char *file, const char *func, int line, ImGuiTestCheckFlags flags, bool result, const char *expr)
+    {
+        return ImGuiTestEngine_Check(file, func, line, flags, result, expr);
+    }
+
+    // CONTEXT
+
+    ZGUI_API void zguiTe_ContextSetRef(ImGuiTestContext *ctx, const char *ref)
+    {
+        ctx->SetRef(ref);
+    }
+
+    ZGUI_API void zguiTe_ContextWindowFocus(ImGuiTestContext *ctx, const char *ref)
+    {
+        ctx->WindowFocus(ref);
+    }
+
+    ZGUI_API void zguiTe_ContextItemAction(ImGuiTestContext *ctx, ImGuiTestAction action, const char *ref, ImGuiTestOpFlags flags = 0, void *action_arg = NULL)
+    {
+        ctx->ItemAction(action, ref, flags, action_arg);
+    }
+
+    ZGUI_API void zguiTe_ContextItemInputStrValue(ImGuiTestContext *ctx, const char *ref, const char *value)
+    {
+        ctx->ItemInputValue(ref, value);
+    }
+
+    ZGUI_API void zguiTe_ContextItemInputIntValue(ImGuiTestContext *ctx, const char *ref, int value)
+    {
+        ctx->ItemInputValue(ref, value);
+    }
+
+    ZGUI_API void zguiTe_ContextItemInputFloatValue(ImGuiTestContext *ctx, const char *ref, float value)
+    {
+        ctx->ItemInputValue(ref, value);
+    }
+
+    ZGUI_API void zguiTe_ContextYield(ImGuiTestContext *ctx, int frame_count)
+    {
+        ctx->Yield(frame_count);
+    }
+
+    ZGUI_API void zguiTe_ContextMenuAction(ImGuiTestContext *ctx, ImGuiTestAction action, const char *ref)
+    {
+        ctx->MenuAction(action, ref);
+    }
+
+    ZGUI_API void zguiTe_ContextDragAndDrop(ImGuiTestContext *ctx, const char *ref_src, const char *ref_dst, ImGuiMouseButton button)
+    {
+        ctx->ItemDragAndDrop(ref_src, ref_dst, button);
+    }
+
+    ZGUI_API void zguiTe_ContextKeyDown(ImGuiTestContext *ctx, ImGuiKeyChord key_chord)
+    {
+        ctx->KeyDown(key_chord);
+    }
+
+    ZGUI_API void zguiTe_ContextKeyUp(ImGuiTestContext *ctx, ImGuiKeyChord key_chord)
+    {
+        ctx->KeyUp(key_chord);
+    }
+
+} /* extern "C" */
+#endif

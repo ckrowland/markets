@@ -6,7 +6,6 @@ const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
 const zstbi = @import("zstbi");
-const zems = @import("zems");
 const Statistics = @import("statistics.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
@@ -16,30 +15,15 @@ const Producer = @import("producer.zig");
 const Camera = @import("camera.zig");
 const Square = @import("square.zig");
 const Circle = @import("circle.zig");
-const content_dir = @import("build_options").content_dir;
-const window_title = "Random Resource Simulator";
-const emscripten = zems.is_emscripten;
-
-pub const std_options = struct {
-    pub const logFn = if (emscripten) zems.emscriptenLog else std.log.defaultLog;
-};
 
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
 pub const NUM_CONSUMER_SIDES = 40;
 pub const PRODUCER_WIDTH = 40;
 
-pub fn GPA(comptime ems: bool) type {
-    if (ems) {
-        return zems.EmmalocAllocator;
-    } else {
-        return std.heap.GeneralPurposeAllocator(.{});
-    }
-}
-
-pub var state: DemoState = undefined;
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
+    window: *zglfw.Window,
     allocator: std.mem.Allocator,
     running: bool = false,
     push_coord_update: bool = false,
@@ -97,7 +81,21 @@ pub const Parameters = struct {
 };
 
 pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(allocator, window, .{});
+    const gctx = try zgpu.GraphicsContext.create(
+        allocator,
+        .{
+            .window = window,
+            .fn_getTime = @ptrCast(&zglfw.getTime),
+            .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
+            .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
+            .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
+            .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
+            .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
+            .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
+            .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
+        },
+        .{},
+    );
     const params = Parameters{
         .aspect = Camera.getAspectRatio(gctx),
         .num_producers = .{},
@@ -159,7 +157,8 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
 
     return DemoState{
         .gctx = gctx,
-        .content_scale = getContentScale(gctx),
+        .window = window,
+        .content_scale = getContentScale(window),
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, config.cpi),
             .square = Wgpu.createRenderPipeline(gctx, config.ppi),
@@ -361,7 +360,7 @@ pub fn draw(demo: *DemoState) void {
     gctx.submit(&.{commands});
 
     if (demo.gctx.present() == .swap_chain_resized) {
-        demo.content_scale = getContentScale(demo.gctx);
+        demo.content_scale = getContentScale(demo.window);
         setImguiContentScale(demo.content_scale);
         updateAspectRatio(demo);
     }
@@ -432,9 +431,8 @@ pub fn updateAspectRatio(demo: *DemoState) void {
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
-fn getContentScale(gctx: *zgpu.GraphicsContext) f32 {
-    if (emscripten) return 1;
-    const content_scale = gctx.window.getContentScale();
+fn getContentScale(window: *zglfw.Window) f32 {
+    const content_scale = window.getContentScale();
     return @max(content_scale[0], content_scale[1]);
 }
 
@@ -443,106 +441,64 @@ fn setImguiContentScale(scale: f32) void {
     zgui.getStyle().scaleAllSizes(scale);
 }
 
-pub fn stateDeinit(demo: *DemoState) void {
+pub fn deinit(demo: *DemoState) void {
     demo.gctx.destroy(demo.allocator);
     demo.stats.deinit();
     demo.buffers.data.consumers.list.deinit();
     demo.buffers.data.producers.list.deinit();
     demo.buffers.data.stats.list.deinit();
-    demo.* = undefined;
-}
-
-fn deinit(demo: *DemoState) void {
-    stateDeinit(demo);
-    zstbi.deinit();
-    zgui.backend.deinit();
-    zgui.plot.deinit();
-    zgui.deinit();
-    zglfw.terminate();
 }
 
 pub fn main() !void {
-    zglfw.init() catch {
-        std.log.err("Failed to initialize GLFW library.", .{});
-        return;
-    };
-    errdefer zglfw.terminate();
+    try zglfw.init();
+    defer zglfw.terminate();
 
     // Change current working directory to where the executable is located.
-    if (!emscripten) {
-        var buffer: [1024]u8 = undefined;
-        const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
-        std.os.chdir(path) catch {};
-    }
+    var buffer: [1024]u8 = undefined;
+    const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
+    std.posix.chdir(path) catch {};
 
-    if (emscripten) {
-        // by default emscripten initializes on window creation WebGL context
-        // this flag skips context creation. otherwise we later can't create webgpu surface
-        zglfw.WindowHint.set(.client_api, @intFromEnum(zglfw.ClientApi.no_api));
-    }
+    zglfw.windowHintTyped(.client_api, .no_api);
 
-    const window = zglfw.Window.create(1600, 1000, window_title, null) catch |err| {
-        std.log.err("Failed to create demo window. {}", .{err});
-        return;
-    };
-    errdefer window.destroy();
+    const window = try zglfw.Window.create(1600, 1000, "Simulations", null);
+    defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
     window.setPos(0, 0);
 
-    var gpa = GPA(emscripten){};
-    errdefer _ = if (!emscripten) gpa.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     zstbi.init(allocator);
-    errdefer zstbi.deinit();
+    defer zstbi.deinit();
 
-    state = try init(allocator, window);
-    errdefer stateDeinit(&state);
-    defer if (!emscripten) deinit(&state);
+    var demo = try init(allocator, window);
+    defer deinit(&demo);
 
     zgui.init(allocator);
-    errdefer zgui.deinit();
+    defer zgui.deinit();
     zgui.plot.init();
-    errdefer zgui.plot.deinit();
+    defer zgui.plot.deinit();
 
     zgui.io.setIniFilename(null);
 
     _ = zgui.io.addFontFromFile(
-        content_dir ++ "/fonts/Roboto-Medium.ttf",
-        26.0 * state.content_scale,
+        "content/fonts/Roboto-Medium.ttf",
+        26.0 * demo.content_scale,
     );
-    setImguiContentScale(state.content_scale);
+    setImguiContentScale(demo.content_scale);
 
     zgui.backend.init(
         window,
-        state.gctx.device,
+        demo.gctx.device,
         @intFromEnum(zgpu.GraphicsContext.swapchain_format),
+        @intFromEnum(wgpu.TextureFormat.undef),
     );
-    errdefer zgui.backend.deinit();
+    defer zgui.backend.deinit();
 
-    if (comptime !emscripten) {
-        while (!window.shouldClose()) {
-            tick();
-        }
-    } else {
-        const id = zems.emscripten_request_animation_frame_loop(&tickCB, null);
-        _ = id;
+    while (!window.shouldClose() and window.getKey(.escape) != .press) {
+        zglfw.pollEvents();
+        update(&demo);
+        draw(&demo);
     }
-}
-
-pub fn tick() void {
-    if (!state.gctx.canRender()) {
-        std.log.err("can't render!", .{});
-        return;
-    }
-    zglfw.pollEvents();
-    update(&state);
-    draw(&state);
-}
-
-pub export fn tickCB(time: f64, user_data: ?*anyopaque) c_int {
-    _ = user_data;
-    _ = time;
-    tick();
-    return 1; // return 0 to stop emscripten_request_animation_frame_loop
 }

@@ -1,47 +1,40 @@
 const gui = @import("gui.zig");
-
-pub const TextureFilterMode = enum(u32) {
-    nearest,
-    linear,
-};
-
-pub const Config = extern struct {
-    pipeline_multisample_count: u32 = 1,
-    texture_filter_mode: TextureFilterMode = .linear,
-};
+const backend_glfw = @import("backend_glfw.zig");
 
 // This call will install GLFW callbacks to handle GUI interactions.
 // Those callbacks will chain-call user's previously installed callbacks, if any.
 // This means that custom user's callbacks need to be installed *before* calling zgpu.gui.init().
-pub fn initWithConfig(
+pub fn init(
     window: *const anyopaque, // zglfw.Window
     wgpu_device: *const anyopaque, // wgpu.Device
     wgpu_swap_chain_format: u32, // wgpu.TextureFormat
-    config: Config,
+    wgpu_depth_format: u32, // wgpu.TextureFormat
 ) void {
-    if (!ImGui_ImplGlfw_InitForOther(window, true)) {
+    backend_glfw.init(window);
+
+    var info = ImGui_ImplWGPU_InitInfo{
+        .device = wgpu_device,
+        .num_frames_in_flight = 1,
+        .rt_format = wgpu_swap_chain_format,
+        .depth_format = wgpu_depth_format,
+        .pipeline_multisample_state = .{},
+    };
+
+    if (!ImGui_ImplWGPU_Init(&info)) {
         unreachable;
     }
-
-    if (!ImGui_ImplWGPU_Init(wgpu_device, 1, wgpu_swap_chain_format, &config)) {
-        unreachable;
-    }
-}
-
-pub fn init(window: *const anyopaque, wgpu_device: *const anyopaque, wgpu_swap_chain_format: u32) void {
-    initWithConfig(window, wgpu_device, wgpu_swap_chain_format, .{});
 }
 
 pub fn deinit() void {
     ImGui_ImplWGPU_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
+    backend_glfw.deinit();
 }
 
 pub fn newFrame(fb_width: u32, fb_height: u32) void {
     ImGui_ImplWGPU_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
+    backend_glfw.newFrame();
 
-    gui.io.setDisplaySize(@as(f32, @floatFromInt(fb_width)), @as(f32, @floatFromInt(fb_height)));
+    gui.io.setDisplaySize(@floatFromInt(fb_width), @floatFromInt(fb_height));
     gui.io.setDisplayFramebufferScale(1.0, 1.0);
 
     gui.newFrame();
@@ -52,17 +45,23 @@ pub fn draw(wgpu_render_pass: *const anyopaque) void {
     ImGui_ImplWGPU_RenderDrawData(gui.getDrawData(), wgpu_render_pass);
 }
 
-// Those functions are defined in `imgui_impl_glfw.cpp` and 'imgui_impl_wgpu.cpp`
-// (they include few custom changes).
-extern fn ImGui_ImplGlfw_InitForOther(window: *const anyopaque, install_callbacks: bool) bool;
-extern fn ImGui_ImplGlfw_NewFrame() void;
-extern fn ImGui_ImplGlfw_Shutdown() void;
-extern fn ImGui_ImplWGPU_Init(
+pub const ImGui_ImplWGPU_InitInfo = extern struct {
     device: *const anyopaque,
-    num_frames_in_flight: u32,
+    num_frames_in_flight: u32 = 1,
     rt_format: u32,
-    config: *const Config,
-) bool;
+    depth_format: u32,
+
+    pipeline_multisample_state: extern struct {
+        next_in_chain: ?*const anyopaque = null,
+        count: u32 = 1,
+        mask: u32 = @bitCast(@as(i32, -1)),
+        alpha_to_coverage_enabled: bool = false,
+    },
+};
+
+// Those functions are defined in 'imgui_impl_wgpu.cpp`
+// (they include few custom changes).
+extern fn ImGui_ImplWGPU_Init(init_info: *ImGui_ImplWGPU_InitInfo) bool;
 extern fn ImGui_ImplWGPU_NewFrame() void;
 extern fn ImGui_ImplWGPU_RenderDrawData(draw_data: *const anyopaque, pass_encoder: *const anyopaque) void;
 extern fn ImGui_ImplWGPU_Shutdown() void;

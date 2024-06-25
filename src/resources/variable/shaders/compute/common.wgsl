@@ -5,9 +5,6 @@ struct Consumer {
   destination: vec4<f32>,
   color: vec4<f32>,
   step_size: vec2<f32>,
-  moving_rate: f32,
-  max_demand_rate: u32,
-  income: u32,
   radius: f32,
   inventory: u32,
   balance: u32,
@@ -15,6 +12,14 @@ struct Consumer {
   producer_id: i32,
   grouping_id: u32,
 }
+
+//Might need padding if something is wonky
+struct ConsumerParams{
+  moving_rate: f32,
+  max_demand_rate: u32,
+  income: u32,
+}
+
 struct Producer {
   absolute_home: vec4<i32>,
   home: vec4<f32>,
@@ -33,8 +38,9 @@ struct Stats {
 }
 
 @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
-@group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
-@group(0) @binding(2) var<storage, read_write> stats: Stats;
+@group(0) @binding(1) var<storage, read_write> consumer_params: ConsumerParams;
+@group(0) @binding(2) var<storage, read_write> producers: array<Producer>;
+@group(0) @binding(3) var<storage, read_write> stats: Stats;
 
 fn step_sizes(pos: vec2<f32>, dest: vec2<f32>, mr: f32) -> vec2<f32>{
     let x_num_steps = num_steps(pos.x, dest.x, mr);

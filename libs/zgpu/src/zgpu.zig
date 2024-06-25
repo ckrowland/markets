@@ -1,32 +1,83 @@
-pub const version = @import("std").SemanticVersion{ .major = 0, .minor = 9, .patch = 1 };
 //--------------------------------------------------------------------------------------------------
 // zgpu is a small helper library built on top of native wgpu implementation (Dawn).
 //
-// It supports Windows 10+ (DirectX 12), macOS 12+ (Metal) and Linux (Vulkan)
+// It supports Windows 10+ (DirectX 12), macOS 12+ (Metal) and Linux (Vulkan).
 //
 // https://github.com/michal-z/zig-gamedev/tree/main/libs/zgpu
 //--------------------------------------------------------------------------------------------------
 const std = @import("std");
 const math = std.math;
 const assert = std.debug.assert;
-const zglfw = @import("zglfw");
 const wgsl = @import("common_wgsl.zig");
 const zgpu_options = @import("zgpu_options");
 pub const wgpu = @import("wgpu.zig");
-pub const slog = std.log.scoped(.zgpu); // scoped log that can be comptime processed in main logger
 
-comptime {
-    _ = @import("binding_tests.zig");
+test {
+    _ = wgpu;
 }
+
+pub const WindowProvider = struct {
+    window: *anyopaque,
+    fn_getTime: *const fn () f64,
+    fn_getFramebufferSize: *const fn (window: *const anyopaque) [2]u32,
+    fn_getWin32Window: *const fn (window: *const anyopaque) ?*anyopaque = undefined,
+    fn_getX11Display: *const fn () ?*anyopaque = undefined,
+    fn_getX11Window: *const fn (window: *const anyopaque) u32 = undefined,
+    fn_getWaylandDisplay: ?*const fn () ?*anyopaque = null,
+    fn_getWaylandSurface: ?*const fn (window: *const anyopaque) ?*anyopaque = null,
+    fn_getCocoaWindow: *const fn (window: *const anyopaque) ?*anyopaque = undefined,
+
+    fn getTime(self: WindowProvider) f64 {
+        return self.fn_getTime();
+    }
+
+    fn getFramebufferSize(self: WindowProvider) [2]u32 {
+        return self.fn_getFramebufferSize(self.window);
+    }
+
+    fn getWin32Window(self: WindowProvider) ?*anyopaque {
+        return self.fn_getWin32Window(self.window);
+    }
+
+    fn getX11Display(self: WindowProvider) ?*anyopaque {
+        return self.fn_getX11Display();
+    }
+
+    fn getX11Window(self: WindowProvider) u32 {
+        return self.fn_getX11Window(self.window);
+    }
+
+    fn getWaylandDisplay(self: WindowProvider) ?*anyopaque {
+        if (self.fn_getWaylandDisplay) |f| {
+            return f();
+        } else {
+            return @as(?*anyopaque, null);
+        }
+    }
+
+    fn getWaylandSurface(self: WindowProvider) ?*anyopaque {
+        if (self.fn_getWaylandSurface) |f| {
+            return f(self.window);
+        } else {
+            return @as(?*anyopaque, null);
+        }
+    }
+
+    fn getCocoaWindow(self: WindowProvider) ?*anyopaque {
+        return self.fn_getCocoaWindow(self.window);
+    }
+};
 
 pub const GraphicsContextOptions = struct {
     present_mode: wgpu.PresentMode = .fifo,
+    required_features: []const wgpu.FeatureName = &.{},
 };
 
 pub const GraphicsContext = struct {
     pub const swapchain_format = wgpu.TextureFormat.bgra8_unorm;
 
-    window: *zglfw.Window,
+    window_provider: WindowProvider,
+
     stats: FrameStats = .{},
 
     native_instance: DawnNativeInstance,
@@ -62,49 +113,15 @@ pub const GraphicsContext = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        window: *zglfw.Window,
+        window_provider: WindowProvider,
         options: GraphicsContextOptions,
     ) !*GraphicsContext {
-        const checkGraphicsApiSupport = (struct {
-            fn impl() error{VulkanNotSupported}!void {
-                // TODO: On Windows we should check if DirectX 12 is supported (Windows 10+).
+        dawnProcSetProcs(dnGetProcs());
 
-                // On Linux we require Vulkan support.
-                if (@import("builtin").target.os.tag == .linux) {
-                    if (!zglfw.isVulkanSupported()) {
-                        return error.VulkanNotSupported;
-                    }
-                    _ = zglfw.getRequiredInstanceExtensions() catch return error.VulkanNotSupported;
-                }
-            }
-        }).impl;
+        const native_instance = dniCreate();
+        errdefer dniDestroy(native_instance);
 
-        checkGraphicsApiSupport() catch |err| switch (err) {
-            error.VulkanNotSupported => {
-                slog.err("\n" ++
-                    \\---------------------------------------------------------------------------
-                    \\
-                    \\This program requires:
-                    \\
-                    \\  * Vulkan graphics driver on Linux (OpenGL is NOT supported)
-                    \\
-                    \\Please install latest supported driver and try again.
-                    \\
-                    \\---------------------------------------------------------------------------
-                    \\
-                , .{});
-                return err;
-            },
-        };
-
-        if (!emscripten) dawnProcSetProcs(dnGetProcs());
-
-        const native_instance = if (!emscripten) dniCreate();
-        errdefer if (!emscripten) dniDestroy(native_instance);
-
-        if (!emscripten) dniDiscoverDefaultAdapters(native_instance);
-
-        const instance = if (emscripten) wgpu.createInstance(.{}) else dniGetWgpuInstance(native_instance).?;
+        const instance = dniGetWgpuInstance(native_instance).?;
 
         const adapter = adapter: {
             const Response = struct {
@@ -133,16 +150,8 @@ pub const GraphicsContext = struct {
                 @ptrCast(&response),
             );
 
-            if (emscripten) {
-                // wait for response. requires emscripten `-sASYNC` flag
-                // otherwise whole api would need to be changed in a way that allows whole program to return from main and wait to js to call back
-                slog.debug("wait for instance.requestAdapter...", .{});
-                while (response.status == .unknown) emscripten_sleep(5);
-                slog.debug("{}", .{response.status});
-            }
-
             if (response.status != .success) {
-                slog.err("Failed to request GPU adapter (status: {s}).", .{@tagName(response.status)});
+                std.log.err("Failed to request GPU adapter (status: {s}).", .{@tagName(response.status)});
                 return error.NoGraphicsAdapter;
             }
             break :adapter response.adapter;
@@ -152,11 +161,11 @@ pub const GraphicsContext = struct {
         var properties: wgpu.AdapterProperties = undefined;
         properties.next_in_chain = null;
         adapter.getProperties(&properties);
-        slog.info("High-performance device has been selected:", .{});
-        slog.info("  Name: {s}", .{properties.name});
-        slog.info("  Driver: {s}", .{properties.driver_description});
-        slog.info("  Adapter type: {s}", .{@tagName(properties.adapter_type)});
-        slog.info("  Backend type: {s}", .{@tagName(properties.backend_type)});
+        std.log.info("[zgpu] High-performance device has been selected:", .{});
+        std.log.info("[zgpu]   Name: {s}", .{properties.name});
+        std.log.info("[zgpu]   Driver: {s}", .{properties.driver_description});
+        std.log.info("[zgpu]   Adapter type: {s}", .{@tagName(properties.adapter_type)});
+        std.log.info("[zgpu]   Backend type: {s}", .{@tagName(properties.backend_type)});
 
         const device = device: {
             const Response = struct {
@@ -179,7 +188,7 @@ pub const GraphicsContext = struct {
             }).callback;
 
             const toggles = [_][*:0]const u8{"skip_validation"};
-            const dawn_toggles = wgpu.DawnTogglesDeviceDescriptor{
+            const dawn_toggles = wgpu.DawnTogglesDescriptor{
                 .chain = .{ .next = null, .struct_type = .dawn_toggles_descriptor },
                 .enabled_toggles_count = toggles.len,
                 .enabled_toggles = &toggles,
@@ -192,21 +201,15 @@ pub const GraphicsContext = struct {
                         @ptrCast(&dawn_toggles)
                     else
                         null,
+                    .required_features_count = options.required_features.len,
+                    .required_features = options.required_features.ptr,
                 },
                 callback,
                 @ptrCast(&response),
             );
 
-            if (emscripten) {
-                // wait for response. requires emscripten `-sASYNC` flag
-                // otherwise whole api would need to be changed in a way that allows whole program to return from main and wait to js to call back
-                slog.debug("wait for adapter.requestDevice...", .{});
-                while (response.status == .unknown) emscripten_sleep(5);
-                slog.debug("{}", .{response.status});
-            }
-
             if (response.status != .success) {
-                slog.err("Failed to request GPU device (status: {s}).", .{@tagName(response.status)});
+                std.log.err("Failed to request GPU device (status: {s}).", .{@tagName(response.status)});
                 return error.NoGraphicsDevice;
             }
             break :device response.device;
@@ -215,10 +218,10 @@ pub const GraphicsContext = struct {
 
         device.setUncapturedErrorCallback(logUnhandledError, null);
 
-        const surface = createSurfaceForWindow(instance, window);
+        const surface = createSurfaceForWindow(instance, window_provider);
         errdefer surface.release();
 
-        const framebuffer_size = window.getFramebufferSize();
+        const framebuffer_size = window_provider.getFramebufferSize();
 
         const swapchain_descriptor = wgpu.SwapChainDescriptor{
             .label = "zig-gamedev-gctx-swapchain",
@@ -233,11 +236,11 @@ pub const GraphicsContext = struct {
 
         const gctx = try allocator.create(GraphicsContext);
         gctx.* = .{
-            .native_instance = if (emscripten) null else native_instance,
+            .window_provider = window_provider,
+            .native_instance = native_instance,
             .instance = instance,
             .device = device,
             .queue = device.getQueue(),
-            .window = window,
             .surface = surface,
             .swapchain = swapchain,
             .swapchain_descriptor = swapchain_descriptor,
@@ -289,7 +292,7 @@ pub const GraphicsContext = struct {
         gctx.swapchain.release();
         gctx.queue.release();
         gctx.device.release();
-        if (!emscripten) dniDestroy(gctx.native_instance);
+        dniDestroy(gctx.native_instance);
         allocator.destroy(gctx);
     }
 
@@ -307,14 +310,13 @@ pub const GraphicsContext = struct {
         const offset = gctx.uniforms.offset;
         const aligned_size = (size + (uniforms_alloc_alignment - 1)) & ~(uniforms_alloc_alignment - 1);
         if ((offset + aligned_size) >= uniforms_buffer_size) {
-            slog.err("Uniforms buffer size is too small. " ++
+            std.log.err("[zgpu] Uniforms buffer size is too small. " ++
                 "Consider increasing 'zgpu.BuildOptions.uniforms_buffer_size' constant.", .{});
             return .{ .slice = @as([*]T, undefined)[0..0], .offset = 0 };
         }
 
         const current = gctx.uniforms.stage.current;
-        const buf_ptr = (gctx.uniforms.stage.buffers[current].slice.?.ptr + offset);
-        const slice = (buf_ptr)[0..size];
+        const slice = (gctx.uniforms.stage.buffers[current].slice.?.ptr + offset)[0..size];
 
         gctx.uniforms.offset += aligned_size;
         return .{
@@ -344,9 +346,8 @@ pub const GraphicsContext = struct {
         assert(usb.slice == null);
         if (status == .success) {
             usb.slice = usb.buffer.getMappedRange(u8, 0, uniforms_buffer_size).?;
-            if (emscripten) assert(@intFromPtr(usb.slice.?.ptr) % 16 == 0); // see: https://github.com/emscripten-core/emscripten/pull/19477/commits/f4bb4f578131578cd13abbbf78d7f4273788d76f
         } else {
-            slog.err("Failed to map buffer (status: {s}).", .{@tagName(status)});
+            std.log.err("[zgpu] Failed to map buffer (status: {s}).", .{@tagName(status)});
         }
     }
 
@@ -375,11 +376,6 @@ pub const GraphicsContext = struct {
         }
 
         if (gctx.uniforms.stage.num >= uniforms_staging_pipeline_len) {
-            if (emscripten) {
-                // we can't block in requestAnimationFrame
-                slog.warn("uniformsNextStagingBuffer: Out of buffers! canRender() must be checked next frame, otherwise we will crash!", .{});
-                return; // use canRender() to check each frame if buffer is available
-            }
             // Wait until one of the buffers is mapped and ready to use.
             while (true) {
                 gctx.device.tick();
@@ -396,7 +392,6 @@ pub const GraphicsContext = struct {
 
         assert(gctx.uniforms.stage.num < uniforms_staging_pipeline_len);
         const current = gctx.uniforms.stage.num;
-        if (emscripten) slog.debug("Adding staging uniform buffer: {}", .{current});
         gctx.uniforms.stage.current = current;
         gctx.uniforms.stage.num += 1;
 
@@ -450,7 +445,8 @@ pub const GraphicsContext = struct {
         gctx.queue.onSubmittedWorkDone(0, gpuWorkDone, @ptrCast(&gctx.stats.gpu_frame_number));
         gctx.queue.submit(command_buffers.slice());
 
-        gctx.stats.tick();
+        gctx.stats.tick(gctx.window_provider.getTime());
+
         gctx.uniformsNextStagingBuffer();
     }
 
@@ -458,7 +454,7 @@ pub const GraphicsContext = struct {
         const gpu_frame_number: *u64 = @ptrCast(@alignCast(userdata));
         gpu_frame_number.* += 1;
         if (status != .success) {
-            slog.err("Failed to complete GPU work (status: {s}).", .{@tagName(status)});
+            std.log.err("[zgpu] Failed to complete GPU work (status: {s}).", .{@tagName(status)});
         }
     }
 
@@ -466,17 +462,9 @@ pub const GraphicsContext = struct {
         normal_execution,
         swap_chain_resized,
     } {
-        if (!emscripten) gctx.swapchain.present();
+        gctx.swapchain.present();
 
-        var fb_size = gctx.window.getFramebufferSize();
-        if (emscripten) {
-            var width: f64 = 0;
-            var height: f64 = 0;
-            _ = emscripten_get_element_css_size("canvas", &width, &height);
-            fb_size[0] = @intFromFloat(width);
-            fb_size[1] = @intFromFloat(height);
-        }
-
+        const fb_size = gctx.window_provider.getFramebufferSize();
         if (gctx.swapchain_descriptor.width != fb_size[0] or
             gctx.swapchain_descriptor.height != fb_size[1])
         {
@@ -487,8 +475,8 @@ pub const GraphicsContext = struct {
 
                 gctx.swapchain = gctx.device.createSwapChain(gctx.surface, gctx.swapchain_descriptor);
 
-                slog.info(
-                    "Window has been resized to: {d}x{d}.",
+                std.log.info(
+                    "[zgpu] Window has been resized to: {d}x{d}.",
                     .{ gctx.swapchain_descriptor.width, gctx.swapchain_descriptor.height },
                 );
                 return .swap_chain_resized;
@@ -496,56 +484,6 @@ pub const GraphicsContext = struct {
         }
 
         return .normal_execution;
-    }
-
-    //pub fn present(gctx: *GraphicsContext) enum {
-    //    normal_execution,
-    //    swap_chain_resized,
-    //} {
-    //    if (!emscripten) gctx.swapchain.present();
-
-    //    //const fb_size = gctx.window.getFramebufferSize();
-    //    var width: f64 = 0;
-    //    var height: f64 = 0;
-    //    _ = emscripten_get_element_css_size("canvas", &width, &height);
-
-    //    const int_width: u32 = @intFromFloat(width);
-    //    const int_height: u32 = @intFromFloat(height);
-    //    if (gctx.swapchain_descriptor.width != int_width or
-    //        gctx.swapchain_descriptor.height != int_height)
-    //    {
-    //        if (width != 0 and height != 0) {
-    //            gctx.swapchain_descriptor.width = int_width;
-    //            gctx.swapchain_descriptor.height = int_height;
-    //            gctx.swapchain.release();
-
-    //            gctx.swapchain = gctx.device.createSwapChain(gctx.surface, gctx.swapchain_descriptor);
-
-    //            slog.info(
-    //                "Window has been resized to: {d}x{d}.",
-    //                .{ gctx.swapchain_descriptor.width, gctx.swapchain_descriptor.height },
-    //            );
-    //            return .swap_chain_resized;
-    //        }
-    //    }
-
-    //    return .normal_execution;
-    //}
-
-    pub fn canRender(gctx: *GraphicsContext) bool {
-        if (emscripten) {
-            if (gctx.uniforms.stage.buffers[gctx.uniforms.stage.current].slice == null) {
-                var i: u32 = 0;
-                while (i < gctx.uniforms.stage.num) : (i += 1) {
-                    if (gctx.uniforms.stage.buffers[i].slice != null) {
-                        gctx.uniforms.stage.current = i;
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-        return true;
     }
 
     //
@@ -653,8 +591,8 @@ pub const GraphicsContext = struct {
                     .{ .gpuobj = pipeline, .pipeline_layout_handle = op.pipeline_layout },
                 );
             } else {
-                slog.err(
-                    "Failed to async create render pipeline (status: {s}, message: {?s}).",
+                std.log.err(
+                    "[zgpu] Failed to async create render pipeline (status: {s}, message: {?s}).",
                     .{ @tagName(status), message },
                 );
             }
@@ -714,8 +652,8 @@ pub const GraphicsContext = struct {
                     .{ .gpuobj = pipeline, .pipeline_layout_handle = op.pipeline_layout },
                 );
             } else {
-                slog.err(
-                    "Failed to async create compute pipeline (status: {s}, message: {?s}).",
+                std.log.err(
+                    "[zgpu] Failed to async create compute pipeline (status: {s}, message: {?s}).",
                     .{ @tagName(status), message },
                 );
             }
@@ -1048,7 +986,7 @@ pub const GraphicsContext = struct {
             });
             defer gctx.releaseResource(texture_view);
 
-            const bind_group = gctx.createBindGroup(mipgen.bind_group_layout, &[_]BindGroupEntryInfo{
+            const bind_group = gctx.createBindGroup(mipgen.bind_group_layout, &.{
                 .{ .binding = 0, .buffer_handle = gctx.uniforms.buffer, .offset = 0, .size = 8 },
                 .{ .binding = 1, .texture_view_handle = texture_view },
                 .{ .binding = 2, .texture_view_handle = mipgen.scratch_texture_views[0] },
@@ -1130,14 +1068,10 @@ const DawnProcsTable = ?*opaque {};
 extern fn dniCreate() DawnNativeInstance;
 extern fn dniDestroy(dni: DawnNativeInstance) void;
 extern fn dniGetWgpuInstance(dni: DawnNativeInstance) ?wgpu.Instance;
-extern fn dniDiscoverDefaultAdapters(dni: DawnNativeInstance) void;
 extern fn dnGetProcs() DawnProcsTable;
 
 // Defined in Dawn codebase
 extern fn dawnProcSetProcs(procs: DawnProcsTable) void;
-
-extern fn emscripten_sleep(ms: u32) void;
-extern fn emscripten_get_element_css_size(target: [*:0]const u8, width: *f64, height: *f64) void;
 
 /// Helper to create a buffer BindGroupLayoutEntry.
 pub fn bufferEntry(
@@ -1317,7 +1251,7 @@ pub fn createWgslShaderModule(
     source: [*:0]const u8,
     label: ?[*:0]const u8,
 ) wgpu.ShaderModule {
-    const wgsl_desc = wgpu.ShaderModuleWgslDescriptor{
+    const wgsl_desc = wgpu.ShaderModuleWGSLDescriptor{
         .chain = .{ .next = null, .struct_type = .shader_module_wgsl_descriptor },
         .code = source,
     };
@@ -1352,7 +1286,7 @@ pub fn imageInfoToTextureFormat(num_components: u32, bytes_per_component: u32, i
 
 pub const BufferInfo = struct {
     gpuobj: ?wgpu.Buffer = null,
-    size: u64 = 0,
+    size: usize = 0,
     usage: wgpu.BufferUsage = .{},
 };
 
@@ -1581,8 +1515,8 @@ const FrameStats = struct {
     cpu_frame_number: u64 = 0,
     gpu_frame_number: u64 = 0,
 
-    fn tick(stats: *FrameStats) void {
-        stats.time = zglfw.getTime();
+    fn tick(stats: *FrameStats, now_secs: f64) void {
+        stats.time = now_secs;
         stats.delta_time = @floatCast(stats.time - stats.previous_time);
         stats.previous_time = stats.time;
 
@@ -1605,66 +1539,95 @@ const SurfaceDescriptorTag = enum {
     metal_layer,
     windows_hwnd,
     xlib,
-    canvas_html,
+    wayland,
 };
 
-const SurfaceDescriptor = union(SurfaceDescriptorTag) { metal_layer: struct {
-    label: ?[*:0]const u8 = null,
-    layer: *anyopaque,
-}, windows_hwnd: struct {
-    label: ?[*:0]const u8 = null,
-    hinstance: *anyopaque,
-    hwnd: *anyopaque,
-}, xlib: struct {
-    label: ?[*:0]const u8 = null,
-    display: *anyopaque,
-    window: u32,
-}, canvas_html: struct {
-    label: ?[*:0]const u8 = null,
-    selector: [*:0]const u8,
-} };
+const SurfaceDescriptor = union(SurfaceDescriptorTag) {
+    metal_layer: struct {
+        label: ?[*:0]const u8 = null,
+        layer: *anyopaque,
+    },
+    windows_hwnd: struct {
+        label: ?[*:0]const u8 = null,
+        hinstance: *anyopaque,
+        hwnd: *anyopaque,
+    },
+    xlib: struct {
+        label: ?[*:0]const u8 = null,
+        display: *anyopaque,
+        window: u32,
+    },
+    wayland: struct {
+        label: ?[*:0]const u8 = null,
+        display: *anyopaque,
+        surface: *anyopaque,
+    },
+};
 
-fn createSurfaceForWindow(instance: wgpu.Instance, window: *zglfw.Window) wgpu.Surface {
+fn isLinuxDesktopLike(tag: std.Target.Os.Tag) bool {
+    return switch (tag) {
+        .linux,
+        .freebsd,
+        .kfreebsd,
+        .openbsd,
+        .dragonfly,
+        => true,
+        else => false,
+    };
+}
+
+fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvider) wgpu.Surface {
     const os_tag = @import("builtin").target.os.tag;
 
-    const descriptor = if (os_tag == .windows) SurfaceDescriptor{
-        .windows_hwnd = .{
-            .label = "basic surface",
-            .hinstance = std.os.windows.kernel32.GetModuleHandleW(null).?,
-            .hwnd = zglfw.native.getWin32Window(window) catch unreachable,
-        },
-    } else if (os_tag == .linux) SurfaceDescriptor{
-        .xlib = .{
-            .label = "basic surface",
-            .display = zglfw.native.getX11Display() catch unreachable,
-            .window = zglfw.native.getX11Window(window) catch unreachable,
-        },
-    } else if (os_tag == .macos) blk: {
-        const ns_window = zglfw.native.getCocoaWindow(window) catch unreachable;
-        const ns_view = msgSend(ns_window, "contentView", .{}, *anyopaque); // [nsWindow contentView]
-
-        // Create a CAMetalLayer that covers the whole window that will be passed to CreateSurface.
-        msgSend(ns_view, "setWantsLayer:", .{true}, void); // [view setWantsLayer:YES]
-        const layer = msgSend(objc.objc_getClass("CAMetalLayer"), "layer", .{}, ?*anyopaque); // [CAMetalLayer layer]
-        if (layer == null) @panic("failed to create Metal layer");
-        msgSend(ns_view, "setLayer:", .{layer.?}, void); // [view setLayer:layer]
-
-        // Use retina if the window was created with retina support.
-        const scale_factor = msgSend(ns_window, "backingScaleFactor", .{}, f64); // [ns_window backingScaleFactor]
-        msgSend(layer.?, "setContentsScale:", .{scale_factor}, void); // [layer setContentsScale:scale_factor]
-
-        break :blk SurfaceDescriptor{
-            .metal_layer = .{
+    const descriptor = switch (os_tag) {
+        .windows => SurfaceDescriptor{
+            .windows_hwnd = .{
                 .label = "basic surface",
-                .layer = layer.?,
+                .hinstance = std.os.windows.kernel32.GetModuleHandleW(null).?,
+                .hwnd = window_provider.getWin32Window().?,
             },
-        };
-    } else if (emscripten) SurfaceDescriptor{
-        .canvas_html = .{
-            .label = "basic surface",
-            .selector = "#canvas", // TODO: can this be somehow exposed through api?
         },
-    } else unreachable;
+        .macos => macos: {
+            const ns_window = window_provider.getCocoaWindow().?;
+            const ns_view = msgSend(ns_window, "contentView", .{}, *anyopaque); // [nsWindow contentView]
+
+            // Create a CAMetalLayer that covers the whole window that will be passed to CreateSurface.
+            msgSend(ns_view, "setWantsLayer:", .{true}, void); // [view setWantsLayer:YES]
+            const layer = msgSend(objc.objc_getClass("CAMetalLayer"), "layer", .{}, ?*anyopaque); // [CAMetalLayer layer]
+            if (layer == null) @panic("failed to create Metal layer");
+            msgSend(ns_view, "setLayer:", .{layer.?}, void); // [view setLayer:layer]
+
+            // Use retina if the window was created with retina support.
+            const scale_factor = msgSend(ns_window, "backingScaleFactor", .{}, f64); // [ns_window backingScaleFactor]
+            msgSend(layer.?, "setContentsScale:", .{scale_factor}, void); // [layer setContentsScale:scale_factor]
+
+            break :macos SurfaceDescriptor{
+                .metal_layer = .{
+                    .label = "basic surface",
+                    .layer = layer.?,
+                },
+            };
+        },
+        else => if (isLinuxDesktopLike(os_tag)) linux: {
+            if (window_provider.getWaylandDisplay()) |wl_display| {
+                break :linux SurfaceDescriptor{
+                    .wayland = .{
+                        .label = "basic surface",
+                        .display = wl_display,
+                        .surface = window_provider.getWaylandSurface().?,
+                    },
+                };
+            } else {
+                break :linux SurfaceDescriptor{
+                    .xlib = .{
+                        .label = "basic surface",
+                        .display = window_provider.getX11Display().?,
+                        .window = window_provider.getX11Window(),
+                    },
+                };
+            }
+        } else unreachable,
+    };
 
     return switch (descriptor) {
         .metal_layer => |src| blk: {
@@ -1699,13 +1662,14 @@ fn createSurfaceForWindow(instance: wgpu.Instance, window: *zglfw.Window) wgpu.S
                 .label = if (src.label) |l| l else null,
             });
         },
-        .canvas_html => |src| blk: {
-            var desc: wgpu.SurfaceDescriptorFromCanvasHTMLSelector = .{
-                .chain = .{ .struct_type = .surface_descriptor_from_canvas_html_selector, .next = null },
-                .selector = src.selector,
-            };
+        .wayland => |src| blk: {
+            var desc: wgpu.SurfaceDescriptorFromWaylandSurface = undefined;
+            desc.chain.next = null;
+            desc.chain.struct_type = .surface_descriptor_from_wayland_surface;
+            desc.display = src.display;
+            desc.surface = src.surface;
             break :blk instance.createSurface(.{
-                .next_in_chain = @as(*const wgpu.ChainedStruct, @ptrCast(&desc)),
+                .next_in_chain = @ptrCast(&desc),
                 .label = if (src.label) |l| l else null,
             });
         },
@@ -1764,12 +1728,12 @@ fn logUnhandledError(
 ) callconv(.C) void {
     _ = userdata;
     switch (err_type) {
-        .no_error => slog.info("No error: {?s}", .{message}),
-        .validation => slog.err("Validation: {?s}", .{message}),
-        .out_of_memory => slog.err("Out of memory: {?s}", .{message}),
-        .device_lost => slog.err("Device lost: {?s}", .{message}),
-        .internal => slog.err("Internal error: {?s}", .{message}),
-        .unknown => slog.err("Unknown error: {?s}", .{message}),
+        .no_error => std.log.info("[zgpu] No error: {?s}", .{message}),
+        .validation => std.log.err("[zgpu] Validation: {?s}", .{message}),
+        .out_of_memory => std.log.err("[zgpu] Out of memory: {?s}", .{message}),
+        .device_lost => std.log.err("[zgpu] Device lost: {?s}", .{message}),
+        .internal => std.log.err("[zgpu] Internal error: {?s}", .{message}),
+        .unknown => std.log.err("[zgpu] Unknown error: {?s}", .{message}),
     }
 
     // Exit the process for easier debugging.
@@ -1817,16 +1781,3 @@ fn formatToShaderFormat(format: wgpu.TextureFormat) []const u8 {
         else => unreachable,
     };
 }
-
-const emscripten = @import("zgpu_options").emscripten;
-usingnamespace if (emscripten) struct {
-    // Missing symbols
-    var wgpuDeviceTickWarnPrinted: bool = false;
-    pub export fn wgpuDeviceTick() void {
-        if (!wgpuDeviceTickWarnPrinted) {
-            std.log.warn("wgpuDeviceTick(): this fn should be avoided! RequestAnimationFrame() is advised for smooth rendering in browser.", .{});
-            wgpuDeviceTickWarnPrinted = true;
-        }
-        emscripten_sleep(1);
-    }
-} else struct {};

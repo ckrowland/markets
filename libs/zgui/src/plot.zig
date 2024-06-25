@@ -302,20 +302,6 @@ pub fn setupAxisLimits(axis: Axis, args: SetupAxisLimits) void {
 }
 extern fn zguiPlot_SetupAxisLimits(axis: Axis, min: f64, max: f64, cond: Condition) void;
 //----------------------------------------------------------------------------------------------
-const SetupAxisConstraints = struct {
-    min: f64,
-    max: f64,
-};
-pub fn setupAxisLimitsConstraints(axis: Axis, args: SetupAxisConstraints) void {
-    zguiPlot_SetupAxisLimitsConstraints(axis, args.min, args.max);
-}
-extern fn zguiPlot_SetupAxisLimitsConstraints(axis: Axis, min: f64, max: f64) void;
-
-pub fn setupAxisZoomConstraints(axis: Axis, args: SetupAxisConstraints) void {
-    zguiPlot_SetupAxisZoomConstraints(axis, args.min, args.max);
-}
-extern fn zguiPlot_SetupAxisZoomConstraints(axis: Axis, min: f64, max: f64) void;
-//----------------------------------------------------------------------------------------------
 /// `pub fn setupFinish() void`
 pub const setupFinish = zguiPlot_SetupFinish;
 extern fn zguiPlot_SetupFinish() void;
@@ -670,11 +656,6 @@ pub fn dragPoint(id: i32, args: DragPoint) bool {
 }
 extern fn zguiPlot_DragPoint(id: i32, x: *f64, y: *f64, *const [4]f32, size: f32, flags: DragToolFlags) bool;
 //----------------------------------------------------------------------------------------------
-pub fn isPlotHovered() bool {
-    return zguiPlot_IsPlotHovered();
-}
-extern fn zguiPlot_IsPlotHovered() bool;
-//----------------------------------------------------------------------------------------------
 // PlotText
 const PlotTextFlags = packed struct(u32) {
     vertical: bool = false,
@@ -697,6 +678,11 @@ extern fn zguiPlot_PlotText(
     flags: PlotTextFlags,
 ) void;
 
+//----------------------------------------------------------------------------------------------
+pub fn isPlotHovered() bool {
+    return zguiPlot_IsPlotHovered();
+}
+extern fn zguiPlot_IsPlotHovered() bool;
 //----------------------------------------------------------------------------------------------
 /// `pub fn showDemoWindow(popen: ?*bool) void`
 pub const showDemoWindow = zguiPlot_ShowDemoWindow;
