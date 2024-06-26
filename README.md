@@ -29,10 +29,6 @@ Mac and Windows apps coming soon.
 - Manually place position of consumers and producers.
 - Each producer and consumer grouping has individual parameters.
 
-## Consumer Incomes
-- Functionality is the same as the random simulation with one difference.
-- Controls consumer incomes with four distinct groups.
-
 ## Variable Parameters
 [variable.webm](https://github.com/ckrowland/simulations/assets/95145274/b7e97f85-6828-42fe-827d-af6ee2bdb049)
 - Very similiar to the random simulation.
