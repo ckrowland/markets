@@ -13,11 +13,12 @@ const Window = @import("windows.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
 
-pub fn update(demo: *DemoState) void {
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
     const gctx = demo.gctx;
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
         zgui.pushIntId(2);
+        selection_gui();
         parameters(demo, gctx);
         zgui.popId();
     }

@@ -80,22 +80,11 @@ pub const Parameters = struct {
     aspect: f32,
 };
 
-pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(
-        allocator,
-        .{
-            .window = window,
-            .fn_getTime = @ptrCast(&zglfw.getTime),
-            .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
-            .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
-            .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
-            .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
-            .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
-            .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
-            .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
-        },
-        .{},
-    );
+pub fn init(
+    gctx: *zgpu.GraphicsContext,
+    allocator: std.mem.Allocator,
+    window: *zglfw.Window,
+) !DemoState {
     const params = Parameters{
         .aspect = Camera.getAspectRatio(gctx),
         .num_producers = .{},
@@ -197,13 +186,13 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     };
 }
 
-pub fn update(demo: *DemoState) void {
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+    zglfw.pollEvents();
     const sd = demo.gctx.swapchain_descriptor;
     zgui.backend.newFrame(sd.width, sd.height);
     if (demo.push_restart) restartSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
-    gui.update(demo);
-    // zgui.showDemoWindow(null);
+    gui.update(demo, selection_gui);
 }
 
 pub fn draw(demo: *DemoState) void {
@@ -442,63 +431,8 @@ fn setImguiContentScale(scale: f32) void {
 }
 
 pub fn deinit(demo: *DemoState) void {
-    demo.gctx.destroy(demo.allocator);
     demo.stats.deinit();
     demo.buffers.data.consumers.list.deinit();
     demo.buffers.data.producers.list.deinit();
     demo.buffers.data.stats.list.deinit();
-}
-
-pub fn main() !void {
-    try zglfw.init();
-    defer zglfw.terminate();
-
-    // Change current working directory to where the executable is located.
-    var buffer: [1024]u8 = undefined;
-    const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
-    std.posix.chdir(path) catch {};
-
-    zglfw.windowHintTyped(.client_api, .no_api);
-
-    const window = try zglfw.Window.create(1600, 1000, "Simulations", null);
-    defer window.destroy();
-    window.setSizeLimits(400, 400, -1, -1);
-    window.setPos(0, 0);
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    zstbi.init(allocator);
-    defer zstbi.deinit();
-
-    var demo = try init(allocator, window);
-    defer deinit(&demo);
-
-    zgui.init(allocator);
-    defer zgui.deinit();
-    zgui.plot.init();
-    defer zgui.plot.deinit();
-
-    zgui.io.setIniFilename(null);
-
-    _ = zgui.io.addFontFromFile(
-        "content/fonts/Roboto-Medium.ttf",
-        26.0 * demo.content_scale,
-    );
-    setImguiContentScale(demo.content_scale);
-
-    zgui.backend.init(
-        window,
-        demo.gctx.device,
-        @intFromEnum(zgpu.GraphicsContext.swapchain_format),
-        @intFromEnum(wgpu.TextureFormat.undef),
-    );
-    defer zgui.backend.deinit();
-
-    while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        zglfw.pollEvents();
-        update(&demo);
-        draw(&demo);
-    }
 }

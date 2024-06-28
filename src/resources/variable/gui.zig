@@ -12,26 +12,16 @@ const Wgpu = @import("wgpu.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
 
-const gui_fn = *const fn (demo: *DemoState) void;
-pub const Window = struct {
-    pos: Pos,
-    size: Pos,
-    num_id: i32,
-    str_id: [:0]const u8,
-    visible: bool,
-    func: gui_fn,
-
-    const Pos = struct {
-        x: f32,
-        y: f32,
-        margin: struct {
-            percent: f32 = 0.02,
-            top: bool = true,
-            bottom: bool = true,
-            left: bool = true,
-            right: bool = true,
-        } = .{},
-    };
+pub const Pos = struct {
+    x: f32,
+    y: f32,
+    margin: struct {
+        percent: f32 = 0.02,
+        top: bool = true,
+        bottom: bool = true,
+        left: bool = true,
+        right: bool = true,
+    } = .{},
 };
 
 pub fn Slider(comptime T: type) type {
@@ -142,6 +132,7 @@ pub const Wave = struct {
     }
 };
 
+const GuiFn = *const fn (demo: *DemoState) void;
 pub const Agent = enum { consumer, producer, custom };
 pub const SliderInfo = struct {
     title: [:0]const u8,
@@ -151,7 +142,7 @@ pub const SliderInfo = struct {
     agent: union(Agent) {
         consumer: bool,
         producer: bool,
-        custom: gui_fn,
+        custom: GuiFn,
     },
 };
 
@@ -219,13 +210,42 @@ pub const Variables = struct {
     },
 };
 
-pub fn update(demo: *DemoState) void {
-    for (demo.imgui_windows) |window| {
-        if (window.visible) {
-            setupWindowPos(demo, window);
-            setupWindowSize(demo, window);
-            runWindow(demo, window);
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+    setupWindowPos(demo, .{ .x = 0, .y = 0 });
+    setupWindowSize(demo, .{ .x = 0.25, .y = 0.75 });
+    const flags = zgui.WindowFlags.no_decoration;
+    if (zgui.begin("0", .{ .flags = flags })) {
+        zgui.pushIntId(0);
+        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+        parameters(demo, selection_gui);
+        zgui.popId();
+    }
+    zgui.end();
+
+    var pos: Pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } };
+    var size: Pos = .{ .x = 1, .y = 0.25, .margin = .{ .top = false } };
+    setupWindowPos(demo, pos);
+    setupWindowSize(demo, size);
+    if (zgui.begin("1", .{ .flags = flags })) {
+        zgui.pushIntId(1);
+        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+        plots(demo);
+        zgui.popId();
+    }
+    zgui.end();
+
+    pos = .{ .x = 0.25, .y = 0, .margin = .{ .left = false } };
+    size = .{ .x = 0.75, .y = 0.75, .margin = .{ .left = false } };
+    if (demo.timeline_visible) {
+        setupWindowPos(demo, pos);
+        setupWindowSize(demo, size);
+        if (zgui.begin("2", .{ .flags = flags })) {
+            zgui.pushIntId(2);
+            zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+            timeline(demo);
+            zgui.popId();
         }
+        zgui.end();
     }
 }
 
@@ -252,11 +272,10 @@ pub fn updateWaves(demo: *DemoState) void {
     demo.params.sample_idx = @mod(sample_idx + 1, SAMPLE_SIZE);
 }
 
-pub fn setupWindowPos(demo: *DemoState, window: Window) void {
+pub fn setupWindowPos(demo: *DemoState, pos: Pos) void {
     const sd = demo.gctx.swapchain_descriptor;
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
-    const pos = window.pos;
     const pos_margin_pixels = getMarginPixels(sd, pos.margin.percent);
 
     var x = width * pos.x;
@@ -271,12 +290,10 @@ pub fn setupWindowPos(demo: *DemoState, window: Window) void {
     zgui.setNextWindowPos(.{ .x = x, .y = y });
 }
 
-pub fn setupWindowSize(demo: *DemoState, window: Window) void {
+pub fn setupWindowSize(demo: *DemoState, size: Pos) void {
     const sd = demo.gctx.swapchain_descriptor;
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
-
-    const size = window.size;
     const size_margin_pixels = getMarginPixels(sd, size.margin.percent);
 
     var w = width * size.x;
@@ -297,20 +314,6 @@ pub fn setupWindowSize(demo: *DemoState, window: Window) void {
     zgui.setNextWindowSize(.{ .w = w, .h = h });
 }
 
-pub fn runWindow(demo: *DemoState, window: Window) void {
-    const flags = zgui.WindowFlags.no_decoration;
-    const start = zgui.begin(window.str_id, .{ .flags = flags });
-    defer zgui.end();
-
-    if (start) {
-        zgui.pushIntId(window.num_id);
-        defer zgui.popId();
-
-        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        window.func(demo);
-    }
-}
-
 fn getMarginPixels(sd: wgpu.SwapChainDescriptor, margin_percent: f32) f32 {
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
@@ -319,7 +322,7 @@ fn getMarginPixels(sd: wgpu.SwapChainDescriptor, margin_percent: f32) f32 {
     return @min(margin_x, margin_y);
 }
 
-pub fn parameters(demo: *DemoState) void {
+pub fn parameters(demo: *DemoState, selection_gui: *const fn () void) void {
     inline for (@typeInfo(Variables).Struct.fields) |f| {
         const info = @field(demo.sliders, f.name);
         const param = &@field(demo.params, info.field);
@@ -328,6 +331,7 @@ pub fn parameters(demo: *DemoState) void {
             checkIfSliderUpdated(demo, slider_type, info);
         }
     }
+    selection_gui();
     if (zgui.beginTabBar("##tab_bar", .{})) {
         defer zgui.endTabBar();
         if (zgui.beginTabItem("Variables", .{})) {
@@ -363,7 +367,7 @@ pub fn parameters(demo: *DemoState) void {
 
 fn showTimeline(demo: *DemoState) void {
     if (zgui.button("Show Timeline", .{})) {
-        demo.imgui_windows[2].visible = !demo.imgui_windows[2].visible;
+        demo.timeline_visible = !demo.timeline_visible;
     }
 }
 
@@ -511,11 +515,11 @@ fn checkIfSliderUpdated(demo: *DemoState, comptime T: type, comptime info: Slide
                 );
             },
             .producer => Wgpu.setObjBufField(
-                demo,
+                demo.gctx,
                 Producer,
-                @TypeOf(param.slider.val),
                 info.field,
                 param.slider.val,
+                demo.buffers.data.producers,
             ),
             .custom => |func| func(demo),
         }
@@ -542,7 +546,15 @@ fn displaySlider(
                     &.{slider.val},
                 );
             },
-            .producer => Wgpu.setObjBufField(demo, Producer, T, info.field, slider.val),
+            .producer => {
+                Wgpu.setObjBufField(
+                    demo.gctx,
+                    Producer,
+                    info.field,
+                    slider.val,
+                    demo.buffers.data.producers,
+                );
+            },
             .custom => |func| func(demo),
         }
         slider.prev = slider.val;
@@ -627,7 +639,13 @@ fn buttons(demo: *DemoState) void {
     }
 
     if (zgui.button("Supply Shock", .{})) {
-        Wgpu.setObjBufField(demo, Producer, i32, "inventory", 0);
+        Wgpu.setObjBufField(
+            demo.gctx,
+            Producer,
+            "inventory",
+            0,
+            demo.buffers.data.producers,
+        );
     }
 
     zgui.sameLine(.{});

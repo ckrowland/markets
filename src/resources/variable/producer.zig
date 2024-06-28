@@ -10,7 +10,7 @@ const DemoState = Main.DemoState;
 const Parameters = Main.Parameters;
 const Camera = @import("camera.zig");
 
-const Self = @This();
+pub const Self = @This();
 
 absolute_home: [4]i32 = .{ 0, 0, 0, 0 },
 home: [4]f32 = .{ 0, 0, 0, 0 },

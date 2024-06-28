@@ -32,11 +32,12 @@ pub const State = struct {
     consumer_grouping_id: u32 = 0,
 };
 
-pub fn update(demo: *DemoState) !void {
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) !void {
     const gctx = demo.gctx;
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
         zgui.pushIntId(2);
+        selection_gui();
         parameters(demo, gctx);
         zgui.popId();
     }

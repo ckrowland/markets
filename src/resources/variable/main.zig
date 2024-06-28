@@ -1,6 +1,5 @@
 const std = @import("std");
 const math = std.math;
-const random = std.crypto.random;
 const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
@@ -33,32 +32,7 @@ pub const DemoState = struct {
     push_coord_update: bool = false,
     push_restart: bool = false,
     content_scale: f32,
-    imgui_windows: [3]Gui.Window = .{
-        .{
-            .pos = .{ .x = 0, .y = 0 },
-            .size = .{ .x = 0.25, .y = 0.75 },
-            .num_id = 0,
-            .str_id = "0",
-            .visible = true,
-            .func = Gui.parameters,
-        },
-        .{
-            .pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } },
-            .size = .{ .x = 1, .y = 0.25, .margin = .{ .top = false } },
-            .num_id = 1,
-            .str_id = "1",
-            .visible = true,
-            .func = Gui.plots,
-        },
-        .{
-            .pos = .{ .x = 0.25, .y = 0, .margin = .{ .left = false } },
-            .size = .{ .x = 0.75, .y = 0.75, .margin = .{ .left = false } },
-            .num_id = 2,
-            .str_id = "2",
-            .visible = true,
-            .func = Gui.timeline,
-        },
-    },
+    timeline_visible: bool,
     comptime sliders: Gui.Variables = .{},
     params: struct {
         sample_idx: usize,
@@ -109,23 +83,11 @@ pub const DemoState = struct {
     depth_texture_view: zgpu.TextureViewHandle,
 };
 
-pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
-    const gctx = try zgpu.GraphicsContext.create(
-        allocator,
-        .{
-            .window = window,
-            .fn_getTime = @ptrCast(&zglfw.getTime),
-            .fn_getFramebufferSize = @ptrCast(&zglfw.Window.getFramebufferSize),
-            .fn_getWin32Window = @ptrCast(&zglfw.getWin32Window),
-            .fn_getX11Display = @ptrCast(&zglfw.getX11Display),
-            .fn_getX11Window = @ptrCast(&zglfw.getX11Window),
-            .fn_getWaylandDisplay = @ptrCast(&zglfw.getWaylandDisplay),
-            .fn_getWaylandSurface = @ptrCast(&zglfw.getWaylandWindow),
-            .fn_getCocoaWindow = @ptrCast(&zglfw.getCocoaWindow),
-        },
-        .{},
-    );
-
+pub fn init(
+    gctx: *zgpu.GraphicsContext,
+    allocator: std.mem.Allocator,
+    window: *zglfw.Window,
+) !DemoState {
     const consumer_object = Wgpu.createObjectBuffer(
         gctx,
         Consumer,
@@ -154,9 +116,10 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
     });
     const depth = Wgpu.createDepthTexture(gctx);
 
-    return DemoState{
+    var demo = DemoState{
         .gctx = gctx,
         .window = window,
+        .timeline_visible = true,
         .aspect = Camera.getAspectRatio(gctx),
         .content_scale = getContentScale(window),
         .render_pipelines = .{
@@ -211,11 +174,29 @@ pub fn init(allocator: std.mem.Allocator, window: *zglfw.Window) !DemoState {
         },
         .stats = Statistics.init(allocator),
     };
+
+    const num_consumers = demo.params.num_consumers.slider.val;
+    const num_producers = demo.params.num_producers.slider.val;
+    Statistics.setNum(&demo, num_consumers, .consumers);
+    Statistics.setNum(&demo, num_producers, .producers);
+    Consumer.generateBulk(&demo, num_consumers);
+    Consumer.setParamsBuf(
+        &demo,
+        demo.params.moving_rate.slider.val,
+        demo.params.max_demand_rate.slider.val,
+        demo.params.income.slider.val,
+    );
+    Producer.generateBulk(&demo, num_producers);
+    setImguiContentScale(demo.content_scale);
+
+    return demo;
 }
 
-pub fn update(demo: *DemoState) void {
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+    zglfw.pollEvents();
     const sd = demo.gctx.swapchain_descriptor;
     zgui.backend.newFrame(sd.width, sd.height);
+
     if (demo.push_restart) restartSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
 
@@ -224,7 +205,7 @@ pub fn update(demo: *DemoState) void {
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
 
     //zgui.showDemoWindow(null);
-    Gui.update(demo);
+    Gui.update(demo, selection_gui);
 
     if (demo.running) {
         Gui.updateWaves(demo);
@@ -455,7 +436,7 @@ fn setImguiContentScale(scale: f32) void {
     zgui.plot.getStyle().line_weight = 2 * scale;
 }
 
-fn deinit(demo: *DemoState) void {
+pub fn deinit(demo: *DemoState) void {
     demo.params.num_consumers.wave.deinit();
     demo.params.num_producers.wave.deinit();
     demo.params.max_demand_rate.wave.deinit();
@@ -466,72 +447,5 @@ fn deinit(demo: *DemoState) void {
     demo.params.production_rate.wave.deinit();
     demo.params.max_inventory.wave.deinit();
     demo.stats.deinit();
-    demo.gctx.destroy(demo.allocator);
-}
-
-pub fn main() !void {
-    try zglfw.init();
-    defer zglfw.terminate();
-
-    // Change current working directory to where the executable is located.
-    var buffer: [1024]u8 = undefined;
-    const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
-    std.posix.chdir(path) catch {};
-
-    zglfw.windowHintTyped(.client_api, .no_api);
-
-    const window = try zglfw.Window.create(1600, 1000, "Simulations", null);
-    defer window.destroy();
-    window.setSizeLimits(400, 400, -1, -1);
-    window.setPos(0, 0);
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    zstbi.init(allocator);
-    defer zstbi.deinit();
-
-    var demo = try init(allocator, window);
-    defer deinit(&demo);
-
-    const num_consumers = demo.params.num_consumers.slider.val;
-    const num_producers = demo.params.num_producers.slider.val;
-    Statistics.setNum(&demo, num_consumers, .consumers);
-    Statistics.setNum(&demo, num_producers, .producers);
-    Consumer.generateBulk(&demo, num_consumers);
-    Consumer.setParamsBuf(
-        &demo,
-        demo.params.moving_rate.slider.val,
-        demo.params.max_demand_rate.slider.val,
-        demo.params.income.slider.val,
-    );
-    Producer.generateBulk(&demo, num_producers);
-
-    zgui.init(allocator);
-    defer zgui.deinit();
-    zgui.plot.init();
-    defer zgui.plot.deinit();
-
-    zgui.io.setIniFilename(null);
-
-    _ = zgui.io.addFontFromFile(
-        "content/fonts/Roboto-Medium.ttf",
-        26.0 * demo.content_scale,
-    );
-    setImguiContentScale(demo.content_scale);
-
-    zgui.backend.init(
-        window,
-        demo.gctx.device,
-        @intFromEnum(zgpu.GraphicsContext.swapchain_format),
-        @intFromEnum(wgpu.TextureFormat.undef),
-    );
-    defer zgui.backend.deinit();
-
-    while (!window.shouldClose() and window.getKey(.escape) != .press) {
-        zglfw.pollEvents();
-        update(&demo);
-        draw(&demo);
-    }
+    //demo.gctx.destroy(demo.allocator);
 }

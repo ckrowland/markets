@@ -19,24 +19,75 @@ pub fn build(b: *std.Build) void {
         .target = b.standardTargetOptions(.{}),
     };
 
-    inline for (comptime std.meta.declarations(demos)) |d| {
-        const exe = @field(demos, d.name).build(b, options);
+    const exe = b.addExecutable(.{
+        .name = "Simulations",
+        .root_source_file = b.path("src/main.zig"),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
 
-        // TODO: Problems with LTO on Windows.
-        if (exe.rootModuleTarget().os.tag == .windows) {
-            exe.want_lto = false;
-        }
+    @import("system_sdk").addLibraryPathsTo(exe);
 
-        if (exe.root_module.optimize == .ReleaseFast) {
-            exe.root_module.strip = true;
-        }
+    const zglfw = b.dependency("zglfw", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zglfw", zglfw.module("root"));
+    exe.linkLibrary(zglfw.artifact("glfw"));
 
-        const install_exe = b.addInstallArtifact(exe, .{});
-        b.getInstallStep().dependOn(&install_exe.step);
-        b.step(d.name, "Build '" ++ d.name ++ "' demo").dependOn(&install_exe.step);
+    @import("zgpu").addLibraryPathsTo(exe);
+    const zgpu = b.dependency("zgpu", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zgpu", zgpu.module("root"));
+    exe.linkLibrary(zgpu.artifact("zdawn"));
 
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_exe.step);
-        b.step(d.name ++ "-run", "Run '" ++ d.name ++ "' demo").dependOn(&run_cmd.step);
+    const zmath = b.dependency("zmath", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zmath", zmath.module("root"));
+
+    const zgui = b.dependency("zgui", .{
+        .target = options.target,
+        .backend = .glfw_wgpu,
+    });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
+
+    const zpool = b.dependency("zpool", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zpool", zpool.module("root"));
+
+    const zstbi = b.dependency("zstbi", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zstbi", zstbi.module("root"));
+    exe.linkLibrary(zstbi.artifact("zstbi"));
+
+    const install_content_step = b.addInstallDirectory(.{
+        .source_dir = b.path("content"),
+        .install_dir = .{ .custom = "" },
+        .install_subdir = "bin/content",
+    });
+    exe.step.dependOn(&install_content_step.step);
+
+    //inline for (comptime std.meta.declarations(demos)) |d| {
+
+    // TODO: Problems with LTO on Windows.
+    if (exe.rootModuleTarget().os.tag == .windows) {
+        exe.want_lto = false;
     }
+
+    if (exe.root_module.optimize == .ReleaseFast) {
+        exe.root_module.strip = true;
+    }
+
+    const install_exe = b.addInstallArtifact(exe, .{});
+    b.getInstallStep().dependOn(&install_exe.step);
+    b.step("demo", "Build demo").dependOn(&install_exe.step);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(&install_exe.step);
+    b.step("run", "Run demo").dependOn(&run_cmd.step);
+    //}
 }

@@ -54,10 +54,5 @@ Mac and Windows apps coming soon.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-
-zig build random-run
-zig build editor-run
-zig build income-run
-zig build variable-run
-
+zig build run
 ```

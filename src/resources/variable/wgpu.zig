@@ -70,19 +70,19 @@ pub const ComputePipelineInfo = struct {
 };
 
 pub fn setObjBufField(
-    demo: *DemoState,
+    gctx: *zgpu.GraphicsContext,
     comptime Object: type,
-    comptime Field: type,
     comptime tag: []const u8,
-    value: Field,
+    value: anytype,
+    obj_buf: ObjectBuffer(Object),
 ) void {
-    const object_name = @typeName(Object) ++ "s";
-    const obj_buf = &@field(demo.buffers.data, object_name);
-    const resource = demo.gctx.lookupResource(obj_buf.buf).?;
+    const resource = gctx.lookupResource(obj_buf.buf).?;
+    const fieldI = std.meta.fieldIndex(Object, tag);
+    const fieldType = @typeInfo(Object).Struct.fields[fieldI.?].type;
     const field_offset = @offsetOf(Object, tag);
     for (0..obj_buf.mapping.num_structs) |i| {
         const offset = i * @sizeOf(Object) + field_offset;
-        demo.gctx.queue.writeBuffer(resource, offset, Field, &.{value});
+        gctx.queue.writeBuffer(resource, offset, fieldType, &.{value});
     }
 }
 
