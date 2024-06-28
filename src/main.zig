@@ -32,10 +32,10 @@ pub fn main() !void {
 
     zglfw.windowHintTyped(.client_api, .no_api);
 
-    const window = try zglfw.Window.create(1600, 1000, "Simulations", null);
+    const window = try zglfw.Window.create(1600, 900, "Simulations", null);
     defer window.destroy();
     window.setSizeLimits(400, 400, -1, -1);
-    window.setPos(0, 0);
+    window.setPos(50, 50);
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
