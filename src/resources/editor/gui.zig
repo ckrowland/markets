@@ -32,7 +32,7 @@ pub const State = struct {
     consumer_grouping_id: u32 = 0,
 };
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) !void {
+pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
     const gctx = demo.gctx;
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
@@ -56,7 +56,7 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) !void {
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
     Wgpu.runCallbackIfReady(ConsumerHover, &demo.buffers.data.consumer_hovers.mapping);
 
-    try demo.popups.display(gctx, .{
+    demo.popups.display(gctx, .{
         .consumers = &demo.buffers.data.consumers,
         .consumer_hovers = &demo.buffers.data.consumer_hovers,
         .mouse = demo.mouse,
@@ -70,13 +70,13 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) !void {
         _ = switch (demo.gui.selection) {
             .none => {},
             .consumer => {
-                try addingConsumer(gctx, demo, addConsumer);
+                addingConsumer(gctx, demo, addConsumer);
             },
             .consumers => {
-                try addingConsumer(gctx, demo, addConsumerBrush);
+                addingConsumer(gctx, demo, addConsumerBrush);
             },
             .producer => {
-                try addingProducer(gctx, demo);
+                addingProducer(gctx, demo);
             },
         };
     }
@@ -123,11 +123,11 @@ fn addingConsumer(
     addFn: *const fn (
         gctx: *zgpu.GraphicsContext,
         demo: *DemoState,
-    ) std.mem.Allocator.Error!void,
-) !void {
+    ) void,
+) void {
     const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
     if (demo.mouse.down() and !space_taken) {
-        try addFn(gctx, demo);
+        addFn(gctx, demo);
     } else if (demo.mouse.released()) {
         const items = demo.buffers.data.consumers.list.items;
         const last_consumer = items[items.len - 1];
@@ -140,11 +140,11 @@ fn addingConsumer(
                     .moving_rate = Consumer.defaults.moving_rate,
                 },
             },
-        }) catch unreachable;
+        });
     }
 }
 
-fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
+fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     const gui_id = @as(u32, @intCast(demo.popups.popups.items.len));
     const consumer_args = Consumer.Args{
         .absolute_home = Camera.getGridFromWorld(gctx, demo.mouse.world_pos),
@@ -169,10 +169,10 @@ fn addConsumer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
         .buf = &demo.buffers.data.consumer_hovers,
     });
     demo.buffers.data.consumer_hovers.mapping.staging.num_structs += 1;
-    demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos) catch unreachable;
+    demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos);
 }
 
-fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
+fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     const world_pos = demo.mouse.world_pos;
     const offset = 20;
     const array_positions: [5][2]f32 = .{
@@ -208,10 +208,10 @@ fn addConsumerBrush(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
         .buf = &demo.buffers.data.consumer_hovers,
     });
     demo.buffers.data.consumer_hovers.mapping.staging.num_structs += 1;
-    demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos) catch unreachable;
+    demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos);
 }
 
-fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
+fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
     const space_taken = demo.popups.doesAgentExist(demo.mouse.grid_pos);
     if (demo.mouse.pressed() and !space_taken) {
         Producer.createAndAppend(gctx, .{
@@ -227,8 +227,8 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) !void {
             .param = .producers,
         });
 
-        try demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos);
-        try demo.popups.appendPopup(.{
+        demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos);
+        demo.popups.appendPopup(.{
             .grid_center = demo.mouse.grid_pos,
             .type_popup = .producer,
             .parameters = .{

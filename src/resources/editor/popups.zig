@@ -96,18 +96,18 @@ pub fn clear(self: *Self) void {
     self.y_axis.clearAndFree();
 }
 
-pub fn appendPopup(self: *Self, popup: Popup) !void {
+pub fn appendPopup(self: *Self, popup: Popup) void {
     var copy = popup;
     copy.id.gui_id = @as(u32, @intCast(self.popups.items.len));
     copy.id.hs_id = self.hover_square_len;
-    try self.popups.append(copy);
+    self.popups.append(copy) catch unreachable;
 }
 
 pub fn appendSquare(
     self: *Self,
     allocator: std.mem.Allocator,
     grid_pos: [2]i32,
-) !void {
+) void {
     const gui_id = @as(u32, @intCast(self.popups.items.len));
     const square = HoverSquare{
         .id = .{
@@ -121,7 +121,7 @@ pub fn appendSquare(
             grid_pos[1] + HOVER_SIZE_GRID,
         },
     };
-    try self.appendRange(allocator, square);
+    self.appendRange(allocator, square);
     self.hover_square_len += 1;
 }
 
@@ -182,9 +182,9 @@ fn resetRange(self: *Self, edges: [4]i32, gui_id: u32) void {
     resetCoords(&self.y_axis, edges[2..4], gui_id);
 }
 
-fn appendRange(self: *Self, allocator: std.mem.Allocator, hs: HoverSquare) !void {
-    try addCoords(&self.x_axis, allocator, hs.corners_grid[0..2], hs.id);
-    try addCoords(&self.y_axis, allocator, hs.corners_grid[2..4], hs.id);
+fn appendRange(self: *Self, allocator: std.mem.Allocator, hs: HoverSquare) void {
+    addCoords(&self.x_axis, allocator, hs.corners_grid[0..2], hs.id) catch unreachable;
+    addCoords(&self.y_axis, allocator, hs.corners_grid[2..4], hs.id) catch unreachable;
 }
 
 pub fn anyOpen(self: *Self) bool {
@@ -278,7 +278,7 @@ pub const popupArgs = struct {
     stats: Wgpu.ObjectBuffer(u32),
     allocator: std.mem.Allocator,
 };
-pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) !void {
+pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
     ConsumerHover.clearHover(gctx, args.consumer_hovers);
 
     const popup_idx = getPopupIndex(self, args.mouse.grid_pos) catch {
@@ -328,7 +328,7 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) !void 
         popup.pixel_center = pixel_center;
         popup.open_grid = open_grid;
 
-        try self.appendRange(args.allocator, .{
+        self.appendRange(args.allocator, .{
             .id = popup.id,
             .corners_grid = popup.open_grid,
         });

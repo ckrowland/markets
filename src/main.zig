@@ -83,52 +83,33 @@ pub fn main() !void {
     defer zgui.backend.deinit();
 
     while (!quit) {
-        switch (selection) {
-            Selection.Random => {
-                var demo = try Random.init(gctx, allocator, window);
-                defer Random.deinit(&demo);
-                quit = window.shouldClose();
-                while (!quit) {
-                    quit = window.shouldClose();
-                    switch (selection) {
-                        Selection.Variable, Selection.Editor => break,
-                        Selection.Random => {
-                            Random.update(&demo, &selectionGui);
-                            Random.draw(&demo);
-                        },
-                    }
-                }
+        inline for (.{
+            .{
+                .file = @import("resources/random/main.zig"),
+                .selection = Selection.Random,
             },
-            Selection.Editor => {
-                var demo = try Editor.init(gctx, allocator, window);
-                defer Editor.deinit(&demo);
-                quit = window.shouldClose();
-                while (!quit) {
-                    quit = window.shouldClose();
-                    switch (selection) {
-                        Selection.Random, Selection.Variable => break,
-                        Selection.Editor => {
-                            try Editor.update(&demo, &selectionGui);
-                            Editor.draw(&demo);
-                        },
-                    }
-                }
+            .{
+                .file = @import("resources/editor/main.zig"),
+                .selection = Selection.Editor,
             },
-            Selection.Variable => {
-                var demo = try Variable.init(gctx, allocator, window);
-                defer Variable.deinit(&demo);
-                quit = window.shouldClose();
-                while (!quit) {
-                    quit = window.shouldClose();
-                    switch (selection) {
-                        Selection.Random, Selection.Editor => break,
-                        Selection.Variable => {
-                            Variable.update(&demo, &selectionGui);
-                            Variable.draw(&demo);
-                        },
-                    }
-                }
+            .{
+                .file = @import("resources/variable/main.zig"),
+                .selection = Selection.Variable,
             },
+        }) |demo| {
+            var state = try demo.file.init(gctx, allocator, window);
+            defer demo.file.deinit(&state);
+            quit = window.shouldClose();
+            while (!quit) {
+                quit = window.shouldClose();
+                switch (selection) {
+                    demo.selection => {
+                        demo.file.update(&state, &selectionGui);
+                        demo.file.draw(&state);
+                    },
+                    else => break,
+                }
+            }
         }
     }
 }
