@@ -213,9 +213,6 @@ pub fn init(gctx: *zgpu.GraphicsContext, allocator: std.mem.Allocator, window: *
 }
 
 pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
-    zglfw.pollEvents();
-    const sd = demo.gctx.swapchain_descriptor;
-    zgui.backend.newFrame(sd.width, sd.height);
     if (demo.push_clear) clearSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
     demo.mouse.update(demo);

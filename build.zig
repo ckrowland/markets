@@ -6,7 +6,7 @@ pub const Options = struct {
     target: std.Build.ResolvedTarget,
 };
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const options = Options{
         .optimize = b.standardOptimizeOption(.{}),
         .target = b.standardTargetOptions(.{}),
@@ -25,13 +25,12 @@ pub fn build(b: *std.Build) void {
     b.step("run", "Run demo").dependOn(&run_cmd.step);
 
     var release_step = b.step("release", "create executables for all apps");
-    const zip_dir_command = b.addSystemCommand(&.{ "zip", "-r9" });
     inline for (.{
         .{ .os = .windows, .arch = .x86_64, .output = "apps/Windows/windows-x86_64" },
-        //.{ .os = .macos, .arch = .x86_64, .output = "apps/Mac/x86_64/Simulations.app/Contents/MacOS" },
+        .{ .os = .macos, .arch = .x86_64, .output = "apps/Mac/x86_64/Simulations.app/Contents/MacOS" },
         .{ .os = .macos, .arch = .aarch64, .output = "apps/Mac/M1/Simulations.app/Contents/MacOS" },
-        //.{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/x86_64/linux-x86_64" },
-        //.{ .os = .linux, .arch = .aarch64, .output = "apps/Linux/aarch64/linux-aarch64" },
+        .{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/x86_64/linux-x86_64" },
+        .{ .os = .linux, .arch = .aarch64, .output = "apps/Linux/aarch64/linux-aarch64" },
     }) |release| {
         const target = b.resolveTargetQuery(.{
             .cpu_arch = release.arch,
@@ -48,9 +47,11 @@ pub fn build(b: *std.Build) void {
         });
         release_step.dependOn(&install_release.step);
 
-        if (release.os != .macos) {
-            zip_dir_command.addArg(release.output ++ ".zip");
-            zip_dir_command.addArg(release.output);
+        if (release.os == .windows) {
+            const zip_dir_command = b.addSystemCommand(&.{ "zip", "-r9" });
+            zip_dir_command.setCwd(b.path("apps/Windows/Windows-x86_64"));
+            zip_dir_command.addArg("../windows-x86_64.zip");
+            zip_dir_command.addArg("./");
             release_step.dependOn(&zip_dir_command.step);
         }
     }
@@ -65,7 +66,6 @@ fn createExe(b: *std.Build, options: Options) *std.Build.Step.Compile {
     });
 
     @import("system_sdk").addLibraryPathsTo(exe);
-
     const zglfw = b.dependency("zglfw", .{
         .target = options.target,
     });

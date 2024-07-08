@@ -104,8 +104,12 @@ pub fn main() !void {
                 quit = window.shouldClose();
                 switch (selection) {
                     demo.selection => {
+                        zglfw.pollEvents();
+                        const sd = state.gctx.swapchain_descriptor;
+                        zgui.backend.newFrame(sd.width, sd.height);
                         demo.file.update(&state, &selectionGui);
                         demo.file.draw(&state);
+                        state.window.swapBuffers();
                     },
                     else => break,
                 }
