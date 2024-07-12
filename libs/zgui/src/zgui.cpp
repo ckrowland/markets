@@ -2587,6 +2587,13 @@ ZGUI_API void zguiPlot_GetLastItemColor(float color[4]) {
   color[3] = col.w;
 }
 
+ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
+    ImPlot::ShowDemoWindow(p_open);
+}
+
+ZGUI_API void zguiPlot_EndPlot(void) {
+    ImPlot::EndPlot();
+}
 
 ZGUI_API bool zguiPlot_DragPoint(
         int id,
@@ -2614,14 +2621,6 @@ ZGUI_API void zguiPlot_PlotText(
 ) {
     const ImVec2 p(pix_offset[0], pix_offset[1]);
     ImPlot::PlotText(text, x, y, p, flags);
-}
-
-ZGUI_API void zguiPlot_ShowDemoWindow(bool* p_open) {
-    ImPlot::ShowDemoWindow(p_open);
-}
-
-ZGUI_API void zguiPlot_EndPlot(void) {
-    ImPlot::EndPlot();
 }
 #endif /* #ifdef ZGUI_IMPLOT */
 
