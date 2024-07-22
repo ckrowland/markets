@@ -25,16 +25,18 @@ pub fn build(b: *std.Build) !void {
     b.step("run", "Run demo").dependOn(&run_cmd.step);
 
     var release_step = b.step("release", "create executables for all apps");
+    var build_step = b.step("build", "build executables for all apps");
     inline for (.{
         .{ .os = .windows, .arch = .x86_64, .output = "apps/Windows/windows-x86_64" },
         .{ .os = .macos, .arch = .x86_64, .output = "apps/Mac/x86_64/Simulations.app/Contents/MacOS" },
-        .{ .os = .macos, .arch = .aarch64, .output = "apps/Mac/M1/Simulations.app/Contents/MacOS" },
-        .{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/x86_64/linux-x86_64" },
-        .{ .os = .linux, .arch = .aarch64, .output = "apps/Linux/aarch64/linux-aarch64" },
+        .{ .os = .macos, .arch = .aarch64, .output = "apps/Mac/aarch64/Simulations.app/Contents/MacOS" },
+        .{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/linux-x86_64-gnu" },
+        //.{ .os = .linux, .arch = .aarch64, .output = "apps/Linux/aarch64/linux-aarch64" },
     }) |release| {
         const target = b.resolveTargetQuery(.{
             .cpu_arch = release.arch,
             .os_tag = release.os,
+            .abi = if (release.os == .linux) .gnu else null,
         });
         const release_exe = createExe(b, .{
             .optimize = .ReleaseFast,
@@ -45,16 +47,80 @@ pub fn build(b: *std.Build) !void {
                 .override = .{ .custom = "../" ++ release.output },
             },
         });
-        release_step.dependOn(&install_release.step);
+        build_step.dependOn(&install_release.step);
 
-        if (release.os == .windows) {
-            const zip_dir_command = b.addSystemCommand(&.{ "zip", "-r9" });
-            zip_dir_command.setCwd(b.path("apps/Windows/Windows-x86_64"));
-            zip_dir_command.addArg("../windows-x86_64.zip");
-            zip_dir_command.addArg("./");
-            release_step.dependOn(&zip_dir_command.step);
-        }
+        const install_content_step = b.addInstallDirectory(.{
+            .source_dir = b.path("content"),
+            .install_dir = .{ .custom = "../" ++ release.output },
+            .install_subdir = "content",
+        });
+        build_step.dependOn(&install_content_step.step);
     }
+
+    const zip_windows = b.addSystemCommand(&.{ "tar", "-cavf" });
+    zip_windows.setCwd(b.path("apps/Windows"));
+    zip_windows.addArg("windows-x86_64.tar.xz");
+    zip_windows.addArg("Windows-x86_64");
+    zip_windows.step.dependOn(build_step);
+
+    const zip_linux = b.addSystemCommand(&.{ "tar", "-cavf" });
+    zip_linux.setCwd(b.path("apps/Linux"));
+    zip_linux.addArg("linux-x86_64-gnu.tar.xz");
+    zip_linux.addArg("linux-x86_64-gnu");
+    zip_linux.step.dependOn(build_step);
+
+    const notarize_apps = b.option(
+        bool,
+        "notarize_apps",
+        "Create an apple signed dmg to distribute",
+    ) orelse false;
+
+    if (notarize_apps) {
+        var notarize_step = b.step("notarize", "notarize macos apps");
+        const dev_id = b.option(
+            []const u8,
+            "developer_id",
+            "Name of certificate used for codesigning macos applications",
+        );
+        const apple_id = b.option(
+            []const u8,
+            "apple_id",
+            "Apple Id used with your Apple Developer account.",
+        );
+        const apple_password = b.option(
+            []const u8,
+            "apple_password",
+            "The Apple app specific password used to notarize applications.",
+        );
+        const apple_team_id = b.option(
+            []const u8,
+            "apple_team_id",
+            "The Apple team ID given on you Apple Developer account.",
+        );
+
+        const x86_64 = notarizeMacApp(
+            b,
+            b.path("apps/Mac/x86_64"),
+            dev_id,
+            apple_id,
+            apple_password,
+            apple_team_id,
+        );
+        const aarch64 = notarizeMacApp(
+            b,
+            b.path("apps/Mac/aarch64"),
+            dev_id,
+            apple_id,
+            apple_password,
+            apple_team_id,
+        );
+        notarize_step.dependOn(x86_64);
+        notarize_step.dependOn(aarch64);
+    }
+
+    release_step.dependOn(build_step);
+    release_step.dependOn(&zip_windows.step);
+    release_step.dependOn(&zip_linux.step);
 }
 
 fn createExe(b: *std.Build, options: Options) *std.Build.Step.Compile {
@@ -119,4 +185,102 @@ fn createExe(b: *std.Build, options: Options) *std.Build.Step.Compile {
     }
 
     return exe;
+}
+
+fn notarizeMacApp(
+    b: *std.Build,
+    path: std.Build.LazyPath,
+    dev_id: ?[]const u8,
+    apple_id: ?[]const u8,
+    apple_password: ?[]const u8,
+    apple_team_id: ?[]const u8,
+) *std.Build.Step {
+    const codesign_app = b.addSystemCommand(&.{
+        "codesign",
+        "-f",
+        "-v",
+        "--deep",
+        "--options=runtime",
+        "--timestamp",
+        "-s",
+        dev_id.?,
+        "Simulations.app",
+    });
+    codesign_app.setCwd(path);
+
+    const create_dmg = b.addSystemCommand(&.{
+        "hdiutil",
+        "create",
+        "-volname",
+        "Simulations",
+        "-srcfolder",
+        "Simulations.app",
+        "-ov",
+        "Simulations.dmg",
+    });
+    create_dmg.setCwd(path);
+    create_dmg.step.dependOn(&codesign_app.step);
+
+    const codesign_dmg = b.addSystemCommand(&.{
+        "codesign",
+        "--timestamp",
+        "-s",
+        dev_id.?,
+        "Simulations.dmg",
+    });
+    codesign_dmg.setCwd(path);
+    codesign_dmg.step.dependOn(&create_dmg.step);
+
+    const notarize_dmg = b.addSystemCommand(&.{
+        "xcrun",
+        "notarytool",
+        "submit",
+        "Simulations.dmg",
+        "--apple-id",
+        apple_id.?,
+        "--password",
+        apple_password.?,
+        "--team-id",
+        apple_team_id.?,
+        "--wait",
+    });
+    notarize_dmg.setCwd(path);
+    notarize_dmg.step.dependOn(&codesign_dmg.step);
+
+    const staple_app = b.addSystemCommand(&.{
+        "xcrun",
+        "stapler",
+        "staple",
+        "Simulations.app",
+    });
+    staple_app.setCwd(path);
+    staple_app.step.dependOn(&notarize_dmg.step);
+
+    const staple_dmg = b.addSystemCommand(&.{
+        "xcrun",
+        "stapler",
+        "staple",
+        "Simulations.dmg",
+    });
+    staple_dmg.setCwd(path);
+    staple_dmg.step.dependOn(&staple_app.step);
+
+    const validate_app = b.addSystemCommand(&.{
+        "xcrun",
+        "stapler",
+        "validate",
+        "Simulations.app",
+    });
+    validate_app.setCwd(path);
+    validate_app.step.dependOn(&staple_dmg.step);
+
+    const validate_dmg = b.addSystemCommand(&.{
+        "xcrun",
+        "stapler",
+        "validate",
+        "Simulations.dmg",
+    });
+    validate_dmg.setCwd(path);
+    validate_dmg.step.dependOn(&validate_app.step);
+    return &validate_dmg.step;
 }

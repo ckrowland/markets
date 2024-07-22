@@ -1054,7 +1054,6 @@ fn _isLinuxDesktopLike() bool {
     return switch (builtin.target.os.tag) {
         .linux,
         .freebsd,
-        .kfreebsd,
         .openbsd,
         .dragonfly,
         => true,
