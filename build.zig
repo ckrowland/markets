@@ -42,6 +42,9 @@ pub fn build(b: *std.Build) !void {
             .optimize = .ReleaseFast,
             .target = target,
         });
+        if (release.os == .macos) {
+            release_exe.headerpad_size = 0x10000;
+        }
         const install_release = b.addInstallArtifact(release_exe, .{
             .dest_dir = .{
                 .override = .{ .custom = "../" ++ release.output },
