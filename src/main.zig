@@ -7,11 +7,13 @@ const zstbi = @import("zstbi");
 const Random = @import("resources/random/main.zig");
 const Editor = @import("resources/editor/main.zig");
 const Variable = @import("resources/variable/main.zig");
+//const MergeSort = @import("algorithms/mergesort/main.zig");
 
 const Selection = enum {
     Random,
     Editor,
     Variable,
+    //MergeSort,
 };
 pub var selection = Selection.Variable;
 pub fn selectionGui() void {
@@ -96,6 +98,10 @@ pub fn main() !void {
                 .file = @import("resources/variable/main.zig"),
                 .selection = Selection.Variable,
             },
+            //.{
+            //    .file = @import("algorithms/mergesort/main.zig"),
+            //    .selection = Selection.MergeSort,
+            //},
         }) |demo| {
             var state = try demo.file.init(gctx, allocator, window);
             defer demo.file.deinit(&state);

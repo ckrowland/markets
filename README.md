@@ -1,8 +1,7 @@
 # Simulations
 GPU accelerated visual simulations for basic economies.
 Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
-Only build from source available.
-Mac and Windows apps coming soon.
+Download from the latest release or build from source. 
 
 ## Random Resource Simulation
 [demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
