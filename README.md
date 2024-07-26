@@ -1,5 +1,5 @@
-# Basic Economies
-GPU accelerated visual simulations for basic economies.
+# Basic Markets
+Visually simulate markets of basic consumers and producers
 Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
 Download from the latest release or build from source. 
 
