@@ -1,4 +1,4 @@
-# Simulations
+# Basic Economies
 GPU accelerated visual simulations for basic economies.
 Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
 Download from the latest release or build from source. 

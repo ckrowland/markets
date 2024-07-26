@@ -4,16 +4,14 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zstbi = @import("zstbi");
-const Random = @import("resources/random/main.zig");
-const Editor = @import("resources/editor/main.zig");
-const Variable = @import("resources/variable/main.zig");
-//const MergeSort = @import("algorithms/mergesort/main.zig");
+const Random = @import("random/main.zig");
+const Editor = @import("editor/main.zig");
+const Variable = @import("variable/main.zig");
 
 const Selection = enum {
     Random,
     Editor,
     Variable,
-    //MergeSort,
 };
 pub var selection = Selection.Variable;
 pub fn selectionGui() void {
@@ -87,21 +85,17 @@ pub fn main() !void {
     while (!quit) {
         inline for (.{
             .{
-                .file = @import("resources/random/main.zig"),
+                .file = @import("random/main.zig"),
                 .selection = Selection.Random,
             },
             .{
-                .file = @import("resources/editor/main.zig"),
+                .file = @import("editor/main.zig"),
                 .selection = Selection.Editor,
             },
             .{
-                .file = @import("resources/variable/main.zig"),
+                .file = @import("variable/main.zig"),
                 .selection = Selection.Variable,
             },
-            //.{
-            //    .file = @import("algorithms/mergesort/main.zig"),
-            //    .selection = Selection.MergeSort,
-            //},
         }) |demo| {
             var state = try demo.file.init(gctx, allocator, window);
             defer demo.file.deinit(&state);
