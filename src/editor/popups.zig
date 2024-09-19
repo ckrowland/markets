@@ -11,7 +11,7 @@ const Camera = @import("camera.zig");
 const ConsumerHover = @import("consumer_hover.zig");
 const Callbacks = @import("callbacks.zig");
 
-pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 350, 150 };
+pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 350, 135 };
 const HOVER_SIZE_GRID = 40;
 
 const HoverSquareID = struct {
@@ -277,6 +277,7 @@ pub const popupArgs = struct {
     producers: Wgpu.ObjectBuffer(Producer),
     stats: Wgpu.ObjectBuffer(u32),
     allocator: std.mem.Allocator,
+    content_scale: f32,
 };
 pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
     ConsumerHover.clearHover(gctx, args.consumer_hovers);
@@ -303,9 +304,9 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
         var center = popup.grid_center;
         const pixel_center = Camera.getPixelPosition(gctx, center);
         const min_x_pixel = pixel_center[0] - HOVER_SIZE_GRID;
-        const max_x_pixel = pixel_center[0] + WINDOW_SIZE_PIXELS[0];
+        const max_x_pixel = pixel_center[0] + (WINDOW_SIZE_PIXELS[0] * args.content_scale);
         const min_y_pixel = pixel_center[1] - HOVER_SIZE_GRID;
-        const max_y_pixel = pixel_center[1] + WINDOW_SIZE_PIXELS[1];
+        const max_y_pixel = pixel_center[1] + (WINDOW_SIZE_PIXELS[1] * args.content_scale);
 
         var open_grid: [4]i32 = .{
             popup.grid_center[0] - HOVER_SIZE_GRID,
@@ -348,8 +349,8 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
     }
 
     zgui.setNextWindowSize(.{
-        .w = WINDOW_SIZE_PIXELS[0],
-        .h = WINDOW_SIZE_PIXELS[1],
+        .w = WINDOW_SIZE_PIXELS[0] * args.content_scale,
+        .h = WINDOW_SIZE_PIXELS[1] * args.content_scale,
     });
 
     switch (popup.type_popup) {

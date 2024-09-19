@@ -63,6 +63,7 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
         .producers = demo.buffers.data.producers,
         .stats = demo.buffers.data.stats,
         .allocator = demo.allocator,
+        .content_scale = demo.content_scale,
     });
 
     hoverUpdate(gctx, demo);

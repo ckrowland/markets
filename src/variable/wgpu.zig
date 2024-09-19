@@ -53,13 +53,13 @@ fn Callback(comptime T: type) type {
 
 pub const RenderPipelineInfo = struct {
     pub const Attribute = struct {
-        name: []const u8,
+        offset: comptime_int,
         type: type,
     };
 
     vs: [:0]const u8,
     fs: [:0]const u8,
-    inst_type: type,
+    inst_size: comptime_int,
     inst_attrs: []const Attribute,
     primitive_topology: wgpu.PrimitiveTopology = .triangle_list,
 };
@@ -72,17 +72,15 @@ pub const ComputePipelineInfo = struct {
 pub fn setObjBufField(
     gctx: *zgpu.GraphicsContext,
     comptime Object: type,
-    comptime tag: []const u8,
-    value: anytype,
+    comptime ValueType: type,
+    field_offset: u32,
+    value: ValueType,
     obj_buf: ObjectBuffer(Object),
 ) void {
     const resource = gctx.lookupResource(obj_buf.buf).?;
-    const fieldI = std.meta.fieldIndex(Object, tag);
-    const fieldType = @typeInfo(Object).Struct.fields[fieldI.?].type;
-    const field_offset = @offsetOf(Object, tag);
     for (0..obj_buf.mapping.num_structs) |i| {
         const offset = i * @sizeOf(Object) + field_offset;
-        gctx.queue.writeBuffer(resource, offset, fieldType, &.{value});
+        gctx.queue.writeBuffer(resource, offset, ValueType, &.{value});
     }
 }
 
@@ -446,7 +444,7 @@ pub fn createRenderPipeline(
         inline for (args.inst_attrs, 0..) |attr, i| {
             arr[i] = .{
                 .format = getWgpuType(attr.type) catch unreachable,
-                .offset = @offsetOf(args.inst_type, attr.name),
+                .offset = attr.offset,
                 .shader_location = i + 1,
             };
         }
@@ -461,7 +459,7 @@ pub fn createRenderPipeline(
             .step_mode = .vertex,
         },
         .{
-            .array_stride = @sizeOf(args.inst_type),
+            .array_stride = args.inst_size,
             .attribute_count = instance_attributes.len,
             .attributes = &instance_attributes,
             .step_mode = .instance,

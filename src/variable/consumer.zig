@@ -35,33 +35,28 @@ pub const Params = struct {
 pub const z_pos = 0;
 pub fn generateBulk(demo: *DemoState, num: u32) void {
     for (0..num) |_| {
-        const c = createNewConsumer(demo);
-        appendConsumer(demo, c);
-    }
-}
-pub fn createNewConsumer(demo: *DemoState) Self {
-    const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
-    const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
-    const f_x = @as(f32, @floatFromInt(x)) * demo.aspect;
-    const f_y = @as(f32, @floatFromInt(y));
-    const home = [4]f32{ f_x, f_y, z_pos, 1 };
-    return .{
-        .absolute_home = .{ x, y, z_pos, 1 },
-        .position = home,
-        .home = home,
-        .destination = home,
-    };
-}
+        const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
+        const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
+        const f_x = @as(f32, @floatFromInt(x)) * demo.aspect;
+        const f_y = @as(f32, @floatFromInt(y));
+        const home = [4]f32{ f_x, f_y, z_pos, 1 };
+        var consumers: [1]Self = .{
+            .{
+                .absolute_home = .{ x, y, z_pos, 1 },
+                .position = home,
+                .home = home,
+                .destination = home,
+            },
+        };
 
-pub fn appendConsumer(demo: *DemoState, c: Self) void {
-    const obj_buf = &demo.buffers.data.consumers;
-    var consumers: [1]Self = .{c};
-    Wgpu.appendBuffer(demo.gctx, Self, .{
-        .num_old_structs = obj_buf.mapping.num_structs,
-        .buf = obj_buf.buf,
-        .structs = consumers[0..],
-    });
-    obj_buf.mapping.num_structs += 1;
+        const obj_buf = &demo.buffers.data.consumers;
+        Wgpu.appendBuffer(demo.gctx, Self, .{
+            .num_old_structs = obj_buf.mapping.num_structs,
+            .buf = obj_buf.buf,
+            .structs = consumers[0..],
+        });
+        obj_buf.mapping.num_structs += 1;
+    }
 }
 
 pub fn setParamsBuf(demo: *DemoState, mr: f32, mdr: u32, income: u32) void {

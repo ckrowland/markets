@@ -37,26 +37,46 @@ pub fn Slider(comptime T: type) type {
     };
 }
 
+const GuiFn = *const fn (demo: *DemoState) void;
+pub const Agent = enum { consumer, producer, custom };
+pub const AgentUnion = union(Agent) {
+    consumer: u32,
+    producer: u32,
+    custom: GuiFn,
+};
+pub const VariableParams = struct {
+    min: f64,
+    mid: f64,
+    max: f64,
+    margin: f64,
+    ratio: f64,
+    variable: bool,
+    extra: bool,
+    title: [:0]const u8,
+    help: ?[:0]const u8 = null,
+    agent: AgentUnion,
+};
 pub fn Variable(comptime T: type) type {
     return struct {
         slider: Slider(T),
         wave: Wave,
+        extra: bool,
+        title: [:0]const u8,
+        help: ?[:0]const u8,
+        scale: [:0]const u8,
+        plot_name: [:0]const u8,
+        agent: AgentUnion,
 
         pub fn init(
             alloc: std.mem.Allocator,
-            min: f64,
-            mid: f64,
-            max: f64,
-            margin: f64,
-            ratio: f64,
-            variable: bool,
+            params: VariableParams,
         ) Variable(T) {
-            const dist_to_min = mid - min;
-            const dist_to_max = max - mid;
+            const dist_to_min = params.mid - params.min;
+            const dist_to_max = params.max - params.mid;
             const wave_amplitude = @min(dist_to_min, dist_to_max);
-            const scale = max / 1000;
-            const wave_margin = margin * scale;
-            var wave_max = mid + wave_amplitude - wave_margin;
+            const scale = params.max / 1000;
+            const wave_margin = params.margin * scale;
+            var wave_max = params.mid + wave_amplitude - wave_margin;
             if (wave_max <= 0) wave_max += wave_margin;
 
             var s_min: T = undefined;
@@ -65,20 +85,42 @@ pub fn Variable(comptime T: type) type {
 
             switch (T) {
                 f32, f64 => {
-                    s_min = @floatCast(min);
-                    s_mid = @floatCast(mid);
-                    s_max = @floatCast(max);
+                    s_min = @floatCast(params.min);
+                    s_mid = @floatCast(params.mid);
+                    s_max = @floatCast(params.max);
                 },
                 else => {
-                    s_min = @intFromFloat(min);
-                    s_mid = @intFromFloat(mid);
-                    s_max = @intFromFloat(max);
+                    s_min = @intFromFloat(params.min);
+                    s_mid = @intFromFloat(params.mid);
+                    s_max = @intFromFloat(params.max);
                 },
             }
+
+            const scale_str = std.fmt.allocPrintZ(alloc, "{d}", .{scale}) catch unreachable;
+            const plot_str = std.fmt.allocPrintZ(alloc, "{s} x {d}", .{ params.title, scale }) catch unreachable;
             return .{
+                .agent = params.agent,
+                .plot_name = plot_str,
+                .scale = scale_str,
                 .slider = Slider(T).init(s_min, s_mid, s_max),
-                .wave = Wave.init(alloc, mid, wave_max, ratio, scale, variable),
+                .title = params.title,
+                .help = params.help,
+                .extra = params.extra,
+                .wave = Wave.init(
+                    alloc,
+                    params.mid,
+                    wave_max,
+                    params.ratio,
+                    scale,
+                    params.variable,
+                ),
             };
+        }
+
+        pub fn deinit(self: *Variable(T), alloc: std.mem.Allocator) void {
+            alloc.free(self.plot_name);
+            alloc.free(self.scale);
+            self.wave.deinit();
         }
     };
 }
@@ -132,84 +174,6 @@ pub const Wave = struct {
     }
 };
 
-const GuiFn = *const fn (demo: *DemoState) void;
-pub const Agent = enum { consumer, producer, custom };
-pub const SliderInfo = struct {
-    title: [:0]const u8,
-    field: [:0]const u8,
-    scale: [:0]const u8 = "1",
-    help: ?[:0]const u8 = null,
-    agent: union(Agent) {
-        consumer: bool,
-        producer: bool,
-        custom: GuiFn,
-    },
-};
-
-pub const Variables = struct {
-    num_consumers: SliderInfo = .{
-        .title = "Number of Consumers",
-        .scale = "10",
-        .field = "num_consumers",
-        .agent = .{ .custom = numConsumerUpdate },
-    },
-    num_producers: SliderInfo = .{
-        .title = "Number of Producers",
-        .scale = "0.1",
-        .field = "num_producers",
-        .agent = .{ .custom = numProducersUpdate },
-    },
-    max_demand_rate: SliderInfo = .{
-        .title = "Max Demand Rate",
-        .help = "The maximum amount consumers will buy from producers " ++
-            "if they have enough money.",
-        .field = "max_demand_rate",
-        .scale = "0.3",
-        .agent = .{ .consumer = true },
-    },
-    consumer_income: SliderInfo = .{
-        .title = "Consumer Income",
-        .help = "How much consumers earn each frame",
-        .field = "income",
-        .scale = "0.5",
-        .agent = .{ .consumer = true },
-    },
-    consumer_size: SliderInfo = .{
-        .title = "Consumer Size",
-        .field = "consumer_size",
-        .scale = "0.003",
-        .agent = .{ .custom = consumerSize },
-    },
-    price: SliderInfo = .{
-        .title = "Resource Price",
-        .help = "The cost a consumer must pay to buy 1 resource item.",
-        .field = "price",
-        .scale = "1",
-        .agent = .{ .producer = true },
-    },
-    production_rate: SliderInfo = .{
-        .title = "Production Rate",
-        .help = "How many resources a producer creates each cycle.",
-        .field = "production_rate",
-        .scale = "1",
-        .agent = .{ .producer = true },
-    },
-    max_producer_inventory: SliderInfo = .{
-        .title = "Max Producer Inventory",
-        .help = "The maximum amount of resources a producer can hold",
-        .field = "max_inventory",
-        .scale = "10",
-        .agent = .{ .producer = true },
-    },
-    moving_rate: SliderInfo = .{
-        .title = "Moving Rate",
-        .help = "How fast consumers move to and from producers",
-        .field = "moving_rate",
-        .scale = "0.02",
-        .agent = .{ .consumer = true },
-    },
-};
-
 pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
     setupWindowPos(demo, .{ .x = 0, .y = 0 });
     setupWindowSize(demo, .{ .x = 0.25, .y = 0.75 });
@@ -251,24 +215,29 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
 
 pub fn updateWaves(demo: *DemoState) void {
     const sample_idx = demo.params.sample_idx;
-    inline for (@typeInfo(Variables).Struct.fields) |f| {
-        const info = @field(demo.sliders, f.name);
-        const param = &@field(demo.params, info.field);
-        if (param.wave.active) {
-            const num = param.wave.yv.items[sample_idx];
 
-            param.slider.prev = param.slider.val;
-            if (@TypeOf(param.slider.val) == f32) {
-                param.slider.val = @floatCast(num * param.wave.scale);
-            } else {
-                param.slider.val = @intFromFloat(num * param.wave.scale);
-            }
+    var it = demo.sliders.iterator();
+    while (it.next()) |entry| {
+        const slider = entry.value_ptr;
+        if (slider.wave.active) {
+            const num = slider.wave.yv.items[sample_idx];
+            slider.slider.prev = slider.slider.val;
+            slider.slider.val = @intFromFloat(num * slider.wave.scale);
         }
     }
 
-    const rad = demo.params.num_consumers.wave.xv.items[sample_idx];
-    demo.params.radian = rad;
+    var fit = demo.f_sliders.iterator();
+    while (fit.next()) |entry| {
+        const slider = entry.value_ptr;
+        if (slider.wave.active) {
+            const num = slider.wave.yv.items[sample_idx];
+            slider.slider.prev = slider.slider.val;
+            slider.slider.val = @floatCast(num * slider.wave.scale);
+        }
+    }
 
+    const rad = demo.sliders.get("num_consumers").?.wave.xv.items[sample_idx];
+    demo.params.radian = rad;
     demo.params.sample_idx = @mod(sample_idx + 1, SAMPLE_SIZE);
 }
 
@@ -276,7 +245,9 @@ pub fn setupWindowPos(demo: *DemoState, pos: Pos) void {
     const sd = demo.gctx.swapchain_descriptor;
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
-    const pos_margin_pixels = getMarginPixels(sd, pos.margin.percent);
+    const margin_x = width * pos.margin.percent;
+    const margin_y = height * pos.margin.percent;
+    const pos_margin_pixels = @min(margin_x, margin_y);
 
     var x = width * pos.x;
     if (pos.margin.left) {
@@ -294,7 +265,9 @@ pub fn setupWindowSize(demo: *DemoState, size: Pos) void {
     const sd = demo.gctx.swapchain_descriptor;
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
-    const size_margin_pixels = getMarginPixels(sd, size.margin.percent);
+    const margin_x = width * size.margin.percent;
+    const margin_y = height * size.margin.percent;
+    const size_margin_pixels = @min(margin_x, margin_y);
 
     var w = width * size.x;
     if (size.margin.left) {
@@ -314,61 +287,81 @@ pub fn setupWindowSize(demo: *DemoState, size: Pos) void {
     zgui.setNextWindowSize(.{ .w = w, .h = h });
 }
 
-fn getMarginPixels(sd: wgpu.SwapChainDescriptor, margin_percent: f32) f32 {
-    const width = @as(f32, @floatFromInt(sd.width));
-    const height = @as(f32, @floatFromInt(sd.height));
-    const margin_x = width * margin_percent;
-    const margin_y = height * margin_percent;
-    return @min(margin_x, margin_y);
+fn agentUpdate(demo: *DemoState, agent: AgentUnion, comptime T: type, val: T) void {
+    switch (agent) {
+        .consumer => |offset| {
+            const cp_buf = demo.buffers.data.consumer_params;
+            const r = demo.gctx.lookupResource(cp_buf).?;
+            demo.gctx.queue.writeBuffer(r, offset, T, &.{val});
+        },
+        .producer => |offset| {
+            const p_buf = demo.buffers.data.producers;
+            Wgpu.setObjBufField(demo.gctx, Producer, T, offset, val, p_buf);
+        },
+        .custom => |func| func(demo),
+    }
+}
+
+pub fn slidersFromMap(
+    demo: *DemoState,
+    comptime T: type,
+    map: *std.StringArrayHashMap(Variable(T)),
+    extra: bool,
+) void {
+    var it = map.iterator();
+    while (it.next()) |entry| {
+        const slider = entry.value_ptr;
+        if (slider.extra == extra) {
+            infoTitle(slider.title, slider.help, &slider.wave.active);
+            const s = &slider.slider;
+            var buf: [100]u8 = undefined;
+            const slider_str = std.fmt.bufPrintZ(&buf, "##{s}", .{slider.title}) catch unreachable;
+            if (zgui.sliderScalar(slider_str, T, .{ .v = &s.val, .min = s.min, .max = s.max })) {
+                agentUpdate(demo, slider.agent, T, slider.slider.val);
+                slider.slider.prev = slider.slider.val;
+            }
+        }
+    }
 }
 
 pub fn parameters(demo: *DemoState, selection_gui: *const fn () void) void {
-    inline for (@typeInfo(Variables).Struct.fields) |f| {
-        const info = @field(demo.sliders, f.name);
-        const param = &@field(demo.params, info.field);
-        if (param.wave.active) {
-            const slider_type = @TypeOf(param.slider.val);
-            checkIfSliderUpdated(demo, slider_type, info);
+    var it = demo.sliders.iterator();
+    while (it.next()) |entry| {
+        const slider = entry.value_ptr;
+        if (slider.slider.prev != slider.slider.val) {
+            agentUpdate(demo, slider.agent, u32, slider.slider.val);
+            slider.slider.prev = slider.slider.val;
         }
     }
+
+    var f_it = demo.f_sliders.iterator();
+    while (f_it.next()) |entry| {
+        const slider = entry.value_ptr;
+        if (slider.slider.prev != slider.slider.val) {
+            agentUpdate(demo, slider.agent, f32, slider.slider.val);
+            slider.slider.prev = slider.slider.val;
+        }
+    }
+
     selection_gui();
     if (zgui.beginTabBar("##tab_bar", .{})) {
         defer zgui.endTabBar();
         if (zgui.beginTabItem("Variables", .{})) {
             defer zgui.endTabItem();
-            showTimeline(demo);
-            inline for (@typeInfo(Variables).Struct.fields) |f| {
-                const info = @field(demo.sliders, f.name);
-                const param = &@field(demo.params, info.field);
-                if (param.wave.active) {
-                    infoTitle(demo, info);
-                    const slider_type = @TypeOf(param.slider.val);
-                    displaySlider(demo, slider_type, &param.slider, info);
-                }
+            if (zgui.button("Show Timeline", .{})) {
+                demo.timeline_visible = !demo.timeline_visible;
             }
+            slidersFromMap(demo, u32, &demo.sliders, false);
+            slidersFromMap(demo, f32, &demo.f_sliders, false);
         }
 
-        if (zgui.beginTabItem("Constants", .{})) {
+        if (zgui.beginTabItem("Extras", .{})) {
             defer zgui.endTabItem();
-            showTimeline(demo);
-            inline for (@typeInfo(Variables).Struct.fields) |f| {
-                const info = @field(demo.sliders, f.name);
-                const param = &@field(demo.params, info.field);
-                if (!param.wave.active) {
-                    infoTitle(demo, info);
-                    const slider_type = @TypeOf(param.slider.val);
-                    displaySlider(demo, slider_type, &param.slider, info);
-                }
-            }
+            slidersFromMap(demo, u32, &demo.sliders, true);
+            slidersFromMap(demo, f32, &demo.f_sliders, true);
         }
     }
     buttons(demo);
-}
-
-fn showTimeline(demo: *DemoState) void {
-    if (zgui.button("Show Timeline", .{})) {
-        demo.timeline_visible = !demo.timeline_visible;
-    }
 }
 
 pub fn timeline(demo: *DemoState) void {
@@ -387,13 +380,23 @@ pub fn timeline(demo: *DemoState) void {
         const legend_flags = .{ .no_buttons = true };
         zgui.plot.setupLegend(location_flags, legend_flags);
 
-        inline for (@typeInfo(Variables).Struct.fields, 0..) |f, i| {
-            const info = @field(demo.sliders, f.name);
-            const param = &@field(demo.params, info.field);
-            if (param.wave.active) {
-                plotWave(&param.wave, info);
-                dragTopPoint(demo, info, i);
-                dragMidPoint(demo, info, i);
+        var it = demo.sliders.iterator();
+        while (it.next()) |entry| {
+            const slider = entry.value_ptr;
+            if (slider.wave.active) {
+                plotWave(&slider.wave, slider.plot_name);
+                dragTopPoint(demo, &slider.wave, it.index);
+                dragMidPoint(demo, &slider.wave, it.index);
+            }
+        }
+
+        var f_it = demo.f_sliders.iterator();
+        while (f_it.next()) |entry| {
+            const slider = entry.value_ptr;
+            if (slider.wave.active) {
+                plotWave(&slider.wave, slider.plot_name);
+                dragTopPoint(demo, &slider.wave, it.index);
+                dragMidPoint(demo, &slider.wave, it.index);
             }
         }
 
@@ -401,9 +404,9 @@ pub fn timeline(demo: *DemoState) void {
     }
 }
 
-fn plotWave(wave: *Wave, comptime info: SliderInfo) void {
+fn plotWave(wave: *Wave, plot_name: [:0]const u8) void {
     const values = .{ .xv = wave.xv.items, .yv = wave.yv.items };
-    zgui.plot.plotLine(info.title ++ " x " ++ info.scale, f64, values);
+    zgui.plot.plotLine(plot_name, f64, values);
 }
 
 fn plotRadianLine(radian: f64) void {
@@ -424,20 +427,17 @@ fn lightenColor(color: [4]f32, amount: f32) [4]f32 {
     };
 }
 
-fn dragTopPoint(demo: *DemoState, comptime info: SliderInfo, id: i32) void {
-    const param = &@field(demo.params, info.field);
-
+fn dragTopPoint(demo: *DemoState, wave: *Wave, id: u32) void {
     var color = zgui.plot.getLastItemColor();
     color = lightenColor(color, 0.3);
 
-    const wave = &param.wave;
     const flags = .{
         .x = &wave.x_max,
         .y = &wave.scaled_max,
         .col = color,
         .size = 4 * demo.content_scale,
     };
-    if (zgui.plot.dragPoint(id, flags)) {
+    if (zgui.plot.dragPoint(@intCast(id), flags)) {
         const scaled_diff = wave.scaled_max - wave.scaled_mid;
         const scaled_min = wave.scaled_mid - scaled_diff;
         const min_outside = scaled_min < 0 or scaled_min > 1000;
@@ -462,21 +462,18 @@ fn dragTopPoint(demo: *DemoState, comptime info: SliderInfo, id: i32) void {
     }
 }
 
-fn dragMidPoint(demo: *DemoState, comptime info: SliderInfo, id: i32) void {
-    const param = &@field(demo.params, info.field);
-
+fn dragMidPoint(demo: *DemoState, wave: *Wave, id: u32) void {
     var color = zgui.plot.getLastItemColor();
     color = lightenColor(color, 0.3);
     var zero: f64 = 0;
 
-    const wave = &param.wave;
     const flags = .{
         .x = &zero,
         .y = &wave.scaled_mid,
         .col = color,
         .size = 4 * demo.content_scale,
     };
-    if (zgui.plot.dragPoint(id + 1000, flags)) {
+    if (zgui.plot.dragPoint(@intCast(id + 1000), flags)) {
         const scaled_max = wave.scaled_mid + wave.scaled_diff;
         const scaled_min = wave.scaled_mid - wave.scaled_diff;
         const min_outside = scaled_min < 0 or scaled_min > 1000;
@@ -500,86 +497,16 @@ fn dragMidPoint(demo: *DemoState, comptime info: SliderInfo, id: i32) void {
     }
 }
 
-fn checkIfSliderUpdated(demo: *DemoState, comptime T: type, comptime info: SliderInfo) void {
-    const param = &@field(demo.params, info.field);
-    const value_changed = param.slider.prev != param.slider.val;
-    if (value_changed) {
-        switch (info.agent) {
-            .consumer => {
-                const offset: u32 = @intCast(std.meta.fieldIndex(Consumer.Params, info.field).?);
-                demo.gctx.queue.writeBuffer(
-                    demo.gctx.lookupResource(demo.buffers.data.consumer_params).?,
-                    offset * @sizeOf(u32),
-                    T,
-                    &.{param.slider.val},
-                );
-            },
-            .producer => Wgpu.setObjBufField(
-                demo.gctx,
-                Producer,
-                info.field,
-                param.slider.val,
-                demo.buffers.data.producers,
-            ),
-            .custom => |func| func(demo),
-        }
-        param.slider.prev = param.slider.val;
-    }
-}
-
-fn displaySlider(
-    demo: *DemoState,
-    comptime T: type,
-    slider: *Slider(T),
-    comptime info: SliderInfo,
-) void {
-    const flags = .{ .v = &slider.val, .min = slider.min, .max = slider.max };
-    const slider_changed = zgui.sliderScalar("##" ++ info.title, T, flags);
-    if (slider_changed) {
-        switch (info.agent) {
-            .consumer => {
-                const offset: u32 = @intCast(std.meta.fieldIndex(Consumer.Params, info.field).?);
-                demo.gctx.queue.writeBuffer(
-                    demo.gctx.lookupResource(demo.buffers.data.consumer_params).?,
-                    offset * @sizeOf(u32),
-                    T,
-                    &.{slider.val},
-                );
-            },
-            .producer => {
-                Wgpu.setObjBufField(
-                    demo.gctx,
-                    Producer,
-                    info.field,
-                    slider.val,
-                    demo.buffers.data.producers,
-                );
-            },
-            .custom => |func| func(demo),
-        }
-        slider.prev = slider.val;
-    }
-}
-
-fn consumerSize(demo: *DemoState) void {
+pub fn consumerSize(demo: *DemoState) void {
     demo.buffers.vertex.circle = Circle.createVertexBuffer(
         demo.gctx,
         40,
-        demo.params.consumer_size.slider.val,
+        demo.f_sliders.get("consumer_size").?.slider.val,
     );
 }
 
-fn numConsumers(demo: *DemoState) void {
-    zgui.text("Number Of Consumers", .{});
-    const param = &demo.params.num_consumers;
-    const new: *u32 = @ptrCast(&param.val);
-    const flags = .{ .v = new, .min = param.min, .max = param.max };
-    _ = zgui.sliderScalar("##nc", u32, flags);
-    numConsumerUpdate(demo);
-}
-
 pub fn numConsumerUpdate(demo: *DemoState) void {
-    const new = demo.params.num_consumers.slider.val;
+    const new = demo.sliders.get("num_consumers").?.slider.val;
     Statistics.setNum(demo, new, .consumers);
 
     const old: u32 = demo.buffers.data.consumers.mapping.num_structs;
@@ -592,8 +519,8 @@ pub fn numConsumerUpdate(demo: *DemoState) void {
     }
 }
 
-fn numProducersUpdate(demo: *DemoState) void {
-    const new = demo.params.num_producers.slider.val;
+pub fn numProducersUpdate(demo: *DemoState) void {
+    const new = demo.sliders.get("num_producers").?.slider.val;
     Statistics.setNum(demo, new, .producers);
 
     const old: u32 = demo.buffers.data.producers.mapping.num_structs;
@@ -606,22 +533,22 @@ fn numProducersUpdate(demo: *DemoState) void {
     }
 }
 
-fn infoTitle(demo: *DemoState, comptime slide: SliderInfo) void {
-    zgui.text(slide.title, .{});
-    if (slide.help) |help| {
+fn infoTitle(title: [:0]const u8, help: ?[:0]const u8, slider: *bool) void {
+    zgui.textUnformatted(title);
+    if (help) |h| {
         zgui.sameLine(.{});
         zgui.textDisabled("(?)", .{});
         if (zgui.isItemHovered(.{})) {
             _ = zgui.beginTooltip();
-            zgui.textUnformatted(help);
+            zgui.textUnformatted(h);
             zgui.endTooltip();
         }
     }
+
+    var buf: [100]u8 = undefined;
+    const checkbox_str = std.fmt.bufPrintZ(&buf, "Variable##{s}", .{title}) catch unreachable;
     zgui.sameLine(.{});
-    if (zgui.button("Switch" ++ "##" ++ slide.field, .{})) {
-        const param = &@field(demo.params, slide.field);
-        param.wave.active = !param.wave.active;
-    }
+    _ = zgui.checkbox(checkbox_str, .{ .v = slider });
 }
 
 fn buttons(demo: *DemoState) void {
@@ -642,7 +569,8 @@ fn buttons(demo: *DemoState) void {
         Wgpu.setObjBufField(
             demo.gctx,
             Producer,
-            "inventory",
+            u32,
+            @offsetOf(Producer, "inventory"),
             0,
             demo.buffers.data.producers,
         );
@@ -683,11 +611,15 @@ pub fn plots(demo: *DemoState) void {
         const ec = .{ .v = stats.num_empty_consumers.items[0..] };
         const tpi = .{ .v = stats.num_total_producer_inventory.items[0..] };
         const acb = .{ .v = stats.avg_consumer_balance.items[0..] };
+        const apb = .{ .v = stats.avg_producer_balance.items[0..] };
+        const am = .{ .v = stats.avg_margin.items[0..] };
 
         zgui.plot.plotLineValues("Transactions", u32, nt);
         zgui.plot.plotLineValues("Empty Consumers", u32, ec);
         zgui.plot.plotLineValues("Total Producer Inventory", u32, tpi);
+        zgui.plot.plotLineValues("Average Producer Balance", u32, apb);
         zgui.plot.plotLineValues("Average Consumer Balance", u32, acb);
+        zgui.plot.plotLineValues("Average Producer Margin", u32, am);
     }
 }
 

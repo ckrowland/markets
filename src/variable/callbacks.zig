@@ -26,18 +26,6 @@ pub fn numTransactions(args: Args(u32)) void {
     Statistics.clearNumTransactions(args.gctx, args.buf.buf);
 }
 
-pub fn totalInventory(args: Args(Producer)) void {
-    const slice = args.buf.mapping.staging.slice;
-
-    var total_inventory: u32 = 0;
-    if (slice) |producers| {
-        for (producers) |p| {
-            total_inventory += @as(u32, @intCast(p.inventory));
-        }
-    }
-    args.stats.num_total_producer_inventory.append(total_inventory) catch unreachable;
-}
-
 pub fn consumerStats(args: Args(Consumer)) void {
     const slice = args.buf.mapping.staging.slice;
 
@@ -62,14 +50,59 @@ pub fn consumerStats(args: Args(Consumer)) void {
     args.stats.avg_consumer_balance.append(avg_balance) catch unreachable;
 }
 
+pub fn producerStats(args: Args(Producer)) void {
+    const slice = args.buf.mapping.staging.slice;
+
+    var total_inventory: u32 = 0;
+    var total_balance: u32 = 0;
+    var total_margin: u32 = 0;
+    if (slice) |producers| {
+        const buf = args.gctx.lookupResource(args.buf.buf).?;
+        const pns_offset = @offsetOf(Producer.Params, "prev_num_sales");
+        const ns_offset = @offsetOf(Producer.Params, "num_sales");
+        const ma_offset = @offsetOf(Producer.Params, "margin");
+        for (producers, 0..) |p, i| {
+            total_inventory += @intCast(p.inventory);
+            total_balance += @intCast(p.balance);
+            total_margin += @intCast(p.params.margin);
+
+            var margin = p.params.margin;
+            const num_sales = p.params.num_sales;
+            if (num_sales < p.params.prev_num_sales and margin > 10) {
+                margin -= 10;
+            } else if (num_sales > p.params.prev_num_sales) {
+                margin += 10;
+            }
+
+            const index_offset = i * @sizeOf(Producer);
+            const p_offset = index_offset + pns_offset;
+            args.gctx.queue.writeBuffer(buf, p_offset, u32, &.{num_sales});
+
+            const n_offset = index_offset + ns_offset;
+            args.gctx.queue.writeBuffer(buf, n_offset, u32, &.{0});
+
+            const m_offset = index_offset + ma_offset;
+            args.gctx.queue.writeBuffer(buf, m_offset, u32, &.{margin});
+        }
+    }
+    args.stats.num_total_producer_inventory.append(total_inventory) catch unreachable;
+
+    const len: u32 = @intCast(args.buf.mapping.num_structs + 1);
+    const avg_balance = total_balance / len;
+    args.stats.avg_producer_balance.append(avg_balance) catch unreachable;
+
+    const avg_margin = total_margin / len;
+    args.stats.avg_margin.append(avg_margin) catch unreachable;
+}
+
 pub fn updateProducerCoords(args: Args(Producer)) void {
     const slice = args.buf.mapping.staging.slice;
 
     if (slice) |producers| {
         for (producers, 0..) |p, i| {
-            const new_coord = Camera.getWorldPosition(args.gctx, p.absolute_home);
+            const new_coord = Camera.getWorldPosition(args.gctx, p.params.absolute_home);
             const buf = args.gctx.lookupResource(args.buf.buf).?;
-            const offset = i * @sizeOf(Producer) + @offsetOf(Producer, "home");
+            const offset = i * @sizeOf(Producer) + @offsetOf(Producer.Params, "home");
             args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
         }
     }

@@ -5,18 +5,18 @@ const Wgpu = @import("wgpu.zig");
 pub const cpi = .{
     .vs = @embedFile("shaders/vertex/consumer.wgsl"),
     .fs = @embedFile("shaders/fragment/fragment.wgsl"),
-    .inst_type = Consumer,
+    .inst_size = @sizeOf(Consumer),
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
-            .name = "position",
+            .offset = @offsetOf(Consumer, "position"),
             .type = [4]f32,
         },
         .{
-            .name = "color",
+            .offset = @offsetOf(Consumer, "color"),
             .type = [4]f32,
         },
         .{
-            .name = "inventory",
+            .offset = @offsetOf(Consumer, "inventory"),
             .type = u32,
         },
     },
@@ -25,22 +25,22 @@ pub const cpi = .{
 pub const ppi = .{
     .vs = @embedFile("shaders/vertex/producer.wgsl"),
     .fs = @embedFile("shaders/fragment/fragment.wgsl"),
-    .inst_type = Producer,
+    .inst_size = @sizeOf(Producer),
     .inst_attrs = &[_]Wgpu.RenderPipelineInfo.Attribute{
         .{
-            .name = "home",
+            .offset = @offsetOf(Producer.Params, "home"),
             .type = [4]f32,
         },
         .{
-            .name = "color",
+            .offset = @offsetOf(Producer.Params, "color"),
             .type = [4]f32,
         },
         .{
-            .name = "inventory",
+            .offset = @offsetOf(Producer, "inventory"),
             .type = u32,
         },
         .{
-            .name = "max_inventory",
+            .offset = @offsetOf(Producer.Params, "max_inventory"),
             .type = u32,
         },
     },

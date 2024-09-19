@@ -11,6 +11,8 @@ second: f32 = 0,
 num_empty_consumers: array(u32),
 num_total_producer_inventory: array(u32),
 avg_consumer_balance: array(u32),
+avg_producer_balance: array(u32),
+avg_margin: array(u32),
 
 pub const NUM_STATS = 8;
 pub const zero = [NUM_STATS]u32{ 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -21,6 +23,8 @@ pub fn init(allocator: std.mem.Allocator) Self {
         .num_empty_consumers = array(u32).init(allocator),
         .num_total_producer_inventory = array(u32).init(allocator),
         .avg_consumer_balance = array(u32).init(allocator),
+        .avg_producer_balance = array(u32).init(allocator),
+        .avg_margin = array(u32).init(allocator),
     };
 }
 
@@ -29,6 +33,8 @@ pub fn deinit(self: *Self) void {
     self.num_empty_consumers.deinit();
     self.num_total_producer_inventory.deinit();
     self.avg_consumer_balance.deinit();
+    self.avg_producer_balance.deinit();
+    self.avg_margin.deinit();
 }
 
 pub fn generateAndFillRandomColor(demo: *DemoState) void {
@@ -43,6 +49,8 @@ pub fn clear(self: *Self) void {
     self.num_empty_consumers.clearAndFree();
     self.num_total_producer_inventory.clearAndFree();
     self.avg_consumer_balance.clearAndFree();
+    self.avg_producer_balance.clearAndFree();
+    self.avg_margin.clearAndFree();
 }
 
 pub fn clearNumTransactions(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {

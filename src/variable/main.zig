@@ -33,23 +33,15 @@ pub const DemoState = struct {
     push_restart: bool = false,
     content_scale: f32,
     timeline_visible: bool,
-    comptime sliders: Gui.Variables = .{},
     params: struct {
         sample_idx: usize,
         radian: f64,
         max_num_stats: u32,
         num_consumer_sides: u32,
         plot_hovered: bool,
-        production_rate: Gui.Variable(u32),
-        max_inventory: Gui.Variable(u32),
-        consumer_size: Gui.Variable(f32),
-        price: Gui.Variable(u32),
-        num_consumers: Gui.Variable(u32),
-        num_producers: Gui.Variable(u32),
-        max_demand_rate: Gui.Variable(u32),
-        moving_rate: Gui.Variable(f32),
-        income: Gui.Variable(u32),
     },
+    sliders: std.StringArrayHashMap(Gui.Variable(u32)),
+    f_sliders: std.StringArrayHashMap(Gui.Variable(f32)),
     stats: Statistics,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
@@ -65,7 +57,6 @@ pub const DemoState = struct {
     },
     buffers: struct {
         data: struct {
-            //ObjectBuffer field name must be ObjectBuffer Type + "s".
             consumers: Wgpu.ObjectBuffer(Consumer),
             consumer_params: zgpu.BufferHandle,
             producers: Wgpu.ObjectBuffer(Producer),
@@ -82,6 +73,17 @@ pub const DemoState = struct {
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
 };
+
+//pub const Sliders = struct {
+//    production_rate: Gui.Variable(u32),
+//    max_inventory: Gui.Variable(u32),
+//    consumer_size: Gui.Variable(f32),
+//    num_consumers: Gui.Variable(u32),
+//    num_producers: Gui.Variable(u32),
+//    max_demand_rate: Gui.Variable(u32),
+//    moving_rate: Gui.Variable(f32),
+//    income: Gui.Variable(u32),
+//};
 
 pub fn init(
     gctx: *zgpu.GraphicsContext,
@@ -115,13 +117,145 @@ pub fn init(
         .stats = stats_object.buf,
     });
     const depth = Wgpu.createDepthTexture(gctx);
+    var slider_map = std.StringArrayHashMap(Gui.Variable(u32)).init(allocator);
+    //try slider_map.put(
+    //    "production_rate",
+    //    Gui.Variable(u32).init(allocator, .{
+    //        .min = 0,
+    //        .mid = 300,
+    //        .max = 1000,
+    //        .margin = 100,
+    //        .ratio = 1,
+    //        .variable = false,
+    //        .title = "Number of Producers",
+    //        .agent = .{ .producer = @intCast(std.meta.fieldIndex(Producer, "production_rate").?) },
+    //    }),
+    //);
+    try slider_map.put(
+        "num_consumers",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 0,
+            .mid = 5000,
+            .max = 10000,
+            .margin = 100,
+            .ratio = 1,
+            .variable = false,
+            .extra = false,
+            .title = "Number of Consumers",
+            .agent = .{ .custom = Gui.numConsumerUpdate },
+        }),
+    );
+    try slider_map.put(
+        "num_producers",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 1,
+            .mid = 10,
+            .max = 100,
+            .margin = 10,
+            .ratio = 0.7,
+            .variable = false,
+            .extra = false,
+            .title = "Number of Producers",
+            .agent = .{ .custom = Gui.numProducersUpdate },
+        }),
+    );
+    try slider_map.put(
+        "max_demand_rate",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 1,
+            .mid = 100,
+            .max = 300,
+            .margin = 100,
+            .ratio = 0.9,
+            .variable = false,
+            .extra = true,
+            .title = "Max Demand Rate",
+            .help = "The maximum amount a consumer will buy given they have enough money.",
+            .agent = .{ .consumer = @offsetOf(Consumer.Params, "max_demand_rate") },
+        }),
+    );
+    try slider_map.put(
+        "income",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 1,
+            .mid = 100,
+            .max = 500,
+            .margin = 100,
+            .ratio = 1.3,
+            .variable = false,
+            .extra = false,
+            .title = "Consumer Income",
+            .agent = .{ .consumer = @offsetOf(Consumer.Params, "income") },
+        }),
+    );
+    try slider_map.put(
+        "max_inventory",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 100,
+            .mid = 50000,
+            .max = 100000,
+            .margin = 100,
+            .ratio = 1,
+            .variable = false,
+            .extra = true,
+            .title = "Max Producer Inventory",
+            .help = "The maximum number of resources a producer can hold at one time.",
+            .agent = .{ .producer = @offsetOf(Producer.Params, "max_inventory") },
+        }),
+    );
+    try slider_map.put(
+        "production_cost",
+        Gui.Variable(u32).init(allocator, .{
+            .min = 1,
+            .mid = 10,
+            .max = 100,
+            .margin = 100,
+            .ratio = 1.4,
+            .variable = false,
+            .extra = false,
+            .title = "Production Cost",
+            .help = "The price to produce 100 of a resource.",
+            .agent = .{ .producer = @offsetOf(Producer.Params, "cost") },
+        }),
+    );
 
+    var f_slider_map = std.StringArrayHashMap(Gui.Variable(f32)).init(allocator);
+    try f_slider_map.put(
+        "moving_rate",
+        Gui.Variable(f32).init(allocator, .{
+            .min = 1,
+            .mid = 5,
+            .max = 20,
+            .margin = 100,
+            .ratio = 1,
+            .extra = true,
+            .variable = false,
+            .title = "Moving Rate",
+            .agent = .{ .consumer = @offsetOf(Consumer.Params, "moving_rate") },
+        }),
+    );
+    try f_slider_map.put(
+        "consumer_size",
+        Gui.Variable(f32).init(allocator, .{
+            .min = 0,
+            .mid = 1,
+            .max = 3,
+            .margin = 100,
+            .ratio = 0.5,
+            .extra = true,
+            .variable = false,
+            .title = "Consumer Size",
+            .agent = .{ .custom = Gui.consumerSize },
+        }),
+    );
     var demo = DemoState{
         .gctx = gctx,
         .window = window,
         .timeline_visible = true,
         .aspect = Camera.getAspectRatio(gctx),
         .content_scale = getContentScale(window),
+        .sliders = slider_map,
+        .f_sliders = f_slider_map,
         .render_pipelines = .{
             .circle = Wgpu.createRenderPipeline(gctx, Config.cpi),
             .square = Wgpu.createRenderPipeline(gctx, Config.ppi),
@@ -162,30 +296,22 @@ pub fn init(
             .max_num_stats = 3,
             .plot_hovered = false,
             .num_consumer_sides = 20,
-            .production_rate = Gui.Variable(u32).init(allocator, 0, 300, 1000, 100, 1, false),
-            .max_inventory = Gui.Variable(u32).init(allocator, 100, 7000, 10000, 100, 1, false),
-            .consumer_size = Gui.Variable(f32).init(allocator, 0, 1, 3, 100, 0.5, false),
-            .price = Gui.Variable(u32).init(allocator, 0, 10, 1000, 100, 0.9, false),
-            .num_consumers = Gui.Variable(u32).init(allocator, 0, 5000, 10000, 100, 1, true),
-            .num_producers = Gui.Variable(u32).init(allocator, 1, 20, 100, 100, 0.7, true),
-            .max_demand_rate = Gui.Variable(u32).init(allocator, 1, 100, 300, 100, 0.9, false),
-            .moving_rate = Gui.Variable(f32).init(allocator, 1, 5, 20, 100, 1, false),
-            .income = Gui.Variable(u32).init(allocator, 1, 100, 500, 100, 1.3, true),
         },
         .stats = Statistics.init(allocator),
     };
 
-    const num_consumers = demo.params.num_consumers.slider.val;
-    const num_producers = demo.params.num_producers.slider.val;
+    const num_consumers = slider_map.get("num_consumers").?.slider.val;
+    const num_producers = slider_map.get("num_producers").?.slider.val;
     Statistics.setNum(&demo, num_consumers, .consumers);
     Statistics.setNum(&demo, num_producers, .producers);
     Consumer.generateBulk(&demo, num_consumers);
     Consumer.setParamsBuf(
         &demo,
-        demo.params.moving_rate.slider.val,
-        demo.params.max_demand_rate.slider.val,
-        demo.params.income.slider.val,
+        f_slider_map.get("moving_rate").?.slider.val,
+        slider_map.get("max_demand_rate").?.slider.val,
+        slider_map.get("income").?.slider.val,
     );
+
     Producer.generateBulk(&demo, num_producers);
     setImguiContentScale(demo.content_scale);
 
@@ -213,7 +339,7 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
             demo.stats.second = current_time;
             Wgpu.getAllAsync(demo, u32, Callbacks.numTransactions);
             Wgpu.getAllAsync(demo, Consumer, Callbacks.consumerStats);
-            Wgpu.getAllAsync(demo, Producer, Callbacks.totalInventory);
+            Wgpu.getAllAsync(demo, Producer, Callbacks.producerStats);
         }
     }
 }
@@ -232,28 +358,6 @@ pub fn draw(demo: *DemoState) void {
         const data = demo.buffers.data;
         const num_consumers = data.consumers.mapping.num_structs;
         const num_producers = data.producers.mapping.num_structs;
-
-        // Compute shaders
-        if (demo.running) {
-            pass: {
-                const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
-                const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
-                const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
-
-                const pass = encoder.beginComputePass(null);
-                defer {
-                    pass.end();
-                    pass.release();
-                }
-                pass.setBindGroup(0, bg, &.{});
-
-                pass.setPipeline(pcp);
-                pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1);
-
-                pass.setPipeline(ccp);
-                pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1);
-            }
-        }
 
         // Copy data to mapped buffers so we can retrieve it on demand
         pass: {
@@ -279,6 +383,28 @@ pub fn draw(demo: *DemoState) void {
                 const cm = gctx.lookupResource(data.consumers.mapping.buf) orelse break :pass;
                 const c_size = @as(usize, @intCast(c_info.size));
                 encoder.copyBufferToBuffer(c, 0, cm, 0, c_size);
+            }
+        }
+
+        // Compute shaders
+        if (demo.running) {
+            pass: {
+                const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
+                const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
+                const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
+
+                const pass = encoder.beginComputePass(null);
+                defer {
+                    pass.end();
+                    pass.release();
+                }
+                pass.setBindGroup(0, bg, &.{});
+
+                pass.setPipeline(pcp);
+                pass.dispatchWorkgroups(@divFloor(num_producers, 64) + 1, 1, 1);
+
+                pass.setPipeline(ccp);
+                pass.dispatchWorkgroups(@divFloor(num_consumers, 64) + 1, 1, 1);
             }
         }
 
@@ -384,8 +510,8 @@ pub fn restartSimulation(demo: *DemoState) void {
     Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
 
-    const num_consumers = demo.params.num_consumers.slider.val;
-    const num_producers = demo.params.num_producers.slider.val;
+    const num_consumers = demo.sliders.get("num_consumers").?.slider.val;
+    const num_producers = demo.sliders.get("num_producers").?.slider.val;
     Statistics.setNum(demo, num_consumers, .consumers);
     Statistics.setNum(demo, num_producers, .producers);
     Consumer.generateBulk(demo, num_consumers);
@@ -433,15 +559,16 @@ fn setImguiContentScale(scale: f32) void {
 }
 
 pub fn deinit(demo: *DemoState) void {
-    demo.params.num_consumers.wave.deinit();
-    demo.params.num_producers.wave.deinit();
-    demo.params.max_demand_rate.wave.deinit();
-    demo.params.moving_rate.wave.deinit();
-    demo.params.income.wave.deinit();
-    demo.params.consumer_size.wave.deinit();
-    demo.params.price.wave.deinit();
-    demo.params.production_rate.wave.deinit();
-    demo.params.max_inventory.wave.deinit();
+    const a = demo.allocator;
+    demo.sliders.getPtr("num_consumers").?.deinit(a);
+    demo.sliders.getPtr("num_producers").?.deinit(a);
+    demo.sliders.getPtr("max_demand_rate").?.deinit(a);
+    demo.sliders.getPtr("income").?.deinit(a);
+    demo.sliders.getPtr("production_cost").?.deinit(a);
+    demo.sliders.getPtr("max_inventory").?.deinit(a);
+    demo.f_sliders.getPtr("moving_rate").?.deinit(a);
+    demo.f_sliders.getPtr("consumer_size").?.deinit(a);
+    demo.sliders.deinit();
+    demo.f_sliders.deinit();
     demo.stats.deinit();
-    //demo.gctx.destroy(demo.allocator);
 }

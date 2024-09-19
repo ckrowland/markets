@@ -21,14 +21,23 @@ struct ConsumerParams{
 }
 
 struct Producer {
+  params: ProducerParams,
+  balance: atomic<i32>,
+  inventory: atomic<i32>,
+}
+
+struct ProducerParams {
   absolute_home: vec4<i32>,
   home: vec4<f32>,
   color: vec4<f32>,
-  production_rate: u32,
-  inventory: atomic<i32>,
+  cost: u32,
   max_inventory: u32,
   price: u32,
+  margin: u32,
+  prev_num_sales: u32,
+  num_sales: u32,
 }
+
 struct Stats {
   transactions: u32,
   num_consumers: u32,
@@ -41,16 +50,3 @@ struct Stats {
 @group(0) @binding(1) var<storage, read_write> consumer_params: ConsumerParams;
 @group(0) @binding(2) var<storage, read_write> producers: array<Producer>;
 @group(0) @binding(3) var<storage, read_write> stats: Stats;
-
-fn step_sizes(pos: vec2<f32>, dest: vec2<f32>, mr: f32) -> vec2<f32>{
-    let x_num_steps = num_steps(pos.x, dest.x, mr);
-    let y_num_steps = num_steps(pos.y, dest.y, mr);
-    let num_steps = max(x_num_steps, y_num_steps);
-    let distance = dest - pos;
-    return distance / num_steps;
-}
-fn num_steps(x: f32, y: f32, rate: f32) -> f32 {
-    let distance = abs(x - y);
-    if (rate > distance) { return 1.0; }
-    return ceil(distance / rate);
-}
