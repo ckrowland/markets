@@ -174,14 +174,14 @@ pub const Wave = struct {
     }
 };
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+pub fn update(demo: *DemoState) void {
     setupWindowPos(demo, .{ .x = 0, .y = 0 });
     setupWindowSize(demo, .{ .x = 0.25, .y = 0.75 });
     const flags = zgui.WindowFlags.no_decoration;
     if (zgui.begin("0", .{ .flags = flags })) {
         zgui.pushIntId(0);
         zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        parameters(demo, selection_gui);
+        parameters(demo);
         zgui.popId();
     }
     zgui.end();
@@ -324,7 +324,7 @@ pub fn slidersFromMap(
     }
 }
 
-pub fn parameters(demo: *DemoState, selection_gui: *const fn () void) void {
+pub fn parameters(demo: *DemoState) void {
     var it = demo.sliders.iterator();
     while (it.next()) |entry| {
         const slider = entry.value_ptr;
@@ -343,7 +343,6 @@ pub fn parameters(demo: *DemoState, selection_gui: *const fn () void) void {
         }
     }
 
-    selection_gui();
     if (zgui.beginTabBar("##tab_bar", .{})) {
         defer zgui.endTabBar();
         if (zgui.beginTabItem("Variables", .{})) {

@@ -331,7 +331,7 @@ pub fn createDepthTexture(gctx: *zgpu.GraphicsContext) Depth {
             .height = gctx.swapchain_descriptor.height,
             .depth_or_array_layers = 1,
         },
-        .format = .depth32_float,
+        .format = .depth24_plus,
         .mip_level_count = 1,
         .sample_count = 1,
     });
@@ -479,7 +479,7 @@ pub fn createRenderPipeline(
             .topology = args.primitive_topology,
         },
         .depth_stencil = &wgpu.DepthStencilState{
-            .format = .depth32_float,
+            .format = .depth24_plus,
             .depth_write_enabled = true,
             .depth_compare = .less_equal,
         },

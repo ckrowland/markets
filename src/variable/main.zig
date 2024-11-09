@@ -318,7 +318,7 @@ pub fn init(
     return demo;
 }
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+pub fn update(demo: *DemoState) void {
     if (demo.push_restart) restartSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
 
@@ -327,7 +327,7 @@ pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
     Wgpu.runCallbackIfReady(Consumer, &demo.buffers.data.consumers.mapping);
 
     //zgui.showDemoWindow(null);
-    Gui.update(demo, selection_gui);
+    Gui.update(demo);
 
     if (demo.running) {
         Gui.updateWaves(demo);
@@ -430,6 +430,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
+                .stencil_read_only = true,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,

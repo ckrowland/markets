@@ -2,12 +2,15 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
-    const target = b.standardTargetOptions(.{});
+    const target_ = b.standardTargetOptions(.{});
 
     _ = b.addModule("root", .{
         .root_source_file = b.path("src/zstbi.zig"),
     });
 
+    const emscripten = target_.result.os.tag == .emscripten;
+    const freestanding = std.Target.Query.parse(.{ .arch_os_abi = "wasm32-freestanding" }) catch unreachable;
+    const target = if (emscripten) b.resolveTargetQuery(freestanding) else target_;
     const zstbi_lib = b.addStaticLibrary(.{
         .name = "zstbi",
         .target = target,
@@ -35,6 +38,10 @@ pub fn build(b: *std.Build) void {
         });
     }
     zstbi_lib.linkLibC();
+    if (emscripten) {
+        zstbi_lib.root_module.stack_protector = false;
+        //zstbi_lib.root_module.disable_stack_probing = true;
+    }
     b.installArtifact(zstbi_lib);
 
     const test_step = b.step("test", "Run zstbi tests");

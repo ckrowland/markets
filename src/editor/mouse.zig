@@ -27,7 +27,7 @@ pub const MouseButton = struct {
         }
         self.world_pos = getWorldPosition(demo);
         self.grid_pos = getGridPosition(demo);
-        const content_scale = demo.window.getContentScale();
+        const content_scale = getContentScale(demo.window);
         var pixel_pos = demo.window.getCursorPos();
         pixel_pos[0] = @abs(pixel_pos[0]);
         pixel_pos[1] = @abs(pixel_pos[1]);
@@ -35,6 +35,7 @@ pub const MouseButton = struct {
             @as(u32, @intFromFloat(pixel_pos[0] * content_scale[0])),
             @as(u32, @intFromFloat(pixel_pos[1] * content_scale[1])),
         };
+        std.log.debug("{any}", .{self});
     }
 
     /// Returns true the frame the mouse button was pressed.
@@ -64,7 +65,7 @@ pub fn getWorldPosition(demo: *DemoState) [2]f32 {
     const width = @as(f32, @floatFromInt(demo.gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
     const cursor_pos = demo.window.getCursorPos();
-    const content_scale = demo.window.getContentScale();
+    const content_scale = getContentScale(demo.window);
     const vp_cursor_pos = [2]f32{
         @as(f32, @floatCast(cursor_pos[0])) * content_scale[0] - xOffset,
         @as(f32, @floatCast(cursor_pos[1])) * content_scale[1],
@@ -93,4 +94,12 @@ pub fn onGrid(demo: *DemoState) bool {
     const x = grid_pos[0];
     const y = grid_pos[1];
     return x > Camera.MIN_X and x < Camera.MAX_X and y > Camera.MIN_Y and y < Camera.MAX_Y;
+}
+
+fn getContentScale(window: *zglfw.Window) [2]f32 {
+    const content_scale = window.getContentScale();
+    return .{
+        @max(1, content_scale[0]),
+        @max(1, content_scale[1]),
+    };
 }

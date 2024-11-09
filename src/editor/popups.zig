@@ -11,7 +11,7 @@ const Camera = @import("camera.zig");
 const ConsumerHover = @import("consumer_hover.zig");
 const Callbacks = @import("callbacks.zig");
 
-pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 350, 135 };
+pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 400, 185 };
 const HOVER_SIZE_GRID = 40;
 
 const HoverSquareID = struct {

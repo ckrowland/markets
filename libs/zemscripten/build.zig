@@ -3,11 +3,12 @@ const std = @import("std");
 
 pub const emsdk_ver_major = "3";
 pub const emsdk_ver_minor = "1";
-pub const emsdk_ver_tiny = "52";
+pub const emsdk_ver_tiny = "70";
 pub const emsdk_version = emsdk_ver_major ++ "." ++ emsdk_ver_minor ++ "." ++ emsdk_ver_tiny;
 
 pub fn build(b: *std.Build) void {
     _ = b.addModule("root", .{ .root_source_file = b.path("src/zemscripten.zig") });
+    _ = b.addModule("dummy", .{ .root_source_file = b.path("src/dummy.zig") });
 }
 
 pub const ActivateEmsdkStep = struct {
@@ -85,10 +86,12 @@ pub const EmccFlags = std.StringHashMap(void);
 
 pub fn emccDefaultFlags(allocator: std.mem.Allocator, optimize: std.builtin.OptimizeMode) EmccFlags {
     var args = EmccFlags.init(allocator);
+    //args.put("-fno-rtti", {}) catch unreachable;
+    //args.put("-fno-exceptions", {}) catch unreachable;
+    //args.put("-fsanitize=undefined", {}) catch unreachable;
     if (optimize == .Debug) {
-        args.put("-Og", {}) catch unreachable;
+        args.put("-g", {}) catch unreachable;
         args.put("-gsource-map", {}) catch unreachable;
-        args.put("-Wemcc", {}) catch unreachable;
     }
     return args;
 }
@@ -114,14 +117,22 @@ pub fn emccDefaultSettings(
     var settings = EmccSettings.init(allocator);
     switch (options.optimize) {
         .Debug, .ReleaseSafe => {
-            settings.put("SAFE_HEAP", "1") catch unreachable;
+            //settings.put("SAFE_HEAP", "1") catch unreachable;
             settings.put("STACK_OVERFLOW_CHECK", "1") catch unreachable;
             settings.put("ASSERTIONS", "1") catch unreachable;
         },
         else => {},
     }
+    settings.put("ASYNCIFY", "1") catch unreachable;
     settings.put("USE_OFFSET_CONVERTER", "1") catch unreachable;
+    settings.put("USE_GLFW", "3") catch unreachable;
+    settings.put("USE_WEBGPU", "1") catch unreachable;
     settings.put("MALLOC", @tagName(options.emsdk_allocator)) catch unreachable;
+    //settings.put("INITIAL_MEMORY", "64MB") catch unreachable;
+    settings.put("ALLOW_MEMORY_GROWTH", "1") catch unreachable;
+    //settings.put("ABORTING_MALLOC", "0") catch unreachable;
+    //settings.put("WASM_BIGINT", "1") catch unreachable;
+    settings.put("EXIT_RUNTIME", "0") catch unreachable;
     return settings;
 }
 
@@ -146,6 +157,8 @@ pub fn emccStep(b: *std.Build, wasm: *std.Build.Step.Compile, options: struct {
         else => b.pathJoin(&.{ emscripten_path, "emcc" }),
     };
 
+    wasm.root_module.stack_protector = false;
+    wasm.linkLibC();
     var emcc = b.addSystemCommand(&.{emcc_path});
 
     var iterFlags = options.flags.iterator();
@@ -220,6 +233,17 @@ pub fn emccStep(b: *std.Build, wasm: *std.Build.Step.Compile, options: struct {
     if (options.shell_file_path) |shell_file_path| {
         emcc.addArgs(&.{ "--shell-file", shell_file_path });
     }
+    //for (emcc.argv.items) |item| {
+    //    switch (item) {
+    //        .bytes => std.debug.print("{s}\n", .{item.bytes}),
+    //        .artifact => std.debug.print("{s}\n", .{item.artifact.out_filename}),
+    //        .output_file => {
+    //            std.debug.print("{s}\n", .{item.output_file.prefix});
+    //            std.debug.print("{s}\n", .{item.output_file.basename});
+    //        },
+    //        else => std.debug.print("{any}\n", .{item}),
+    //    }
+    //}
 
     const install_step = b.addInstallDirectory(.{
         .source_dir = out_file.dirname(),

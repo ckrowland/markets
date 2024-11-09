@@ -212,11 +212,11 @@ pub fn init(gctx: *zgpu.GraphicsContext, allocator: std.mem.Allocator, window: *
     };
 }
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+pub fn update(demo: *DemoState) void {
     if (demo.push_clear) clearSimulation(demo);
     if (demo.push_coord_update) updateAspectRatio(demo);
     demo.mouse.update(demo);
-    Gui.update(demo, selection_gui);
+    Gui.update(demo);
 }
 
 pub fn draw(demo: *DemoState) void {
@@ -319,6 +319,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
+                .stencil_read_only = true,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,
@@ -444,7 +445,7 @@ fn updateDepthTexture(demo: *DemoState) void {
     demo.depth_texture_view = depth.view;
 }
 
-fn updateAspectRatio(demo: *DemoState) void {
+pub fn updateAspectRatio(demo: *DemoState) void {
     updateDepthTexture(demo);
 
     const consumer_waiting = demo.buffers.data.consumers.mapping.waiting;
@@ -462,9 +463,9 @@ fn updateAspectRatio(demo: *DemoState) void {
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
-fn getContentScale(window: *zglfw.Window) f32 {
+pub fn getContentScale(window: *zglfw.Window) f32 {
     const content_scale = window.getContentScale();
-    return @max(content_scale[0], content_scale[1]);
+    return @max(1, @max(content_scale[0], content_scale[1]));
 }
 
 fn setImguiContentScale(scale: f32) void {

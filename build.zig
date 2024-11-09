@@ -12,102 +12,128 @@ pub fn build(b: *std.Build) !void {
         .target = b.standardTargetOptions(.{}),
     };
 
-
-    const exe = b.addStaticLibrary(.{
+    // If emscripten target - library, else - executable
+    const emscripten = options.target.result.os.tag == .emscripten;
+    const exe_desc = .{
         .name = "Simulations",
         .root_source_file = b.path("src/main.zig"),
         .target = options.target,
         .optimize = options.optimize,
-    });
+    };
+    const exe = blk: {
+        if (emscripten) {
+            break :blk b.addStaticLibrary(exe_desc);
+        } else {
+            break :blk b.addExecutable(exe_desc);
+        }
+    };
 
-    //@import("system_sdk").addLibraryPathsTo(exe);
-    //const zglfw = b.dependency("zglfw", .{});
-    //exe.root_module.addImport("zglfw", zglfw.module("root"));
-    //exe.linkLibrary(zglfw.artifact("glfw"));
-
-    @import("zgpu").addLibraryPathsTo(exe);
-    const zgpu = b.dependency("zgpu", .{
-        .target = b.target("macos-x86_64"),
-    });
-    exe.root_module.addImport("zgpu", zgpu.module("root"));
-    exe.linkLibrary(zgpu.artifact("zdawn"));
-
-    const zmath = b.dependency("zmath", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zmath", zmath.module("root"));
-
-    //const zgui = b.dependency("zgui", .{
-    //    .target = options.target,
-    //    .backend = .glfw_wgpu,
-    //});
-    //exe.root_module.addImport("zgui", zgui.module("root"));
-    //exe.linkLibrary(zgui.artifact("imgui"));
-
-    const zpool = b.dependency("zpool", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zpool", zpool.module("root"));
-
-    //const zstbi = b.dependency("zstbi", .{
-    //    .target = options.target,
-    //});
-    //exe.root_module.addImport("zstbi", zstbi.module("root"));
-    //exe.linkLibrary(zstbi.artifact("zstbi"));
-
-    
     // If user did not set --sysroot then default to emsdk package path
-    if (b.sysroot == null) {
+    if (emscripten and b.sysroot == null) {
         b.sysroot = b.dependency("emsdk", .{}).path("upstream/emscripten/cache/sysroot").getPath(b);
         std.log.info("sysroot set to \"{s}\"", .{b.sysroot.?});
     }
 
-    const activate_emsdk_step = @import("zemscripten").activateEmsdkStep(b);
+    @import("system_sdk").addLibraryPathsTo(exe);
+    const zglfw = b.dependency("zglfw", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zglfw", zglfw.module("root"));
+
+    @import("zgpu").addLibraryPathsTo(exe);
+    const zgpu = b.dependency("zgpu", .{});
+    exe.root_module.addImport("zgpu", zgpu.module("root"));
+
     const zemscripten = b.dependency("zemscripten", .{});
-    exe.root_module.addImport("zemscripten", zemscripten.module("root"));
+    if (!emscripten) {
+        exe.linkLibrary(zglfw.artifact("glfw"));
+        exe.linkLibrary(zgpu.artifact("zdawn"));
+        exe.root_module.addImport("zemscripten", zemscripten.module("dummy"));
+    }
 
-    const emcc_flags = @import("zemscripten").emccDefaultFlags(b.allocator, options.optimize);
-    
-    var emcc_settings = @import("zemscripten").emccDefaultSettings(b.allocator, .{
-        .optimize = options.optimize,
+    const zmath = b.dependency("zmath", .{});
+    exe.root_module.addImport("zmath", zmath.module("root"));
+
+    const zgui = b.dependency("zgui", .{
+        .target = options.target,
+        .backend = .glfw_wgpu,
     });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
 
-    try emcc_settings.put("ALLOW_MEMORY_GROWTH", "1");
+    const zpool = b.dependency("zpool", .{});
+    exe.root_module.addImport("zpool", zpool.module("root"));
 
-    const emcc_step = @import("zemscripten").emccStep(b, exe, .{
-        .optimize = options.optimize,
-        .flags = emcc_flags,
-        .settings = emcc_settings,
-        .use_preload_plugins = true,
-        .embed_paths = &.{},
-        .preload_paths = &.{},
-        .install_dir = .{ .custom = "web" },
+    const zstbi = b.dependency("zstbi", .{
+        .target = options.target,
     });
-    emcc_step.dependOn(activate_emsdk_step);
+    exe.root_module.addImport("zstbi", zstbi.module("root"));
+    exe.linkLibrary(zstbi.artifact("zstbi"));
 
-    b.getInstallStep().dependOn(emcc_step);
+    if (emscripten) {
+        exe.root_module.addImport("zemscripten", zemscripten.module("root"));
+        const zems = @import("zemscripten");
+        const activate_emsdk_step = zems.activateEmsdkStep(b);
+        const emcc_flags = zems.emccDefaultFlags(b.allocator, options.optimize);
+        const emcc_settings = zems.emccDefaultSettings(b.allocator, .{
+            .optimize = options.optimize,
+        });
+        const emcc_step = zems.emccStep(b, exe, .{
+            .optimize = options.optimize,
+            .flags = emcc_flags,
+            .settings = emcc_settings,
+            .use_preload_plugins = true,
+            .embed_paths = &.{
+                .{
+                    .src_path = "content",
+                    .virtual_path = "/content",
+                },
+                .{
+                    .src_path = "src/random",
+                    .virtual_path = "/",
+                },
+            },
+            .preload_paths = &.{},
+            .install_dir = .{ .custom = "web" },
+            .shell_file_path = "libs/zemscripten/content/shell_minimal.html",
+        });
+        emcc_step.dependOn(activate_emsdk_step);
+        b.getInstallStep().dependOn(emcc_step);
 
-    const html_filename = try std.fmt.allocPrint(b.allocator, "{s}.html", .{exe.name});
+        const html_filename = try std.fmt.allocPrint(b.allocator, "{s}.html", .{exe.name});
 
-    const emrun_args = .{"--no_browser"};
-    const emrun_step = @import("zemscripten").emrunStep(b, b.getInstallPath(.{ .custom = "web" }, html_filename), &emrun_args);
+        const emrun_args = .{"--no_browser"};
+        const emrun_step = zems.emrunStep(
+            b,
+            b.getInstallPath(.{ .custom = "web" }, html_filename),
+            &emrun_args,
+        );
 
-    emrun_step.dependOn(emcc_step);
+        emrun_step.dependOn(emcc_step);
 
-    const run_step = b.step("emrun", "Serve and run the web app locally using emrun");
-    run_step.dependOn(emrun_step);
+        const run_step = b.step(
+            "emrun",
+            "Serve and run the web app locally using emrun",
+        );
+        run_step.dependOn(emrun_step);
+    }
 
-//    const exe = createExe(b, options);
-//    //const native = std.zig.system.NativeTargetInfo.detect(options.target) catch unreachable;
-//    //std.debug.print("{s}-{s}-{s}\n", .{ @tagName(native.target.cpu.arch), @tagName(native.target.os.tag), @tagName(native.target.abi) });
-//
     const install_exe = b.addInstallArtifact(exe, .{});
     b.getInstallStep().dependOn(&install_exe.step);
     //b.step("demo", "Build demo").dependOn(&install_exe.step);
 
-    //const run_cmd = b.addRunArtifact(exe);
-    //run_cmd.step.dependOn(&install_exe.step);
-    //b.step("run", "Run demo").dependOn(&run_cmd.step);
+    if (!emscripten) {
+        const install_content_step = b.addInstallDirectory(.{
+            .source_dir = b.path("content"),
+            .install_dir = .{ .custom = "" },
+            .install_subdir = "bin/content",
+        });
+        exe.step.dependOn(&install_content_step.step);
+
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_exe.step);
+        b.step("run", "Run demo").dependOn(&run_cmd.step);
+    }
 }
 //
 //    var release_step = b.step("release", "create executables for all apps");

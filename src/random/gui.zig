@@ -13,12 +13,11 @@ const Window = @import("windows.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
+pub fn update(demo: *DemoState) void {
     const gctx = demo.gctx;
     Window.setNextWindow(gctx, Window.ParametersWindow);
     if (zgui.begin("Parameters", Window.window_flags)) {
         zgui.pushIntId(2);
-        selection_gui();
         parameters(demo, gctx);
         zgui.popId();
     }
@@ -100,6 +99,11 @@ fn plots(demo: *DemoState) void {
 
 fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+    zgui.bulletText(
+        "{d:.3} ms/frame ({d:.1} fps)",
+        .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+    );
+
     zgui.text("Number Of Producers", .{});
 
     const p_bufs = demo.buffers.data.producers;

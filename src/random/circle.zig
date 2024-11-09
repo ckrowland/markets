@@ -25,8 +25,9 @@ pub fn createIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32
         i += 1;
     }
     indices[num_indices - 1] = 1;
+    const data = indices[0..num_indices];
 
-    gctx.queue.writeBuffer(gctx.lookupResource(consumer_index_buffer).?, 0, u32, indices[0..]);
+    gctx.queue.writeBuffer(gctx.lookupResource(consumer_index_buffer).?, 0, u32, data);
     return consumer_index_buffer;
 }
 

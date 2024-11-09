@@ -79,12 +79,24 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(imgui);
 
+    const emscripten = target.result.os.tag == .emscripten;
+    if (emscripten) {
+        imgui.defineCMacro("__EMSCRIPTEN__", null);
+        // TODO: read from enviroment or `emcc --version`
+        imgui.defineCMacro("__EMSCRIPTEN_major__", "3");
+        imgui.defineCMacro("__EMSCRIPTEN_minor__", "1");
+        imgui.root_module.stack_protector = false;
+        //imgui.root_module.disable_stack_probing = true;
+    }
+
     imgui.addIncludePath(b.path("libs"));
     imgui.addIncludePath(b.path("libs/imgui"));
 
-    imgui.linkLibC();
-    if (target.result.abi != .msvc)
-        imgui.linkLibCpp();
+    if (!emscripten) {
+        imgui.linkLibC();
+        if (target.result.abi != .msvc)
+            imgui.linkLibCpp();
+    }
 
     imgui.addCSourceFile(.{
         .file = b.path("src/zgui.cpp"),
@@ -187,8 +199,15 @@ pub fn build(b: *std.Build) void {
         .glfw_wgpu => {
             const zglfw = b.dependency("zglfw", .{});
             const zgpu = b.dependency("zgpu", .{});
-            imgui.addIncludePath(zglfw.path("libs/glfw/include"));
-            imgui.addIncludePath(zgpu.path("libs/dawn/include"));
+            if (emscripten) {
+                imgui.addSystemIncludePath(.{
+                    .cwd_relative = b.pathJoin(&.{ b.sysroot.?, "include" }),
+                });
+            } else {
+                imgui.addIncludePath(zglfw.path("libs/glfw/include"));
+                imgui.addIncludePath(zgpu.path("libs/dawn/include"));
+            }
+
             imgui.addCSourceFiles(.{
                 .files = &.{
                     "libs/imgui/backends/imgui_impl_glfw.cpp",

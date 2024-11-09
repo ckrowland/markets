@@ -78,6 +78,7 @@ pub fn build(b: *std.Build) void {
     };
 
     const options_step = b.addOptions();
+    options_step.addOption(bool, "emscripten", target.result.os.tag == .emscripten,);
     inline for (std.meta.fields(@TypeOf(options))) |field| {
         options_step.addOption(field.type, field.name, @field(options, field.name));
     }
@@ -91,6 +92,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "zpool", .module = b.dependency("zpool", .{}).module("root") },
         },
     });
+
 
     const zdawn = b.addStaticLibrary(.{
         .name = "zdawn",

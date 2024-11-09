@@ -5,7 +5,7 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
-const zstbi = @import("zstbi");
+//const zstbi = @import("zstbi");
 const Statistics = @import("statistics.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu.zig");
@@ -28,6 +28,7 @@ pub const DemoState = struct {
     running: bool = false,
     push_coord_update: bool = false,
     push_restart: bool = false,
+    resize_started: bool = false,
     content_scale: f32,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
@@ -68,8 +69,8 @@ pub const Parameters = struct {
         new: u32 = 6,
     },
     num_consumers: struct {
-        old: u32 = 5000,
-        new: u32 = 5000,
+        old: u32 = 1000,
+        new: u32 = 1000,
     },
     production_rate: u32 = 300,
     demand_rate: u32 = 100,
@@ -133,6 +134,11 @@ pub fn init(
     });
     Statistics.setNum(gctx, .{
         .stat_obj = stats_object,
+        .num = params.num_consumers.new,
+        .param = .consumers,
+    });
+    Statistics.setNum(gctx, .{
+        .stat_obj = stats_object,
         .num = params.num_producers.new,
         .param = .producers,
     });
@@ -186,12 +192,6 @@ pub fn init(
     };
 }
 
-pub fn update(demo: *DemoState, selection_gui: *const fn () void) void {
-    if (demo.push_restart) restartSimulation(demo);
-    if (demo.push_coord_update) updateAspectRatio(demo);
-    gui.update(demo, selection_gui);
-}
-
 pub fn draw(demo: *DemoState) void {
     const gctx = demo.gctx;
     const cam_world_to_clip = Camera.getObjectToClipMat(gctx);
@@ -213,21 +213,18 @@ pub fn draw(demo: *DemoState) void {
                 const pcp = gctx.lookupResource(demo.compute_pipelines.producer) orelse break :pass;
                 const ccp = gctx.lookupResource(demo.compute_pipelines.consumer) orelse break :pass;
                 const bg = gctx.lookupResource(demo.bind_groups.compute) orelse break :pass;
-
                 const pass = encoder.beginComputePass(null);
                 defer {
                     pass.end();
                     pass.release();
                 }
                 pass.setBindGroup(0, bg, &.{});
-
                 pass.setPipeline(pcp);
                 pass.dispatchWorkgroups(
                     @divFloor(num_producers, 64) + 1,
                     1,
                     1,
                 );
-
                 pass.setPipeline(ccp);
                 pass.dispatchWorkgroups(
                     @divFloor(num_consumers, 64) + 1,
@@ -286,6 +283,8 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
+                .depth_read_only = false,
+                .stencil_read_only = true,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,
@@ -346,10 +345,17 @@ pub fn draw(demo: *DemoState) void {
     gctx.submit(&.{commands});
 
     if (demo.gctx.present() == .swap_chain_resized) {
+        std.log.debug("hi", .{});
         demo.content_scale = getContentScale(demo.window);
         setImguiContentScale(demo.content_scale);
         updateAspectRatio(demo);
     }
+}
+
+pub fn update(demo: *DemoState) void {
+    if (demo.push_restart) restartSimulation(demo);
+    if (demo.push_coord_update) updateAspectRatio(demo);
+    gui.update(demo);
 }
 
 pub fn restartSimulation(demo: *DemoState) void {
@@ -388,7 +394,7 @@ pub fn restartSimulation(demo: *DemoState) void {
         .num = demo.params.num_producers.new,
         .param = .producers,
     });
-    demo.stats.clear();
+    //demo.stats.clear();
     demo.push_restart = false;
 }
 
@@ -417,12 +423,12 @@ pub fn updateAspectRatio(demo: *DemoState) void {
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
-fn getContentScale(window: *zglfw.Window) f32 {
+pub fn getContentScale(window: *zglfw.Window) f32 {
     const content_scale = window.getContentScale();
-    return @max(content_scale[0], content_scale[1]);
+    return @max(1, @max(content_scale[0], content_scale[1]));
 }
 
-fn setImguiContentScale(scale: f32) void {
+pub fn setImguiContentScale(scale: f32) void {
     zgui.getStyle().* = zgui.Style.init();
     zgui.getStyle().scaleAllSizes(scale);
 }
