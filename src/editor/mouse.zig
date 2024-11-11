@@ -35,7 +35,6 @@ pub const MouseButton = struct {
             @as(u32, @intFromFloat(pixel_pos[0] * content_scale[0])),
             @as(u32, @intFromFloat(pixel_pos[1] * content_scale[1])),
         };
-        std.log.debug("{any}", .{self});
     }
 
     /// Returns true the frame the mouse button was pressed.

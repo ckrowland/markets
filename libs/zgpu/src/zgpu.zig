@@ -171,25 +171,25 @@ pub const GraphicsContext = struct {
         };
         errdefer adapter.release();
 
-        //var properties: wgpu.AdapterProperties = undefined;
-        //properties.next_in_chain = null;
-        //adapter.getProperties(&properties);
+        var properties: wgpu.AdapterProperties = undefined;
+        properties.next_in_chain = null;
+        adapter.getProperties(&properties);
 
-        //unsure if getProperties is still supported. On wasm-emscripten
-        //it can't find a AdapterType/BackendType enum. Ignoring for now.
-        //properties.adapter_type = .unknown;
-        //properties.backend_type = .undef;
-
+        //webgpu updated since our dawn builds.
+        //getInfo is new way to do this, some errors though
         //var info: wgpu.AdapterInfo = undefined;
         //info.next_in_chain = null;
         //adapter.getInfo(&info);
-        //std.log.info("[zgpu] High-performance device has been selected:", .{});
-        //std.log.info("[zgpu]   Vendor: {s}", .{info.vendor});
-        //std.log.info("[zgpu]   Architecture: {s}", .{info.architecture});
-        //std.log.info("[zgpu]   Device: {s}", .{info.device});
-        //std.log.info("[zgpu]   Description: {s}", .{info.description});
-        //std.log.info("[zgpu]   Adapter type: {s}", .{@tagName(info.adapter_type)});
-        //std.log.info("[zgpu]   Backend type: {s}", .{@tagName(info.backend_type)});
+
+        if (emscripten) {
+            properties.adapter_type = .unknown;
+            properties.backend_type = .undef;
+        }
+        std.log.info("[zgpu] High-performance device has been selected:", .{});
+        std.log.info("[zgpu]   Name: {s}", .{properties.name});
+        std.log.info("[zgpu]   Driver: {s}", .{properties.driver_description});
+        std.log.info("[zgpu]   Adapter type: {s}", .{@tagName(properties.adapter_type)});
+        std.log.info("[zgpu]   Backend type: {s}", .{@tagName(properties.backend_type)});
 
         const device = device: {
             const Response = struct {
@@ -564,15 +564,6 @@ pub const GraphicsContext = struct {
     ) TextureViewHandle {
         const texture = gctx.lookupResource(texture_handle).?;
         const info = gctx.lookupResourceInfo(texture_handle).?;
-        //var dim = descriptor.dimension;
-        //if (dim == .undef) {
-        //    dim = switch (info.dimension) {
-        //        .undef => unreachable,
-        //        .tdim_1d => .tvdim_1d,
-        //        .tdim_2d => .tvdim_2d,
-        //        .tdim_3d => .tvdim_3d,
-        //    };
-        //}
         return gctx.texture_view_pool.addResource(gctx.*, .{
             .gpuobj = texture.createView(descriptor),
             .format = if (descriptor.format == .undef) info.format else descriptor.format,

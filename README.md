@@ -53,5 +53,13 @@ Download from the latest release or build from source.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-zig build run
+# Run natively
+zig build random-run
+zig build editor-run
+zig build variable-run
+
+# Run in browser
+zig build random-web-emrun
+zig build editor-web-emrun
+zig build variable-web-emrun
 ```
