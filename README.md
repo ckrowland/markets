@@ -59,7 +59,7 @@ zig build editor-run
 zig build variable-run
 
 # Run in browser
-zig build random-web-emrun
-zig build editor-web-emrun
-zig build variable-web-emrun
+zig build -Dtarget=wasm32-emscripten random-web-emrun
+zig build -Dtarget=wasm32-emscripten editor-web-emrun
+zig build -Dtarget=wasm32-emscripten variable-web-emrun
 ```
