@@ -1,15 +1,33 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub const Options = struct {
+const Options = struct {
     optimize: std.builtin.Mode,
     target: std.Build.ResolvedTarget,
 };
 
-const Demos = struct {
-    pub const random = @import("src/random/build.zig");
-    pub const editor = @import("src/editor/build.zig");
-    pub const variable = @import("src/variable/build.zig");
+const Demo = struct {
+    name: []const u8,
+    native: [:0]const u8,
+    web: [:0]const u8,
+};
+
+pub const Demos = [_]Demo{
+    Demo{
+        .name = "random",
+        .native = "src/random/main-native.zig",
+        .web = "src/random/main-web.zig",
+    },
+    Demo{
+        .name = "editor",
+        .native = "src/editor/main-native.zig",
+        .web = "src/editor/main-web.zig",
+    },
+    Demo{
+        .name = "variable",
+        .native = "src/variable/main-native.zig",
+        .web = "src/variable/main-web.zig",
+    },
 };
 
 pub fn build(b: *std.Build) !void {
@@ -25,8 +43,8 @@ pub fn build(b: *std.Build) !void {
         }
         const zemscripten = @import("zemscripten");
         const activate_emsdk_step = zemscripten.activateEmsdkStep(b);
-        inline for (comptime std.meta.declarations(Demos)) |d| {
-            const emcc_step = @field(Demos, d.name).buildWeb(b, options);
+        inline for (Demos) |d| {
+            const emcc_step = buildWeb(b, d.web, options);
             emcc_step.dependOn(activate_emsdk_step);
 
             const html_filename = try std.fmt.allocPrint(b.allocator, "{s}.html", .{d.name});
@@ -48,8 +66,8 @@ pub fn build(b: *std.Build) !void {
             ).dependOn(emrun_step);
         }
     } else {
-        inline for (comptime std.meta.declarations(Demos)) |d| {
-            const exe = @field(Demos, d.name).build(b, options);
+        inline for (Demos) |d| {
+            const exe = buildNative(b, d.native, options);
 
             // TODO: Problems with LTO on Windows.
             if (exe.rootModuleTarget().os.tag == .windows) {
@@ -70,6 +88,160 @@ pub fn build(b: *std.Build) !void {
         }
     }
 }
+pub fn buildNative(
+    b: *std.Build,
+    comptime root_source_file: [:0]const u8,
+    options: anytype,
+) *std.Build.Step.Compile {
+    const exe = b.addExecutable(.{
+        .name = "Simulations",
+        .root_source_file = b.path(root_source_file),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+
+    const zglfw = b.dependency("zglfw", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zglfw", zglfw.module("root"));
+    exe.linkLibrary(zglfw.artifact("glfw"));
+
+    @import("zgpu").addLibraryPathsTo(exe);
+    const zgpu = b.dependency("zgpu", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zgpu", zgpu.module("root"));
+    exe.linkLibrary(zgpu.artifact("zdawn"));
+
+    const zemscripten = b.dependency("zemscripten", .{});
+    exe.root_module.addImport("zemscripten", zemscripten.module("dummy"));
+
+    const zmath = b.dependency("zmath", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zmath", zmath.module("root"));
+
+    const zstbi = b.dependency("zstbi", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zstbi", zstbi.module("root"));
+    exe.linkLibrary(zstbi.artifact("zstbi"));
+
+    const zgui = b.dependency("zgui", .{
+        .target = options.target,
+        .backend = .glfw_wgpu,
+        .with_implot = true,
+    });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
+
+    const zpool = b.dependency("zpool", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zpool", zpool.module("root"));
+
+    const install_content_step = b.addInstallDirectory(.{
+        .source_dir = b.path("content"),
+        .install_dir = .{ .custom = "" },
+        .install_subdir = "bin/content",
+    });
+    exe.step.dependOn(&install_content_step.step);
+
+    if (options.target.result.os.tag == .macos) {
+        if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
+            exe.addLibraryPath(system_sdk.path("macos12/usr/lib"));
+            exe.addSystemFrameworkPath(system_sdk.path("macos12/System/Library/Frameworks"));
+        }
+    }
+
+    return exe;
+}
+
+pub fn buildWeb(
+    b: *std.Build,
+    comptime root_source_file: [:0]const u8,
+    options: anytype,
+) *std.Build.Step {
+    const exe = b.addStaticLibrary(.{
+        .name = "Simulations",
+        .root_source_file = b.path(root_source_file),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+
+    const zglfw = b.dependency("zglfw", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zglfw", zglfw.module("root"));
+
+    @import("zgpu").addLibraryPathsTo(exe);
+    const zgpu = b.dependency("zgpu", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zgpu", zgpu.module("root"));
+
+    const zemscripten = b.dependency("zemscripten", .{});
+    exe.root_module.addImport("zemscripten", zemscripten.module("root"));
+
+    const zmath = b.dependency("zmath", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zmath", zmath.module("root"));
+
+    const zstbi = b.dependency("zstbi", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zstbi", zstbi.module("root"));
+    exe.linkLibrary(zstbi.artifact("zstbi"));
+
+    const zgui = b.dependency("zgui", .{
+        .target = options.target,
+        .backend = .glfw_wgpu,
+        .with_implot = true,
+    });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
+
+    const zpool = b.dependency("zpool", .{
+        .target = options.target,
+    });
+    exe.root_module.addImport("zpool", zpool.module("root"));
+
+    const zems = @import("zemscripten");
+
+    //Add profect specific emcc flags
+    var settings = zems.emccDefaultSettings(b.allocator, .{
+        .optimize = options.optimize,
+    });
+    settings.put("ASYNCIFY", "1") catch unreachable;
+    settings.put("USE_OFFSET_CONVERTER", "1") catch unreachable;
+    settings.put("USE_GLFW", "3") catch unreachable;
+    settings.put("USE_WEBGPU", "1") catch unreachable;
+    settings.put("MALLOC", @tagName(.emmalloc)) catch unreachable;
+    settings.put("ALLOW_MEMORY_GROWTH", "1") catch unreachable;
+    settings.put("EXIT_RUNTIME", "0") catch unreachable;
+
+    exe.root_module.stack_protector = false;
+    //exe.linkLibC();
+    const emcc_step = zems.emccStep(b, exe, .{
+        .optimize = options.optimize,
+        .flags = zems.emccDefaultFlags(b.allocator, options.optimize),
+        .settings = settings,
+        .use_preload_plugins = true,
+        .embed_paths = &.{
+            .{
+                .src_path = "content",
+                .virtual_path = "/content",
+            },
+        },
+        .preload_paths = &.{},
+        .install_dir = .{ .custom = "web" },
+        .shell_file_path = "content/html/shell_minimal.html",
+    });
+
+    return emcc_step;
+}
+
 //
 //    var release_step = b.step("release", "create executables for all apps");
 //    var build_step = b.step("build", "build executables for all apps");

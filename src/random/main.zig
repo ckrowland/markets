@@ -16,9 +16,6 @@ const Square = @import("square.zig");
 const Circle = @import("circle.zig");
 const zemscripten = @import("zemscripten");
 const emscripten = @import("builtin").target.os.tag == .emscripten;
-pub const std_options = std.Options{
-    .logFn = if (emscripten) zemscripten.log else std.log.defaultLog,
-};
 
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
@@ -85,34 +82,47 @@ pub const Parameters = struct {
     aspect: f32,
 };
 
-pub fn main() !void {
+pub fn updateAndRender(demo: *DemoState) !void {
+    zglfw.pollEvents();
+    zgui.backend.newFrame(
+        demo.gctx.swapchain_descriptor.width,
+        demo.gctx.swapchain_descriptor.height,
+    );
+    update(demo);
+    draw(demo);
+    demo.window.swapBuffers();
+}
+
+pub fn setImguiContentScale(scale: f32) void {
+    zgui.getStyle().* = zgui.Style.init();
+    zgui.getStyle().scaleAllSizes(scale);
+}
+
+pub fn getContentScale(window: *zglfw.Window) f32 {
+    const content_scale = window.getContentScale();
+    return @max(1, @max(content_scale[0], content_scale[1]));
+}
+
+pub fn deinit(demo: *DemoState) void {
+    demo.buffers.data.consumers.list.deinit();
+    demo.buffers.data.producers.list.deinit();
+    demo.buffers.data.stats.list.deinit();
+    demo.stats.deinit();
+
+    zgui.backend.deinit();
+    zgui.plot.deinit();
+    zgui.deinit();
+    demo.gctx.destroy(demo.allocator);
+    demo.window.destroy();
+    zglfw.terminate();
+}
+
+pub fn init(allocator: std.mem.Allocator) !DemoState {
     try zglfw.init();
-    defer zglfw.terminate();
     zglfw.windowHintTyped(.client_api, .no_api);
 
-    // Change current working directory to where the executable is located.
-    //if (!emscripten) {
-    //    var buffer: [1024]u8 = undefined;
-    //    const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
-    //    std.posix.chdir(path) catch {};
-    //}
-
     const window = try zglfw.Window.create(1600, 900, "Simulations", null);
-    defer window.destroy();
-
     window.setSizeLimits(400, 400, -1, -1);
-    if (!emscripten) window.setPos(50, 50);
-
-    var gpa = blk: {
-        if (emscripten) {
-            break :blk zemscripten.EmmalocAllocator{};
-        } else {
-            break :blk std.heap.GeneralPurposeAllocator(.{}){};
-        }
-    };
-    defer _ = if (!emscripten) gpa.deinit();
-
-    const allocator = gpa.allocator();
 
     const gctx = try zgpu.GraphicsContext.create(
         allocator,
@@ -129,12 +139,9 @@ pub fn main() !void {
         },
         .{},
     );
-    defer gctx.destroy(allocator);
 
     zgui.init(allocator);
-    defer zgui.deinit();
     zgui.plot.init();
-    defer zgui.plot.deinit();
     zgui.io.setIniFilename(null);
 
     const content_scale = getContentScale(window);
@@ -152,80 +159,7 @@ pub fn main() !void {
         @intFromEnum(zgpu.GraphicsContext.swapchain_format),
         @intFromEnum(wgpu.TextureFormat.undef),
     );
-    defer zgui.backend.deinit();
 
-    var demo = try init(gctx, allocator, window);
-    defer deinit(&demo);
-
-    if (emscripten) {
-        _ = zemscripten.setResizeCallback(&resizeCallback, false, &demo);
-        zemscripten.requestAnimationFrameLoop(&tickEmcripten, &demo);
-        while (true) zemscripten.emscripten_sleep(1000);
-    } else while (!window.shouldClose()) {
-        try tick(&demo);
-    }
-}
-
-pub fn tick(demo: *DemoState) !void {
-    zglfw.pollEvents();
-    zgui.backend.newFrame(
-        demo.gctx.swapchain_descriptor.width,
-        demo.gctx.swapchain_descriptor.height,
-    );
-    update(demo);
-    draw(demo);
-    demo.window.swapBuffers();
-}
-
-pub fn resizeCallback(
-    event_type: i16,
-    event: *anyopaque,
-    user_data: ?*anyopaque,
-) callconv(.C) c_int {
-    _ = event_type;
-    _ = event;
-    var width: f64 = 0;
-    var height: f64 = 0;
-    const demo: *DemoState = @ptrCast(@alignCast(user_data.?));
-    const result = zemscripten.getElementCssSize("#canvas", &width, &height);
-    if (result != .success) return 0;
-
-    demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
-    if (demo.gctx.present() == .swap_chain_resized) {
-        demo.content_scale = getContentScale(demo.window);
-        zgui.getStyle().* = zgui.Style.init();
-        zgui.getStyle().scaleAllSizes(demo.content_scale);
-        updateAspectRatio(demo);
-    }
-
-    return 1;
-}
-
-fn getContentScale(window: *zglfw.Window) f32 {
-    const content_scale = window.getContentScale();
-    return @max(1, @max(content_scale[0], content_scale[1]));
-}
-
-usingnamespace if (emscripten) struct {
-    pub export fn tickEmcripten(time: f64, user_data: ?*anyopaque) callconv(.C) c_int {
-        _ = time;
-        const demo: *DemoState = @ptrCast(@alignCast(user_data.?));
-        if (demo.gctx.canRender()) tick(demo) catch |err| {
-            std.log.err("animation frame canceled! tick failed with: {}", .{err});
-            return 0; // FALSE - stop animation frame callback loop
-        } else {
-            std.log.warn("canRender(): Frame skipped!", .{});
-        }
-        return 1; // TRUE - continue animation frame callback loop
-    }
-} else struct {};
-extern fn tickEmcripten(time: f64, user_data: ?*anyopaque) callconv(.C) c_int;
-
-pub fn init(
-    gctx: *zgpu.GraphicsContext,
-    allocator: std.mem.Allocator,
-    window: *zglfw.Window,
-) !DemoState {
     const params = Parameters{
         .aspect = Camera.getAspectRatio(gctx),
         .num_producers = .{},
@@ -380,24 +314,21 @@ pub fn draw(demo: *DemoState) void {
                 const s = gctx.lookupResource(data.stats.buf) orelse break :pass;
                 const s_info = gctx.lookupResourceInfo(data.stats.buf) orelse break :pass;
                 const sm = gctx.lookupResource(data.stats.mapping.buf) orelse break :pass;
-                const s_size = @as(usize, @intCast(s_info.size));
-                encoder.copyBufferToBuffer(s, 0, sm, 0, s_size);
+                encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
             }
 
             if (!demo.buffers.data.producers.mapping.waiting) {
                 const p = gctx.lookupResource(data.producers.buf) orelse break :pass;
                 const p_info = gctx.lookupResourceInfo(data.producers.buf) orelse break :pass;
                 const pm = gctx.lookupResource(data.producers.mapping.buf) orelse break :pass;
-                const p_size = @as(usize, @intCast(p_info.size));
-                encoder.copyBufferToBuffer(p, 0, pm, 0, p_size);
+                encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
             }
 
             if (!demo.buffers.data.consumers.mapping.waiting) {
                 const c = gctx.lookupResource(data.consumers.buf) orelse break :pass;
                 const c_info = gctx.lookupResourceInfo(data.consumers.buf) orelse break :pass;
                 const cm = gctx.lookupResource(data.consumers.mapping.buf) orelse break :pass;
-                const c_size = @as(usize, @intCast(c_info.size));
-                encoder.copyBufferToBuffer(c, 0, cm, 0, c_size);
+                encoder.copyBufferToBuffer(c, 0, cm, 0, c_info.size);
             }
         }
 
@@ -561,11 +492,4 @@ pub fn updateAspectRatio(demo: *DemoState) void {
     Wgpu.updateCoords(demo.gctx, Producer, demo.buffers.data.producers);
     demo.push_coord_update = false;
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
-}
-
-pub fn deinit(demo: *DemoState) void {
-    demo.stats.deinit();
-    demo.buffers.data.consumers.list.deinit();
-    demo.buffers.data.producers.list.deinit();
-    demo.buffers.data.stats.list.deinit();
 }

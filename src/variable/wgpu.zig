@@ -150,8 +150,8 @@ pub fn runCallbackIfReady(comptime T: type, buf: *MappingBuffer(T)) void {
     const request = buf.requests[buf.remove_idx];
     if (buf.waiting and buf.staging.ready) {
         buf.remove_idx = (buf.remove_idx + 1) % callback_queue_len;
-        buf.staging.buffer.unmap();
         request.func.?(request.args);
+        buf.staging.buffer.unmap();
         buf.staging.slice = null;
         buf.waiting = false;
         buf.staging.ready = false;
