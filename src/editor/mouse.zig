@@ -1,4 +1,5 @@
 const std = @import("std");
+const emscripten = @import("builtin").target.os.tag == .emscripten;
 const zglfw = @import("zglfw");
 const zm = @import("zmath");
 const zgpu = @import("zgpu");
@@ -97,8 +98,12 @@ pub fn onGrid(demo: *DemoState) bool {
 
 fn getContentScale(window: *zglfw.Window) [2]f32 {
     const content_scale = window.getContentScale();
-    return .{
-        @max(1, content_scale[0]),
-        @max(1, content_scale[1]),
-    };
+
+    switch (emscripten) {
+        true => return .{ 1, 1 },
+        false => return .{
+            @max(1, content_scale[0]),
+            @max(1, content_scale[1]),
+        },
+    }
 }

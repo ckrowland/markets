@@ -100,7 +100,7 @@ pub fn setImguiContentScale(scale: f32) void {
 
 pub fn getContentScale(window: *zglfw.Window) f32 {
     const content_scale = window.getContentScale();
-    return @max(1, @max(content_scale[0], content_scale[1]));
+    return @max(content_scale[0], content_scale[1]);
 }
 
 pub fn deinit(demo: *DemoState) void {
@@ -147,11 +147,10 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
     const content_scale = getContentScale(window);
     zgui.getStyle().scaleAllSizes(content_scale);
 
-    const font_size = switch (emscripten) {
-        true => 28.0 * content_scale,
-        false => 20.0 * content_scale,
-    };
-    _ = zgui.io.addFontFromFile("content/fonts/Roboto-Medium.ttf", font_size);
+    _ = zgui.io.addFontFromFile(
+        "content/fonts/Roboto-Medium.ttf",
+        18 * content_scale,
+    );
 
     zgui.backend.init(
         window,
@@ -309,6 +308,7 @@ pub fn draw(demo: *DemoState) void {
         }
 
         // Copy data to mapped buffers so we can retrieve it on demand
+        // This could be run only when data is requested
         pass: {
             if (!demo.buffers.data.stats.mapping.waiting) {
                 const s = gctx.lookupResource(data.stats.buf) orelse break :pass;
@@ -354,8 +354,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
-                .depth_read_only = false,
-                .stencil_read_only = true,
+                .stencil_read_only = 1,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,

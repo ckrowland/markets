@@ -25,8 +25,8 @@
             .hash = "122028a3c9bc317697407bb8d85a39b120b3ce8d97d2e5aa0c03e97a8d1dc3449d02",
         },
         .emsdk = .{
-            .url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.70.tar.gz",
-            .hash = "12203d37f4492c950b6a30710844d6896fbeffc9bc6e70bffef6f702f7c5bc9849f0",
+            .url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.73.tar.gz",
+            .hash = "1220d2b37748757d43de92f0ef723b6a00c3cae4b6a9c582b607421704498a5cfd2b",
         },
         .zglfw = .{
             .url = "https://github.com/ckrowland/zglfw/archive/refs/heads/main.tar.gz",
@@ -34,7 +34,7 @@
         },
         .zgpu = .{
             .url = "https://github.com/ckrowland/zgpu/archive/refs/heads/main.tar.gz",
-            .hash = "1220048acacbbdf54f6dadc8713466eb388a8adaf32da127cc7bac04b23930cb2f74",
+            .hash = "122051dc73bb83e0733d8d0940a9259c890cb0cc4b8e533aa2ee6f09a39658f0a5f1",
         },
         .zpool = .{
             .url = "https://github.com/zig-gamedev/zpool/archive/b3d91a939f6738b7beec41d9fada07bc9cc01eaf.tar.gz",

@@ -104,7 +104,7 @@ pub fn updateAndRender(demo: *DemoState) !void {
 
 pub fn getContentScale(window: *zglfw.Window) f32 {
     const content_scale = window.getContentScale();
-    return @max(1, @max(content_scale[0], content_scale[1]));
+    return @max(content_scale[0], content_scale[1]);
 }
 
 pub fn setImguiContentScale(scale: f32) void {
@@ -160,12 +160,10 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
 
     const content_scale = getContentScale(window);
     zgui.getStyle().scaleAllSizes(content_scale);
-
-    const font_size = switch (emscripten) {
-        true => 28.0 * content_scale,
-        false => 20.0 * content_scale,
-    };
-    _ = zgui.io.addFontFromFile("content/fonts/Roboto-Medium.ttf", font_size);
+    _ = zgui.io.addFontFromFile(
+        "content/fonts/Roboto-Medium.ttf",
+        18 * content_scale,
+    );
 
     zgui.backend.init(
         window,
@@ -342,37 +340,34 @@ pub fn draw(demo: *DemoState) void {
         }
 
         // Copy data to mapped buffers so we can retrieve it on demand
+        // This could be run only when data is requested
         pass: {
             if (!demo.buffers.data.stats.mapping.waiting) {
                 const s = gctx.lookupResource(data.stats.buf) orelse break :pass;
                 const s_info = gctx.lookupResourceInfo(data.stats.buf) orelse break :pass;
                 const sm = gctx.lookupResource(data.stats.mapping.buf) orelse break :pass;
-                const s_size = @as(usize, @intCast(s_info.size));
-                encoder.copyBufferToBuffer(s, 0, sm, 0, s_size);
+                encoder.copyBufferToBuffer(s, 0, sm, 0, s_info.size);
             }
 
             if (!demo.buffers.data.producers.mapping.waiting) {
                 const p = gctx.lookupResource(data.producers.buf) orelse break :pass;
                 const p_info = gctx.lookupResourceInfo(data.producers.buf) orelse break :pass;
                 const pm = gctx.lookupResource(data.producers.mapping.buf) orelse break :pass;
-                const p_size = @as(usize, @intCast(p_info.size));
-                encoder.copyBufferToBuffer(p, 0, pm, 0, p_size);
+                encoder.copyBufferToBuffer(p, 0, pm, 0, p_info.size);
             }
 
             if (!demo.buffers.data.consumers.mapping.waiting) {
                 const c = gctx.lookupResource(data.consumers.buf) orelse break :pass;
                 const c_info = gctx.lookupResourceInfo(data.consumers.buf) orelse break :pass;
                 const cm = gctx.lookupResource(data.consumers.mapping.buf) orelse break :pass;
-                const c_size = @as(usize, @intCast(c_info.size));
-                encoder.copyBufferToBuffer(c, 0, cm, 0, c_size);
+                encoder.copyBufferToBuffer(c, 0, cm, 0, c_info.size);
             }
 
             if (!demo.buffers.data.consumer_hovers.mapping.waiting) {
                 const ch = gctx.lookupResource(data.consumer_hovers.buf) orelse break :pass;
                 const ch_info = gctx.lookupResourceInfo(data.consumer_hovers.buf) orelse break :pass;
                 const chm = gctx.lookupResource(data.consumer_hovers.mapping.buf) orelse break :pass;
-                const ch_size = @as(usize, @intCast(ch_info.size));
-                encoder.copyBufferToBuffer(ch, 0, chm, 0, ch_size);
+                encoder.copyBufferToBuffer(ch, 0, chm, 0, ch_info.size);
             }
         }
 
@@ -403,7 +398,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
-                .stencil_read_only = true,
+                .stencil_read_only = 1,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,
