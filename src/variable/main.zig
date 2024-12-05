@@ -580,9 +580,12 @@ pub fn restartSimulation(demo: *DemoState) void {
         return;
     }
 
-    Wgpu.clearObjBuffer(demo.gctx, Consumer, &demo.buffers.data.consumers);
-    Wgpu.clearObjBuffer(demo.gctx, Producer, &demo.buffers.data.producers);
-    Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
+    const encoder = demo.gctx.device.createCommandEncoder(null);
+    defer encoder.release();
+
+    Wgpu.clearObjBuffer(encoder, demo.gctx, Consumer, &demo.buffers.data.consumers);
+    Wgpu.clearObjBuffer(encoder, demo.gctx, Producer, &demo.buffers.data.producers);
+    Wgpu.clearObjBuffer(encoder, demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
 
     const num_consumers = demo.sliders.get("num_consumers").?.slider.val;

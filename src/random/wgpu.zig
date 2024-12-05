@@ -292,21 +292,6 @@ pub const shrinkArgs = struct {
     new_size: u32,
     buf: zgpu.BufferHandle,
 };
-pub fn shrinkBuffer(gctx: *Gctx, comptime T: type, args: shrinkArgs) void {
-    const all_zero = [_]u8{0} ** 10000000;
-    const buf = gctx.lookupResource(args.buf).?;
-    const buf_info = gctx.lookupResourceInfo(args.buf).?;
-    const size_to_keep = @sizeOf(T) * args.new_size;
-    const size_to_clear = buf_info.size - size_to_keep;
-    const usize_to_clear = @as(usize, @intCast(size_to_clear));
-    gctx.queue.writeBuffer(
-        buf,
-        size_to_keep,
-        u8,
-        all_zero[0..usize_to_clear],
-    );
-}
-
 pub fn appendArgs(comptime T: type) type {
     return struct {
         num_old_structs: u32,
@@ -323,37 +308,14 @@ pub fn appendBuffer(gctx: *Gctx, comptime T: type, args: appendArgs(T)) void {
     );
 }
 
-pub fn clearBuffer(gctx: *Gctx, buf: zgpu.BufferHandle) void {
-    const all_zero = [_]u8{0} ** 10000000;
-    const buf_info = gctx.lookupResourceInfo(buf).?;
-    const b_size = @as(usize, @intCast(buf_info.size));
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(buf).?,
-        0,
-        u8,
-        all_zero[0..b_size],
-    );
-}
-
-pub fn clearObjBuffer(gctx: *Gctx, comptime T: type, obj_buf: *ObjectBuffer(T)) void {
-    const all_zero = [_]u8{0} ** 10000000;
+pub fn clearObjBuffer(encoder: wgpu.CommandEncoder, gctx: *Gctx, comptime T: type, obj_buf: *ObjectBuffer(T)) void {
+    const buf = gctx.lookupResource(obj_buf.buf).?;
+    const map_buf = gctx.lookupResource(obj_buf.mapping.buf).?;
     const buf_info = gctx.lookupResourceInfo(obj_buf.buf).?;
-    const b_size = @as(usize, @intCast(buf_info.size));
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(obj_buf.buf).?,
-        0,
-        u8,
-        all_zero[0..b_size],
-    );
-
     const map_buf_info = gctx.lookupResourceInfo(obj_buf.mapping.buf).?;
-    const m_size = @as(usize, @intCast(map_buf_info.size));
-    gctx.queue.writeBuffer(
-        gctx.lookupResource(obj_buf.mapping.buf).?,
-        0,
-        u8,
-        all_zero[0..m_size],
-    );
+
+    encoder.clearBuffer(buf, 0, @intCast(buf_info.size));
+    encoder.clearBuffer(map_buf, 0, @intCast(map_buf_info.size));
 
     obj_buf.list.clearAndFree();
     obj_buf.mapping.insert_idx = 0;

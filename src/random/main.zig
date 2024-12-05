@@ -354,7 +354,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
-                .stencil_read_only = 1,
+                .stencil_read_only = .true,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,
@@ -437,9 +437,12 @@ pub fn restartSimulation(demo: *DemoState) void {
         return;
     }
 
-    Wgpu.clearObjBuffer(demo.gctx, Consumer, &demo.buffers.data.consumers);
-    Wgpu.clearObjBuffer(demo.gctx, Producer, &demo.buffers.data.producers);
-    Wgpu.clearObjBuffer(demo.gctx, u32, &demo.buffers.data.stats);
+    const encoder = demo.gctx.device.createCommandEncoder(null);
+    defer encoder.release();
+
+    Wgpu.clearObjBuffer(encoder, demo.gctx, Consumer, &demo.buffers.data.consumers);
+    Wgpu.clearObjBuffer(encoder, demo.gctx, Producer, &demo.buffers.data.producers);
+    Wgpu.clearObjBuffer(encoder, demo.gctx, u32, &demo.buffers.data.stats);
     demo.buffers.data.stats.mapping.num_structs = Statistics.NUM_STATS;
 
     Consumer.generateBulk(
@@ -464,7 +467,7 @@ pub fn restartSimulation(demo: *DemoState) void {
         .num = demo.params.num_producers.new,
         .param = .producers,
     });
-    //demo.stats.clear();
+    demo.stats.clear();
     demo.push_restart = false;
 }
 

@@ -106,7 +106,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.text("Number Of Producers", .{});
 
-    const p_bufs = demo.buffers.data.producers;
     if (zgui.sliderScalar(
         "##np",
         u32,
@@ -120,10 +119,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         });
 
         if (num_producers.old >= num_producers.new) {
-            Wgpu.shrinkBuffer(gctx, Producer, .{
-                .new_size = num_producers.new,
-                .buf = p_bufs.buf,
-            });
             demo.buffers.data.producers.list.resize(num_producers.new) catch unreachable;
             demo.buffers.data.producers.mapping.num_structs = num_producers.new;
         } else {
@@ -197,7 +192,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
-    const c_bufs = demo.buffers.data.consumers;
     zgui.text("Number of Consumers", .{});
     if (zgui.sliderScalar("##nc", u32, .{
         .v = &demo.params.num_consumers.new,
@@ -212,10 +206,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         });
 
         if (num_consumers.old >= num_consumers.new) {
-            Wgpu.shrinkBuffer(gctx, Consumer, .{
-                .new_size = num_consumers.new,
-                .buf = c_bufs.buf,
-            });
             demo.buffers.data.consumers.list.resize(num_consumers.new) catch unreachable;
             demo.buffers.data.consumers.mapping.num_structs = num_consumers.new;
         } else {

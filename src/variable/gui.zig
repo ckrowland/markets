@@ -510,8 +510,6 @@ pub fn numConsumerUpdate(demo: *DemoState) void {
 
     const old: u32 = demo.buffers.data.consumers.mapping.num_structs;
     if (old >= new) {
-        const buf = demo.buffers.data.consumers.buf;
-        Wgpu.shrinkBuffer(demo.gctx, buf, Consumer, new);
         demo.buffers.data.consumers.mapping.num_structs = new;
     } else {
         Consumer.generateBulk(demo, new - old);
@@ -524,8 +522,6 @@ pub fn numProducersUpdate(demo: *DemoState) void {
 
     const old: u32 = demo.buffers.data.producers.mapping.num_structs;
     if (old >= new) {
-        const buf = demo.buffers.data.producers.buf;
-        Wgpu.shrinkBuffer(demo.gctx, buf, Producer, new);
         demo.buffers.data.producers.mapping.num_structs = new;
     } else {
         Producer.generateBulk(demo, new - old);

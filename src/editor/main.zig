@@ -398,7 +398,7 @@ pub fn draw(demo: *DemoState) void {
                 .depth_load_op = .clear,
                 .depth_store_op = .store,
                 .depth_clear_value = 1.0,
-                .stencil_read_only = 1,
+                .stencil_read_only = .true,
             };
             const render_pass_info = wgpu.RenderPassDescriptor{
                 .color_attachment_count = color_attachments.len,
@@ -483,9 +483,12 @@ pub fn clearSimulation(demo: *DemoState) void {
     }
 
     const gctx = demo.gctx;
-    Wgpu.clearObjBuffer(gctx, Consumer, &demo.buffers.data.consumers);
-    Wgpu.clearObjBuffer(gctx, Producer, &demo.buffers.data.producers);
-    Wgpu.clearObjBuffer(gctx, ConsumerHover, &demo.buffers.data.consumer_hovers);
+    const encoder = demo.gctx.device.createCommandEncoder(null);
+    defer encoder.release();
+
+    Wgpu.clearObjBuffer(encoder, gctx, Consumer, &demo.buffers.data.consumers);
+    Wgpu.clearObjBuffer(encoder, gctx, Producer, &demo.buffers.data.producers);
+    Wgpu.clearObjBuffer(encoder, gctx, ConsumerHover, &demo.buffers.data.consumer_hovers);
 
     Statistics.setNum(gctx, .{
         .stat_obj = demo.buffers.data.stats,
