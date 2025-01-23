@@ -1,39 +1,46 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const Wgpu = @import("wgpu");
+const Camera = @import("camera");
 const Consumer = @import("consumer");
 const Producer = @import("producer");
 const Statistics = @import("statistics");
-const Camera = @import("camera");
-const ConsumerHover = @import("consumer_hover.zig");
+const Wgpu = @import("wgpu");
 
 pub fn numTransactions(args: Wgpu.CallbackArgs(u32)) void {
-    const gpu_stats = Wgpu.getMappedData(u32, &args.obj_buf.mapping);
-    args.stat_array.append(gpu_stats[0]) catch unreachable;
+    const slice = args.obj_buf.mapping.staging.slice;
+    var num: u32 = 0;
+    if (slice) |stats| {
+        num = stats[0];
+    }
+    args.stat_array.append(num) catch unreachable;
 
     const resource = args.gctx.lookupResource(args.obj_buf.buf).?;
     args.gctx.queue.writeBuffer(resource, 0, u32, &.{0});
 }
 
-pub fn totalInventory(args: Wgpu.CallbackArgs(Producer)) void {
-    const producers = Wgpu.getMappedData(Producer, &args.obj_buf.mapping);
-    var total_inventory: u32 = 0;
-    for (producers) |p| {
-        total_inventory += @as(u32, @intCast(p.inventory));
-    }
-    args.stat_array.append(total_inventory) catch unreachable;
-}
-
-pub fn emptyConsumers(args: Wgpu.CallbackArgs(Consumer)) void {
-    const consumers = Wgpu.getMappedData(Consumer, &args.obj_buf.mapping);
+pub fn consumerStats(args: Wgpu.CallbackArgs(Consumer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
     var empty_consumers: u32 = 0;
-    for (consumers) |c| {
-        if (c.inventory == 0) {
-            empty_consumers += 1;
+    if (slice) |consumers| {
+        for (consumers) |c| {
+            if (c.inventory == 0) {
+                empty_consumers += 1;
+            }
         }
     }
     args.stat_array.append(empty_consumers) catch unreachable;
+}
+
+pub fn producerStats(args: Wgpu.CallbackArgs(Producer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    var total_inventory: u32 = 0;
+    if (slice) |producers| {
+        for (producers) |p| {
+            total_inventory += @intCast(p.inventory);
+        }
+    }
+    args.stat_array.append(total_inventory) catch unreachable;
 }
 
 pub fn updateProducerCoords(args: Wgpu.CallbackArgs(Producer)) void {
@@ -65,16 +72,5 @@ pub fn updateConsumerCoords(args: Wgpu.CallbackArgs(Consumer)) void {
             offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "destination");
             args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
         }
-    }
-}
-
-pub fn updateConsumerHoverCoords(args: Wgpu.CallbackArgs(ConsumerHover)) void {
-    const consumers = args.obj_buf.mapping.staging.slice.?;
-    const buf = args.gctx.lookupResource(args.obj_buf.buf).?;
-    var offset: usize = @offsetOf(ConsumerHover, "home");
-    for (consumers, 0..) |c, i| {
-        const new_coord = Camera.getWorldPosition(args.gctx, c.absolute_home);
-        offset += i * @sizeOf(ConsumerHover);
-        args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
     }
 }

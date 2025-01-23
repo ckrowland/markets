@@ -2,26 +2,27 @@ const std = @import("std");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
 const zmath = @import("zmath");
-const Wgpu = @import("wgpu.zig");
-const Windows = @import("windows.zig");
-const Consumer = @import("consumer.zig");
-const Producer = @import("producer.zig");
+const Camera = @import("camera");
+const Wgpu = @import("wgpu");
+const Consumer = @import("consumer");
+const Producer = @import("producer");
 const Mouse = @import("mouse.zig");
-const Camera = @import("camera.zig");
 const ConsumerHover = @import("consumer_hover.zig");
 const Callbacks = @import("callbacks.zig");
 
 pub const WINDOW_SIZE_PIXELS: [2]u32 = .{ 400, 185 };
-const HOVER_SIZE_GRID = 40;
+const HOVER_SIZE_GRID = 30;
 
 const HoverSquareID = struct {
-    hs_id: u32,
+    hs_id: ?u32 = null,
     gui_id: u32,
+    popup_type: PopupType,
 };
 pub const HoverSquare = struct {
     id: HoverSquareID,
     corners_grid: [4]i32,
 };
+pub const PopupType = enum { consumers, producer };
 pub const Popup = struct {
     id: HoverSquareID = undefined,
     grid_center: [2]i32,
@@ -30,7 +31,7 @@ pub const Popup = struct {
     pivot: bool = false,
     open_grid: [4]i32 = undefined,
     closed_grid: [4]i32 = undefined,
-    type_popup: enum { consumers, producer },
+    type_popup: PopupType,
     parameters: union {
         consumer: struct {
             demand_rate: u32,
@@ -44,15 +45,15 @@ pub const Popup = struct {
 };
 
 const Self = @This();
-hover_square_len: u32,
-popups: std.ArrayList(Popup),
+consumers_popups: std.ArrayList(Popup),
+producer_popups: std.ArrayList(Popup),
 x_axis: std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
 y_axis: std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
 
 pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
-        .hover_square_len = 0,
-        .popups = std.ArrayList(Popup).init(allocator),
+        .consumers_popups = std.ArrayList(Popup).init(allocator),
+        .producer_popups = std.ArrayList(Popup).init(allocator),
         .x_axis = std.AutoHashMap(
             i32,
             std.AutoHashMap(HoverSquareID, void),
@@ -65,7 +66,8 @@ pub fn init(allocator: std.mem.Allocator) Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.popups.deinit();
+    self.consumers_popups.deinit();
+    self.producer_popups.deinit();
     var x_arrays = self.x_axis.valueIterator();
     while (x_arrays.next()) |set| {
         set.deinit();
@@ -80,8 +82,8 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn clear(self: *Self) void {
-    self.hover_square_len = 0;
-    self.popups.clearAndFree();
+    self.consumers_popups.clearAndFree();
+    self.producer_popups.clearAndFree();
 
     var x_arrays = self.x_axis.valueIterator();
     while (x_arrays.next()) |set| {
@@ -98,21 +100,36 @@ pub fn clear(self: *Self) void {
 
 pub fn appendPopup(self: *Self, popup: Popup) void {
     var copy = popup;
-    copy.id.gui_id = @as(u32, @intCast(self.popups.items.len));
-    copy.id.hs_id = self.hover_square_len;
-    self.popups.append(copy) catch unreachable;
+    switch (popup.type_popup) {
+        .consumers => {
+            copy.id.gui_id = @as(u32, @intCast(self.consumers_popups.items.len));
+            copy.id.popup_type = .consumers;
+            self.consumers_popups.append(copy) catch unreachable;
+        },
+        .producer => {
+            copy.id.gui_id = @as(u32, @intCast(self.producer_popups.items.len));
+            copy.id.popup_type = .producer;
+            self.producer_popups.append(copy) catch unreachable;
+        },
+    }
 }
 
 pub fn appendSquare(
     self: *Self,
     allocator: std.mem.Allocator,
-    grid_pos: [2]i32,
+    grid_pos: [4]i32,
+    popup_type: PopupType,
 ) void {
-    const gui_id = @as(u32, @intCast(self.popups.items.len));
+    const gui_id = switch (popup_type) {
+        .consumers => @as(u32, @intCast(self.consumers_popups.items.len)),
+        .producer => @as(u32, @intCast(self.producer_popups.items.len)),
+    };
+
     const square = HoverSquare{
         .id = .{
-            .hs_id = self.hover_square_len,
+            .hs_id = self.x_axis.count() + self.y_axis.count(),
             .gui_id = gui_id,
+            .popup_type = popup_type,
         },
         .corners_grid = .{
             grid_pos[0] - HOVER_SIZE_GRID,
@@ -122,37 +139,10 @@ pub fn appendSquare(
         },
     };
     self.appendRange(allocator, square);
-    self.hover_square_len += 1;
 }
 
 fn inBetween(bottom: i32, value: i32, top: i32) bool {
     return bottom < value and value < top;
-}
-
-fn resetCoords(
-    axis: *std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
-    closed_grid: *[2]i32,
-    open_grid: *[2]i32,
-    hsid: HoverSquareID,
-) void {
-    var it = axis.iterator();
-    while (it.next()) |kv| {
-        const coord = kv.key_ptr.*;
-        const pixel_has_gui = kv.value_ptr.contains(hsid);
-        const in_open_grid = inBetween(open_grid[0], coord, open_grid[1]);
-        const not_in_closed_grid = !inBetween(
-            closed_grid[0],
-            coord,
-            closed_grid[1],
-        );
-        if (pixel_has_gui and in_open_grid and not_in_closed_grid) {
-            _ = kv.value_ptr.remove(hsid);
-            if (kv.value_ptr.count() == 0) {
-                kv.value_ptr.deinit();
-                _ = axis.remove(coord);
-            }
-        }
-    }
 }
 
 fn addCoords(
@@ -177,127 +167,155 @@ fn addCoords(
     }
 }
 
-fn resetRange(self: *Self, edges: [4]i32, gui_id: u32) void {
-    resetCoords(&self.x_axis, edges[0..2], gui_id);
-    resetCoords(&self.y_axis, edges[2..4], gui_id);
-}
-
 fn appendRange(self: *Self, allocator: std.mem.Allocator, hs: HoverSquare) void {
     addCoords(&self.x_axis, allocator, hs.corners_grid[0..2], hs.id) catch unreachable;
     addCoords(&self.y_axis, allocator, hs.corners_grid[2..4], hs.id) catch unreachable;
 }
 
 pub fn anyOpen(self: *Self) bool {
-    var b = false;
-    for (self.popups.items) |w| {
-        b = b or w.open;
+    for (self.consumers_popups.items) |w| {
+        if (w.open) return true;
     }
-    return b;
-}
-
-fn isPopupOpen(self: *Self, gui_id: u32) bool {
-    for (self.popups.items) |p| {
-        if (p.id.gui_id == gui_id) {
-            return p.open;
-        }
+    for (self.producer_popups.items) |w| {
+        if (w.open) return true;
     }
     return false;
 }
 
-pub fn doesAgentExist(self: *Self, grid_pos: [2]i32) bool {
-    var x_set = self.x_axis.get(grid_pos[0]);
-    var y_set = self.y_axis.get(grid_pos[1]);
-    if (x_set == null or y_set == null) {
-        return false;
-    }
-    const gui_id: ?u32 = blk: {
-        var last_gui_id: ?u32 = null;
-        var it = x_set.?.keyIterator();
-        while (it.next()) |key| {
-            if (y_set.?.contains(key.*)) {
-                last_gui_id = key.gui_id;
-                if (isPopupOpen(self, key.gui_id)) {
-                    break :blk key.gui_id;
+fn isPopupOpen(self: *Self, hsid: HoverSquareID) bool {
+    switch (hsid.popup_type) {
+        .consumers => {
+            for (self.consumers_popups.items) |p| {
+                if (p.id.gui_id == hsid.gui_id) {
+                    return p.open;
                 }
             }
-        }
-
-        // If neither gui is open, just open the last one we saw
-        if (last_gui_id) |gid| {
-            break :blk gid;
-        }
-        break :blk null;
-    };
-
-    if (gui_id == null) {
-        return false;
+        },
+        .producer => {
+            for (self.producer_popups.items) |p| {
+                if (p.id.gui_id == hsid.gui_id) {
+                    return p.open;
+                }
+            }
+        },
     }
+    return false;
+}
+
+pub fn doesAgentExist(self: *Self, grid_pos: [4]i32) bool {
+    _ = self.getHoverSquareID(grid_pos) catch {
+        return false;
+    };
     return true;
 }
 
-fn getPopupIndex(self: *Self, grid_pos: [2]i32) !usize {
+fn getHoverSquareID(self: *Self, grid_pos: [4]i32) !HoverSquareID {
     var x_set = self.x_axis.get(grid_pos[0]);
     var y_set = self.y_axis.get(grid_pos[1]);
     if (x_set == null or y_set == null) {
-        return error.PopupNotFound;
+        return error.HSIDNotFound;
+    }
+    var it = x_set.?.keyIterator();
+    while (it.next()) |key| {
+        if (y_set.?.contains(key.*)) {
+            return key.*;
+        }
     }
 
-    const gui_id: ?u32 = blk: {
-        var last_gui_id: ?u32 = null;
-        var it = x_set.?.keyIterator();
-        while (it.next()) |key| {
-            if (y_set.?.contains(key.*)) {
-                last_gui_id = key.gui_id;
-                if (isPopupOpen(self, key.gui_id)) {
-                    break :blk key.gui_id;
-                }
+    return error.HSIDNotFound;
+}
+
+fn getPopup(self: *Self, grid_pos: [4]i32) !*Popup {
+    const hsid = try self.getHoverSquareID(grid_pos);
+    const gui_id = hsid.gui_id;
+    switch (hsid.popup_type) {
+        .consumers => {
+            if (gui_id >= self.consumers_popups.items.len) {
+                return error.GuiIDTooBig;
+            }
+            return &self.consumers_popups.items[gui_id];
+        },
+        .producer => {
+            if (gui_id >= self.producer_popups.items.len) {
+                return error.GuiIDTooBig;
+            }
+            return &self.producer_popups.items[gui_id];
+        },
+    }
+}
+
+fn closePopup(self: *Self, p: *Popup) void {
+    if (p.open == false) return;
+    p.open = false;
+
+    var it = self.x_axis.iterator();
+    while (it.next()) |kv| {
+        const coord = kv.key_ptr.*;
+        const pixel_has_gui = kv.value_ptr.contains(p.id);
+        const in_open_grid = p.open_grid[0] < coord and coord < p.open_grid[1];
+        const not_in_closed_grid = coord < p.closed_grid[0] or p.closed_grid[1] < coord;
+        if (pixel_has_gui and in_open_grid and not_in_closed_grid) {
+            _ = kv.value_ptr.remove(p.id);
+            if (kv.value_ptr.count() == 0) {
+                kv.value_ptr.deinit();
+                _ = self.x_axis.remove(coord);
             }
         }
+    }
 
-        // If neither gui is open, just open the last one we saw
-        if (last_gui_id) |gid| {
-            break :blk gid;
+    it = self.y_axis.iterator();
+    while (it.next()) |kv| {
+        const coord = kv.key_ptr.*;
+        const pixel_has_gui = kv.value_ptr.contains(p.id);
+        const in_open_grid = p.open_grid[2] < coord and coord < p.open_grid[3];
+        const not_in_closed_grid = coord < p.closed_grid[2] or p.closed_grid[3] < coord;
+        if (pixel_has_gui and in_open_grid and not_in_closed_grid) {
+            _ = kv.value_ptr.remove(p.id);
+            if (kv.value_ptr.count() == 0) {
+                kv.value_ptr.deinit();
+                _ = self.y_axis.remove(coord);
+            }
         }
-        break :blk null;
-    };
-
-    if (gui_id == null) {
-        return error.PopupNotFound;
     }
-    if (gui_id.? >= self.popups.items.len) {
-        return error.PopupNotFound;
-    }
-    return @as(usize, @intCast(gui_id.?));
 }
 
 pub const popupArgs = struct {
     consumers: *Wgpu.ObjectBuffer(Consumer),
+    consumer_params: zgpu.BufferHandle,
     consumer_hovers: *Wgpu.ObjectBuffer(ConsumerHover),
+    consumer_hover_colors: zgpu.BufferHandle,
     mouse: Mouse.MouseButton,
     producers: Wgpu.ObjectBuffer(Producer),
-    stats: Wgpu.ObjectBuffer(u32),
     allocator: std.mem.Allocator,
     content_scale: f32,
 };
-pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
-    ConsumerHover.clearHover(gctx, args.consumer_hovers);
 
-    const popup_idx = getPopupIndex(self, args.mouse.grid_pos) catch {
-        for (self.popups.items, 0..) |p, i| {
-            if (p.open) {
-                self.closePopup(&self.popups.items[i]);
-            }
-        }
+fn closeAllPopups(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
+    const resource = gctx.lookupResource(args.consumer_hover_colors).?;
+    const black = [4]f32{ 0, 0, 0, 0 };
+    for (self.consumers_popups.items[0..]) |*p| {
+        const offset = p.id.gui_id * 4 * @sizeOf(f32);
+        gctx.queue.writeBuffer(resource, offset, [4]f32, &.{black});
+        self.closePopup(p);
+    }
+    for (self.producer_popups.items[0..]) |*p| {
+        self.closePopup(p);
+    }
+}
+
+pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
+    var popup = getPopup(self, args.mouse.grid_pos) catch {
+        closeAllPopups(self, gctx, args);
         return;
     };
 
-    ConsumerHover.highlightConsumers(
-        gctx,
-        popup_idx,
-        args.consumer_hovers,
-    );
+    if (popup.type_popup == .consumers) {
+        const resource = gctx.lookupResource(args.consumer_hover_colors).?;
+        const blue = [4]f32{ 0, 0, 1, 0 };
+        const offset = popup.id.gui_id * 4 * @sizeOf(f32);
+        gctx.queue.writeBuffer(resource, offset, [4]f32, &.{blue});
+    }
 
-    const popup = &self.popups.items[popup_idx];
     if (!popup.open) {
         popup.open = true;
 
@@ -310,8 +328,8 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
 
         var open_grid: [4]i32 = .{
             popup.grid_center[0] - HOVER_SIZE_GRID,
-            Camera.getGridPosition(gctx, .{ max_x_pixel, min_y_pixel })[0],
-            Camera.getGridPosition(gctx, .{ min_x_pixel, max_y_pixel })[1],
+            Camera.getGridPosition(gctx, .{ max_x_pixel, min_y_pixel, 0, 1 })[0],
+            Camera.getGridPosition(gctx, .{ min_x_pixel, max_y_pixel, 0, 1 })[1],
             popup.grid_center[1] + HOVER_SIZE_GRID,
         };
 
@@ -353,126 +371,80 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
         .h = WINDOW_SIZE_PIXELS[1] * args.content_scale,
     });
 
-    switch (popup.type_popup) {
-        .consumers => consumerGui(gctx, popup_idx, popup, args),
-        .producer => producerGui(gctx, popup_idx, popup, args),
-    }
-}
+    const flags = zgui.WindowFlags.no_decoration;
+    if (zgui.begin("Test", .{ .flags = flags })) {
+        switch (popup.type_popup) {
+            .consumers => {
+                zgui.pushIntId(@as(i32, @intCast(popup.id.gui_id)) + 3);
+                zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+                zgui.text("Demand Rate", .{});
+                zgui.sameLine(.{});
+                zgui.textDisabled("(?)", .{});
+                if (zgui.isItemHovered(.{})) {
+                    _ = zgui.beginTooltip();
+                    zgui.textUnformatted("How much consumers demand from producers on a single trip.");
+                    zgui.endTooltip();
+                }
 
-fn closePopup(self: *Self, popup: *Popup) void {
-    popup.open = false;
-    resetCoords(
-        &self.x_axis,
-        popup.closed_grid[0..2],
-        popup.open_grid[0..2],
-        popup.id,
-    );
-    resetCoords(
-        &self.y_axis,
-        popup.closed_grid[2..4],
-        popup.open_grid[2..4],
-        popup.id,
-    );
-}
+                const demand_rate_ptr = &popup.parameters.consumer.demand_rate;
+                if (zgui.sliderScalar(
+                    "##dr",
+                    u32,
+                    .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },
+                )) {
+                    const offset = popup.id.gui_id * @sizeOf(Consumer.Params) +
+                        @offsetOf(Consumer.Params, "demand_rate");
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(args.consumer_params).?,
+                        offset,
+                        u32,
+                        &.{demand_rate_ptr.*},
+                    );
+                }
 
-fn consumerGui(gctx: *zgpu.GraphicsContext, idx: usize, popup: *Popup, args: popupArgs) void {
-    if (zgui.begin("Test", Windows.window_flags)) {
-        zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
-        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        demandRateButton(gctx, popup, args);
-        movingRateSlider(gctx, popup, args);
+                zgui.text("Moving Rate", .{});
+                const moving_rate_ptr = &popup.parameters.consumer.moving_rate;
+                if (zgui.sliderScalar("##mr", f32, .{ .v = moving_rate_ptr, .min = 1.0, .max = 20 })) {
+                    const offset = popup.id.gui_id * @sizeOf(Consumer.Params) +
+                        @offsetOf(Consumer.Params, "moving_rate");
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(args.consumer_params).?,
+                        offset,
+                        f32,
+                        &.{moving_rate_ptr.*},
+                    );
+                }
+            },
+            .producer => {
+                zgui.pushIntId(@as(i32, @intCast(popup.id.gui_id)) + 100);
+                zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+                zgui.text("Production Rate", .{});
+                const production_rate_ptr = &popup.parameters.producer.production_rate;
+                if (zgui.sliderScalar("##pr", u32, .{ .v = production_rate_ptr, .min = 1, .max = 1000 })) {
+                    const offset = popup.id.gui_id * @sizeOf(Producer) +
+                        @offsetOf(Producer, "production_rate");
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(args.producers.buf).?,
+                        offset,
+                        u32,
+                        &.{production_rate_ptr.*},
+                    );
+                }
+                zgui.text("Max Inventory", .{});
+                const max_inventory_ptr = &popup.parameters.producer.max_inventory;
+                if (zgui.sliderScalar("##mi", u32, .{ .v = max_inventory_ptr, .min = 10, .max = 10000 })) {
+                    const offset = popup.id.gui_id * @sizeOf(Producer) +
+                        @offsetOf(Producer, "max_inventory");
+                    gctx.queue.writeBuffer(
+                        gctx.lookupResource(args.producers.buf).?,
+                        offset,
+                        u32,
+                        &.{max_inventory_ptr.*},
+                    );
+                }
+            },
+        }
         zgui.popId();
     }
     zgui.end();
-}
-
-fn demandRateButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
-    zgui.text("Demand Rate", .{});
-    zgui.sameLine(.{});
-    zgui.textDisabled("(?)", .{});
-    if (zgui.isItemHovered(.{})) {
-        _ = zgui.beginTooltip();
-        zgui.textUnformatted("How much consumers demand from producers on a single trip.");
-        zgui.endTooltip();
-    }
-
-    const demand_rate_ptr = &popup.parameters.consumer.demand_rate;
-    if (zgui.sliderScalar(
-        "##dr",
-        u32,
-        .{ .v = demand_rate_ptr, .min = 1, .max = 1000 },
-    )) {
-        for (args.consumers.list.items, 0..) |c, i| {
-            if (popup.id.gui_id == c.grouping_id) {
-                gctx.queue.writeBuffer(
-                    gctx.lookupResource(args.consumers.buf).?,
-                    i * @sizeOf(Consumer) + @offsetOf(Consumer, "demand_rate"),
-                    u32,
-                    &.{demand_rate_ptr.*},
-                );
-            }
-        }
-    }
-}
-
-fn movingRateSlider(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
-    zgui.text("Moving Rate", .{});
-    const moving_rate_ptr = &popup.parameters.consumer.moving_rate;
-    if (zgui.sliderScalar("##mr", f32, .{ .v = moving_rate_ptr, .min = 1.0, .max = 20 })) {
-        for (args.consumers.list.items, 0..) |c, i| {
-            if (popup.id.gui_id == c.grouping_id) {
-                gctx.queue.writeBuffer(
-                    gctx.lookupResource(args.consumers.buf).?,
-                    i * @sizeOf(Consumer) + @offsetOf(Consumer, "moving_rate"),
-                    f32,
-                    &.{moving_rate_ptr.*},
-                );
-            }
-        }
-    }
-}
-
-fn producerGui(gctx: *zgpu.GraphicsContext, idx: usize, popup: *Popup, args: popupArgs) void {
-    if (zgui.begin("Test", Windows.window_flags)) {
-        zgui.pushIntId(@as(i32, @intCast(idx)) + 3);
-        zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-        productionRateButton(gctx, popup, args);
-        maxInventoryButton(gctx, popup, args);
-        zgui.popId();
-    }
-    zgui.end();
-}
-
-fn productionRateButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
-    zgui.text("Production Rate", .{});
-    const production_rate_ptr = &popup.parameters.producer.production_rate;
-    if (zgui.sliderScalar("##pr", u32, .{ .v = production_rate_ptr, .min = 1, .max = 1000 })) {
-        for (args.producers.list.items, 0..) |p, i| {
-            if (std.mem.eql(i32, popup.grid_center[0..2], p.absolute_home[0..2])) {
-                gctx.queue.writeBuffer(
-                    gctx.lookupResource(args.producers.buf).?,
-                    i * @sizeOf(Producer) + @offsetOf(Producer, "production_rate"),
-                    u32,
-                    &.{production_rate_ptr.*},
-                );
-            }
-        }
-    }
-}
-
-fn maxInventoryButton(gctx: *zgpu.GraphicsContext, popup: *Popup, args: popupArgs) void {
-    zgui.text("Max Inventory", .{});
-    const max_inventory_ptr = &popup.parameters.producer.max_inventory;
-    if (zgui.sliderScalar("##mi", u32, .{ .v = max_inventory_ptr, .min = 10, .max = 10000 })) {
-        for (args.producers.list.items, 0..) |p, i| {
-            if (std.mem.eql(i32, popup.grid_center[0..2], p.absolute_home[0..2])) {
-                gctx.queue.writeBuffer(
-                    gctx.lookupResource(args.producers.buf).?,
-                    i * @sizeOf(Producer) + @offsetOf(Producer, "max_inventory"),
-                    u32,
-                    &.{max_inventory_ptr.*},
-                );
-            }
-        }
-    }
 }

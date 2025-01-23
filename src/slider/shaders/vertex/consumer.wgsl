@@ -8,13 +8,11 @@ struct VertexOut {
     @location(1) position: vec4<f32>,
     @location(2) color: vec4<f32>,
     @location(3) inventory: u32,
-    @location(4) max_inventory: u32,
 ) -> VertexOut {
     var output: VertexOut;
-    let num = f32(inventory) / f32(max_inventory);
-    let scale = min(max(num, 0.4), 1.0);
-    var x = position[0] + (scale * vertex_position[0]);
-    var y = position[1] + (scale * vertex_position[1]);
+    let scale = max(f32(inventory) / 20, 5.0);
+    var x = position[0] + (vertex_position[0] * scale);
+    var y = position[1] + (vertex_position[1] * scale);
     output.position_clip = object_to_clip * vec4(x, y, position[2], 1.0);
     output.color = color;
     return output;

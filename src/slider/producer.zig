@@ -4,10 +4,10 @@ const random = std.crypto.random;
 const Allocator = std.mem.Allocator;
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
-const Camera = @import("camera");
 const Wgpu = @import("wgpu");
 const DemoState = @import("main.zig");
 const Parameters = DemoState.Parameters;
+const Camera = @import("camera");
 
 const Self = @This();
 
@@ -89,11 +89,10 @@ pub fn createAndAppend(gctx: *zgpu.GraphicsContext, args: AppendArgs) void {
     };
     var producers: [1]Self = .{producer};
     Wgpu.appendBuffer(gctx, Self, .{
-        .num_old_structs = @as(u32, @intCast(args.obj_buf.list.items.len)),
+        .num_old_structs = args.obj_buf.mapping.num_structs,
         .buf = args.obj_buf.buf,
         .structs = producers[0..],
     });
-    args.obj_buf.list.append(producers[0]) catch unreachable;
     args.obj_buf.mapping.num_structs += 1;
 }
 

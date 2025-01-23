@@ -10,10 +10,12 @@ struct Consumer {
   producer_id: i32,
   grouping_id: u32,
 }
-struct ConsumerParams {
+
+struct ConsumerParams{
   moving_rate: f32,
   demand_rate: u32,
 }
+
 struct Producer {
   absolute_home: vec4<i32>,
   home: vec4<f32>,
@@ -22,6 +24,7 @@ struct Producer {
   inventory: atomic<i32>,
   max_inventory: u32,
 }
+
 struct Stats {
   transactions: u32,
   num_consumers: u32,
@@ -31,7 +34,7 @@ struct Stats {
 }
 
 @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
-@group(0) @binding(1) var<storage, read_write> consumer_params: array<ConsumerParams>;
+@group(0) @binding(1) var<storage, read_write> consumer_params: ConsumerParams;
 @group(0) @binding(2) var<storage, read_write> producers: array<Producer>;
 @group(0) @binding(3) var<storage, read_write> stats: Stats;
 

@@ -3,7 +3,7 @@ const emscripten = @import("builtin").target.os.tag == .emscripten;
 const zglfw = @import("zglfw");
 const zm = @import("zmath");
 const zgpu = @import("zgpu");
-const Camera = @import("camera.zig");
+const Camera = @import("camera");
 const DemoState = @import("main.zig").DemoState;
 
 pub const MouseButton = struct {
@@ -11,9 +11,9 @@ pub const MouseButton = struct {
     button: zglfw.MouseButton = zglfw.MouseButton.left,
     state: bool = false,
     previousState: bool = false,
-    grid_pos: [2]i32 = .{ 0, 0 },
+    grid_pos: [4]i32 = .{ 0, 0, 0, 0 },
     pixel_pos: [2]u32 = .{ 0, 0 },
-    world_pos: [2]f32 = .{ 0, 0 },
+    world_pos: [4]f32 = .{ 0, 0, 0, 0 },
 
     pub fn update(self: *MouseButton, demo: *DemoState) void {
         self.previousState = self.state;
@@ -60,7 +60,7 @@ pub const MouseButton = struct {
 };
 
 // Return world position of current cursor pos
-pub fn getWorldPosition(demo: *DemoState) [2]f32 {
+pub fn getWorldPosition(demo: *DemoState) [4]f32 {
     const viewport_size = Camera.getViewportPixelSize(demo.gctx);
     const width = @as(f32, @floatFromInt(demo.gctx.swapchain_descriptor.width));
     const xOffset = width - viewport_size[0];
@@ -80,13 +80,15 @@ pub fn getWorldPosition(demo: *DemoState) [2]f32 {
     return .{
         world_pos[0] / world_pos[3],
         world_pos[1] / world_pos[3],
+        0,
+        1,
     };
 }
 
-pub fn getGridPosition(demo: *DemoState) [2]i32 {
+pub fn getGridPosition(demo: *DemoState) [4]i32 {
     const world_pos = getWorldPosition(demo);
     const full_grid_pos = Camera.getGridFromWorld(demo.gctx, world_pos);
-    return .{ full_grid_pos[0], full_grid_pos[1] };
+    return .{ full_grid_pos[0], full_grid_pos[1], 0, 1 };
 }
 
 pub fn onGrid(demo: *DemoState) bool {

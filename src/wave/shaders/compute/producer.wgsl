@@ -4,6 +4,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     if(index >= stats.num_producers) {
       return;
     }
+
     let max_inventory = i32(producers[index].max_inventory);
     var production_rate = i32(producers[index].production_rate);
 

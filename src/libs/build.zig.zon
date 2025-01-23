@@ -1,0 +1,24 @@
+.{
+    .name = "square",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .dependencies = .{
+        .zgui = .{
+            .url = "https://github.com/ckrowland/zgui/archive/refs/heads/main.tar.gz",
+            .hash = "1220cbfb62a1da9ca7f5039d0d5d48fbf5511fdb14c20d6319e1400d2fda7e2c617e",
+        },
+        .zmath = .{
+            .url = "https://github.com/zig-gamedev/zmath/archive/fb075f0f2f90d6d938a5959a3a79700cdec155c2.tar.gz",
+            .hash = "1220081d55b58b968d953db1afc2fb01b2f5733929144e69522461ce25fa6450d84e",
+        },
+        .zgpu = .{
+            .url = "https://github.com/ckrowland/zgpu/archive/refs/heads/main.tar.gz",
+            .hash = "122051dc73bb83e0733d8d0940a9259c890cb0cc4b8e533aa2ee6f09a39658f0a5f1",
+        },
+    },
+}

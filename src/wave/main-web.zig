@@ -1,6 +1,6 @@
 const std = @import("std");
 const zemscripten = @import("zemscripten");
-const editor = @import("main.zig");
+const variable = @import("main.zig");
 pub const panic = zemscripten.panic;
 pub const std_options = std.Options{
     .logFn = zemscripten.log,
@@ -13,14 +13,14 @@ export fn main() c_int {
 }
 
 var initialized = false;
-var demo: editor.DemoState = undefined;
+var demo: variable.DemoState = undefined;
 var gpa = zemscripten.EmmalocAllocator{};
 const allocator = gpa.allocator();
 
 export fn mainLoopCallback() void {
     if (initialized == false) {
-        demo = editor.init(allocator) catch |err| {
-            std.log.err("editor.init failed with error: {s}", .{@errorName(err)});
+        demo = variable.init(allocator) catch |err| {
+            std.log.err("variable.init failed with error: {s}", .{@errorName(err)});
             return;
         };
         var width: f64 = 0;
@@ -28,10 +28,9 @@ export fn mainLoopCallback() void {
         const result = zemscripten.getElementCssSize("#canvas", &width, &height);
         if (result != .success) unreachable;
         demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
-
         initialized = true;
     }
-    editor.updateAndRender(&demo) catch |err| {
+    variable.updateAndRender(&demo) catch |err| {
         std.log.err("sdl_demo.tick failed with error: {s}", .{@errorName(err)});
     };
 }
@@ -45,15 +44,15 @@ pub fn resizeCallback(
     _ = event;
     var width: f64 = 0;
     var height: f64 = 0;
-    const editor_demo: *editor.DemoState = @ptrCast(@alignCast(user_data.?));
+    const variable_demo: *variable.DemoState = @ptrCast(@alignCast(user_data.?));
     const result = zemscripten.getElementCssSize("#canvas", &width, &height);
     if (result != .success) return 0;
 
-    editor_demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
-    if (editor_demo.gctx.present() == .swap_chain_resized) {
-        editor_demo.content_scale = editor.getContentScale(editor_demo.window);
-        editor.setImguiContentScale(editor_demo.content_scale);
-        editor.updateAspectRatio(editor_demo);
+    variable_demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
+    if (variable_demo.gctx.present() == .swap_chain_resized) {
+        variable_demo.content_scale = variable.getContentScale(variable_demo.window);
+        variable.setImguiContentScale(variable_demo.content_scale);
+        variable.updateAspectRatio(variable_demo);
     }
 
     return 1;

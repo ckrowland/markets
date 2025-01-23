@@ -4,33 +4,34 @@
     .minimum_zig_version = "0.14.0",
     .paths = .{""},
     .dependencies = .{
+        .my_libs = .{ .path = "src/libs" },
         .system_sdk = .{
             .url = "https://github.com/zig-gamedev/system_sdk/archive/bf49d627a191e339f70e72668c8333717fb969b0.tar.gz",
             .hash = "122047a9298c4c9dd43389d418d6826d469b192246ba0944102964cdc57f94c562df",
         },
         .zgui = .{
-            .url = "https://github.com/ckrowland/zgui/archive/refs/heads/main.tar.gz",
-            .hash = "1220cbfb62a1da9ca7f5039d0d5d48fbf5511fdb14c20d6319e1400d2fda7e2c617e",
+            .url = "https://github.com/zig-gamedev/zgui/archive/refs/heads/main.tar.gz",
+            .hash = "1220e4a659899a9b99eec44ed85280fd7a9d87b38587759d3b9a918619d491fe78b4",
         },
         .zmath = .{
             .url = "https://github.com/zig-gamedev/zmath/archive/fb075f0f2f90d6d938a5959a3a79700cdec155c2.tar.gz",
             .hash = "1220081d55b58b968d953db1afc2fb01b2f5733929144e69522461ce25fa6450d84e",
         },
         .zstbi = .{
-            .url = "https://github.com/ckrowland/zstbi/archive/refs/heads/main.tar.gz",
+            .url = "https://github.com/zig-gamedev/zstbi/archive/refs/heads/main.tar.gz",
             .hash = "12208b7d15a730294a7d8ee3a9d3ef145e109f94d0a68be7f0ee282e0630ede093d5",
         },
         .zemscripten = .{
             .url = "https://github.com/ckrowland/zemscripten/archive/refs/heads/main.tar.gz",
-            .hash = "122028a3c9bc317697407bb8d85a39b120b3ce8d97d2e5aa0c03e97a8d1dc3449d02",
+            .hash = "1220b5e691d1320f88f73c41c34ead1a511fdcd3760e84a05be75b89dc8863110301",
         },
         .emsdk = .{
             .url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.73.tar.gz",
             .hash = "1220d2b37748757d43de92f0ef723b6a00c3cae4b6a9c582b607421704498a5cfd2b",
         },
         .zglfw = .{
-            .url = "https://github.com/ckrowland/zglfw/archive/refs/heads/main.tar.gz",
-            .hash = "1220f1d1b65bf32770fd6ad0ae7f0288b3aaa18d7045b976cb21cdd9c5255a63030e",
+            .url = "https://github.com/zig-gamedev/zglfw/archive/refs/heads/main.tar.gz",
+            .hash = "1220a0a7529410a883cb98ada50a01a2a8e1b8588603c3a5c1f1b9990a801a7a777e",
         },
         .zgpu = .{
             .url = "https://github.com/ckrowland/zgpu/archive/refs/heads/main.tar.gz",

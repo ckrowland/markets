@@ -14,9 +14,9 @@ const Demo = struct {
 
 pub const Demos = [_]Demo{
     Demo{
-        .name = "random",
-        .native = "src/random/main-native.zig",
-        .web = "src/random/main-web.zig",
+        .name = "slider",
+        .native = "src/slider/main-native.zig",
+        .web = "src/slider/main-web.zig",
     },
     Demo{
         .name = "editor",
@@ -24,10 +24,15 @@ pub const Demos = [_]Demo{
         .web = "src/editor/main-web.zig",
     },
     Demo{
-        .name = "variable",
-        .native = "src/variable/main-native.zig",
-        .web = "src/variable/main-web.zig",
+        .name = "wave",
+        .native = "src/wave/main-native.zig",
+        .web = "src/wave/main-web.zig",
     },
+    //Demo{
+    //    .name = "greedy",
+    //    .native = "src/greedy/main-native.zig",
+    //    .web = "src/greedy/main-web.zig",
+    //},
 };
 
 pub fn build(b: *std.Build) !void {
@@ -99,6 +104,15 @@ pub fn buildNative(
         .target = options.target,
         .optimize = options.optimize,
     });
+
+    const my_libs = b.dependency("my_libs", .{ .target = options.target });
+    exe.root_module.addImport("shapes", my_libs.module("shapes"));
+    exe.root_module.addImport("gui", my_libs.module("gui"));
+    exe.root_module.addImport("camera", my_libs.module("camera"));
+    exe.root_module.addImport("statistics", my_libs.module("statistics"));
+    exe.root_module.addImport("consumer", my_libs.module("consumer"));
+    exe.root_module.addImport("producer", my_libs.module("producer"));
+    exe.root_module.addImport("wgpu", my_libs.module("wgpu"));
 
     const zglfw = b.dependency("zglfw", .{
         .target = options.target,
@@ -207,6 +221,15 @@ pub fn buildWeb(
     });
     exe.root_module.addImport("zpool", zpool.module("root"));
 
+    const my_libs = b.dependency("my_libs", .{ .target = options.target });
+    exe.root_module.addImport("shapes", my_libs.module("shapes"));
+    exe.root_module.addImport("gui", my_libs.module("gui"));
+    exe.root_module.addImport("camera", my_libs.module("camera"));
+    exe.root_module.addImport("statistics", my_libs.module("statistics"));
+    exe.root_module.addImport("consumer", my_libs.module("consumer"));
+    exe.root_module.addImport("producer", my_libs.module("producer"));
+    exe.root_module.addImport("wgpu", my_libs.module("wgpu"));
+
     const zems = @import("zemscripten");
 
     //Add profect specific emcc flags
@@ -222,7 +245,7 @@ pub fn buildWeb(
     settings.put("EXIT_RUNTIME", "0") catch unreachable;
 
     exe.root_module.stack_protector = false;
-    //exe.linkLibC();
+    exe.linkLibC();
     const emcc_step = zems.emccStep(b, exe, .{
         .optimize = options.optimize,
         .flags = zems.emccDefaultFlags(b.allocator, options.optimize),
