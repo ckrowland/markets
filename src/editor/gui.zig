@@ -137,7 +137,7 @@ fn addingConsumer(
         addFn(gctx, demo);
     } else if (demo.mouse.released()) {
         demo.popups.appendPopup(.{
-            .grid_center = demo.mouse.grid_pos[0..2].*,
+            .grid_center = demo.mouse.grid_pos,
             .type_popup = .consumers,
             .parameters = .{
                 .consumer = .{
@@ -148,7 +148,7 @@ fn addingConsumer(
         });
 
         const last = demo.popups.consumers_popups.getLast();
-        const buf_offset = last.id.gui_id * 8;
+        const buf_offset = last.hs.id.gui_id * 8;
         const r = gctx.lookupResource(demo.buffers.data.consumer_params).?;
         gctx.queue.writeBuffer(r, buf_offset, f32, &.{demo.params.moving_rate});
         gctx.queue.writeBuffer(r, buf_offset + 4, u32, &.{demo.params.demand_rate});
@@ -229,7 +229,7 @@ fn addingProducer(gctx: *zgpu.GraphicsContext, demo: *DemoState) void {
 
         demo.popups.appendSquare(demo.allocator, demo.mouse.grid_pos, .producer);
         const popup = Popups.Popup{
-            .grid_center = demo.mouse.grid_pos[0..2].*,
+            .grid_center = demo.mouse.grid_pos,
             .type_popup = Popups.PopupType.producer,
             .parameters = .{
                 .producer = .{

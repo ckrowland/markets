@@ -122,7 +122,6 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         demo.stats.setNum(gctx, num_producers.new, .producers);
 
         if (num_producers.old >= num_producers.new) {
-            //demo.buffers.data.producers.list.resize(num_producers.new) catch unreachable;
             demo.buffers.data.producers.mapping.num_structs = num_producers.new;
         } else {
             Producer.generateBulk(
