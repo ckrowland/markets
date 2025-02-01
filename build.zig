@@ -149,11 +149,6 @@ pub fn buildNative(
     exe.root_module.addImport("zgui", zgui.module("root"));
     exe.linkLibrary(zgui.artifact("imgui"));
 
-    const zpool = b.dependency("zpool", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zpool", zpool.module("root"));
-
     const install_content_step = b.addInstallDirectory(.{
         .source_dir = b.path("content"),
         .install_dir = .{ .custom = "" },
@@ -215,11 +210,6 @@ pub fn buildWeb(
     });
     exe.root_module.addImport("zgui", zgui.module("root"));
     exe.linkLibrary(zgui.artifact("imgui"));
-
-    const zpool = b.dependency("zpool", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zpool", zpool.module("root"));
 
     const my_libs = b.dependency("my_libs", .{ .target = options.target });
     exe.root_module.addImport("shapes", my_libs.module("shapes"));

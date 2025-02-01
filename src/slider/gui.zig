@@ -2,7 +2,6 @@ const std = @import("std");
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
-const wgpu = zgpu.wgpu;
 const Shapes = @import("shapes");
 const Gui = @import("gui");
 const Main = @import("main.zig");

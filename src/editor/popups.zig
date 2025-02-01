@@ -1,7 +1,6 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
-const zmath = @import("zmath");
 const Camera = @import("camera");
 const Wgpu = @import("wgpu");
 const Consumer = @import("consumer");

@@ -1,5 +1,6 @@
 const std = @import("std");
 const zemscripten = @import("zemscripten");
+const zglfw = @import("zglfw");
 const editor = @import("main.zig");
 pub const panic = zemscripten.panic;
 pub const std_options = std.Options{
@@ -27,9 +28,10 @@ export fn mainLoopCallback() void {
         var height: f64 = 0;
         const result = zemscripten.getElementCssSize("#canvas", &width, &height);
         if (result != .success) unreachable;
-        demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
+        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
 
         initialized = true;
+        std.log.err("initialized", .{});
     }
     editor.updateAndRender(&demo) catch |err| {
         std.log.err("sdl_demo.tick failed with error: {s}", .{@errorName(err)});
@@ -49,7 +51,7 @@ pub fn resizeCallback(
     const result = zemscripten.getElementCssSize("#canvas", &width, &height);
     if (result != .success) return 0;
 
-    editor_demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
+    zglfw.setSize(editor_demo.window, @intFromFloat(width), @intFromFloat(height));
     if (editor_demo.gctx.present() == .swap_chain_resized) {
         editor_demo.content_scale = editor.getContentScale(editor_demo.window);
         editor.setImguiContentScale(editor_demo.content_scale);

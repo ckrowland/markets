@@ -1,5 +1,4 @@
 const std = @import("std");
-const math = std.math;
 const zgpu = @import("zgpu");
 
 pub fn createSquareVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.BufferHandle {
@@ -59,7 +58,7 @@ pub fn createCircleVertexBuffer(
     });
     var consumer_vertex_data: [num_vertices][3]f32 = undefined;
     const num_sides = @as(f32, num_vertices - 1);
-    const angle = 2 * math.pi / num_sides;
+    const angle = 2 * std.math.pi / num_sides;
     consumer_vertex_data[0] = [3]f32{ 0, 0, 0 };
     var i: u32 = 1;
     while (i < num_vertices) {

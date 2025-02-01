@@ -9,16 +9,16 @@
     },
     .dependencies = .{
         .zgui = .{
-            .url = "https://github.com/ckrowland/zgui/archive/refs/heads/main.tar.gz",
-            .hash = "1220cbfb62a1da9ca7f5039d0d5d48fbf5511fdb14c20d6319e1400d2fda7e2c617e",
+            .url = "https://github.com/zig-gamedev/zgui/archive/refs/heads/main.tar.gz",
+            .hash = "1220e4a659899a9b99eec44ed85280fd7a9d87b38587759d3b9a918619d491fe78b4",
         },
         .zmath = .{
             .url = "https://github.com/zig-gamedev/zmath/archive/fb075f0f2f90d6d938a5959a3a79700cdec155c2.tar.gz",
             .hash = "1220081d55b58b968d953db1afc2fb01b2f5733929144e69522461ce25fa6450d84e",
         },
         .zgpu = .{
-            .url = "https://github.com/ckrowland/zgpu/archive/refs/heads/main.tar.gz",
-            .hash = "122051dc73bb83e0733d8d0940a9259c890cb0cc4b8e533aa2ee6f09a39658f0a5f1",
+            .url = "https://github.com/zig-gamedev/zgpu/archive/refs/heads/main.tar.gz",
+            .hash = "1220e44b32228e968d57e32e2c6a72b80d39b6ebc8ecfbdc9b1d527f94e0b075f976",
         },
     },
 }

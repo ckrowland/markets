@@ -1,5 +1,4 @@
 const std = @import("std");
-const math = std.math;
 const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
@@ -19,7 +18,6 @@ const Shapes = @import("shapes");
 const Mouse = @import("mouse.zig");
 const Hover = @import("hover.zig");
 const Popups = @import("popups.zig");
-const zemscripten = @import("zemscripten");
 const emscripten = @import("builtin").target.os.tag == .emscripten;
 
 pub const NUM_CONSUMER_SIDES: u32 = 80;
@@ -128,7 +126,7 @@ pub fn deinit(demo: *DemoState) void {
 
 pub fn init(allocator: std.mem.Allocator) !DemoState {
     try zglfw.init();
-    zglfw.windowHintTyped(.client_api, .no_api);
+    zglfw.windowHint(.client_api, .no_api);
 
     const window = try zglfw.Window.create(1600, 900, "Simulations", null);
     window.setSizeLimits(400, 400, -1, -1);

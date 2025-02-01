@@ -1,5 +1,4 @@
 const std = @import("std");
-const math = std.math;
 const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
@@ -13,7 +12,6 @@ const Producer = @import("producer");
 const Camera = @import("camera");
 const Shapes = @import("shapes");
 const Callbacks = @import("callbacks.zig");
-const zemscripten = @import("zemscripten");
 const emscripten = @import("builtin").target.os.tag == .emscripten;
 
 pub const MAX_NUM_PRODUCERS = 100;
@@ -117,7 +115,7 @@ pub fn deinit(demo: *DemoState) void {
 
 pub fn init(allocator: std.mem.Allocator) !DemoState {
     try zglfw.init();
-    zglfw.windowHintTyped(.client_api, .no_api);
+    zglfw.windowHint(.client_api, .no_api);
 
     const window = try zglfw.Window.create(1600, 900, "Simulations", null);
     window.setSizeLimits(400, 400, -1, -1);

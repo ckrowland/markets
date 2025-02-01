@@ -15,7 +15,6 @@ const Camera = @import("camera");
 const Square = @import("square.zig");
 const Circle = @import("circle.zig");
 const Callbacks = @import("callbacks.zig");
-const zemscripten = @import("zemscripten");
 const emscripten = @import("builtin").target.os.tag == .emscripten;
 
 pub const MAX_NUM_PRODUCERS = 100;
@@ -126,7 +125,7 @@ pub fn deinit(demo: *DemoState) void {
 
 pub fn init(allocator: std.mem.Allocator) !DemoState {
     try zglfw.init();
-    zglfw.windowHintTyped(.client_api, .no_api);
+    zglfw.windowHint(.client_api, .no_api);
 
     const window = try zglfw.Window.create(1600, 900, "Simulations", null);
     window.setSizeLimits(400, 400, -1, -1);
