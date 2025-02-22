@@ -1,4 +1,5 @@
 const std = @import("std");
+const zglfw = @import("zglfw");
 const zemscripten = @import("zemscripten");
 const variable = @import("main.zig");
 pub const panic = zemscripten.panic;
@@ -27,7 +28,7 @@ export fn mainLoopCallback() void {
         var height: f64 = 0;
         const result = zemscripten.getElementCssSize("#canvas", &width, &height);
         if (result != .success) unreachable;
-        demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
+        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
         initialized = true;
     }
     variable.updateAndRender(&demo) catch |err| {
@@ -48,7 +49,7 @@ pub fn resizeCallback(
     const result = zemscripten.getElementCssSize("#canvas", &width, &height);
     if (result != .success) return 0;
 
-    variable_demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
+    zglfw.setSize(variable_demo.window, @intFromFloat(width), @intFromFloat(height));
     if (variable_demo.gctx.present() == .swap_chain_resized) {
         variable_demo.content_scale = variable.getContentScale(variable_demo.window);
         variable.setImguiContentScale(variable_demo.content_scale);

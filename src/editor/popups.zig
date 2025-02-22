@@ -14,10 +14,9 @@ const HOVER_SIZE_GRID = 30;
 
 pub const AsyncAxisWrite = struct {
     start: i32 = 0,
-    val: i32 = 0,
     end: i32 = 0,
     done: bool = true,
-    max_num_writes: u32 = 70,
+    max_num_writes: u32 = 10,
 };
 pub const HoverSquareID = struct {
     hs_id: ?u32 = null,
@@ -54,6 +53,7 @@ pub const Popup = struct {
 const Self = @This();
 consumers_popups: std.ArrayList(Popup),
 producer_popups: std.ArrayList(Popup),
+hover_squares: std.ArrayList(HoverSquare),
 x_axis: std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
 y_axis: std.AutoHashMap(i32, std.AutoHashMap(HoverSquareID, void)),
 
@@ -61,6 +61,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .consumers_popups = std.ArrayList(Popup).init(allocator),
         .producer_popups = std.ArrayList(Popup).init(allocator),
+        .hover_squares = std.ArrayList(HoverSquare).init(allocator),
         .x_axis = std.AutoHashMap(
             i32,
             std.AutoHashMap(HoverSquareID, void),
@@ -75,6 +76,7 @@ pub fn init(allocator: std.mem.Allocator) Self {
 pub fn deinit(self: *Self) void {
     self.consumers_popups.deinit();
     self.producer_popups.deinit();
+    self.hover_squares.deinit();
     var x_arrays = self.x_axis.valueIterator();
     while (x_arrays.next()) |set| {
         set.deinit();
@@ -91,6 +93,7 @@ pub fn deinit(self: *Self) void {
 pub fn clear(self: *Self) void {
     self.consumers_popups.clearAndFree();
     self.producer_popups.clearAndFree();
+    self.hover_squares.clearAndFree();
 
     var x_arrays = self.x_axis.valueIterator();
     while (x_arrays.next()) |set| {
@@ -148,17 +151,16 @@ pub fn appendSquare(
     square.async_write = .{
         .{
             .start = square.corners_grid[0],
-            .val = square.corners_grid[0],
             .end = square.corners_grid[1],
             .done = false,
         },
         .{
             .start = square.corners_grid[2],
-            .val = square.corners_grid[2],
             .end = square.corners_grid[3],
             .done = false,
         },
     };
+    self.hover_squares.append(square) catch unreachable;
     self.appendRange(allocator, &square);
 }
 
@@ -173,21 +175,19 @@ fn addCoords(
     hs: HoverSquare,
 ) !void {
     var num_writes: u32 = 0;
-    while (write.val <= write.end) {
+    while (write.start <= write.end) {
         if (num_writes >= write.max_num_writes) return;
 
-        const set = axis.getPtr(write.val);
+        const set = axis.getPtr(write.start);
         if (set) |s| {
-            if (!s.contains(hs.id)) {
-                try s.put(hs.id, {});
-            }
+            try s.put(hs.id, {});
         } else {
             var new_set = std.AutoHashMap(HoverSquareID, void).init(allocator);
             try new_set.put(hs.id, {});
-            try axis.put(write.val, new_set);
+            try axis.put(write.start, new_set);
         }
 
-        write.val += 1;
+        write.start += 1;
         num_writes += 1;
     }
     write.done = true;
@@ -329,24 +329,37 @@ fn closeAllPopups(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) voi
     }
 }
 
-fn checkAsyncWrites(self: *Self, alloc: std.mem.Allocator, p: *Popup) void {
-    const writes = &p.hs.async_write;
+fn checkAsyncWrites(self: *Self, alloc: std.mem.Allocator, hs: *HoverSquare) void {
+    const writes = &hs.async_write;
     if (!writes[0].done) {
-        addCoords(&self.x_axis, alloc, &writes[0], p.hs) catch unreachable;
+        addCoords(&self.x_axis, alloc, &writes[0], hs.*) catch unreachable;
     }
     if (!writes[1].done) {
-        addCoords(&self.y_axis, alloc, &writes[1], p.hs) catch unreachable;
+        addCoords(&self.y_axis, alloc, &writes[1], hs.*) catch unreachable;
+    }
+}
+
+fn checkHoverAsyncWrites(self: *Self, alloc: std.mem.Allocator) void {
+    for (self.hover_squares.items[0..], 0..) |*hs, i| {
+        checkAsyncWrites(self, alloc, hs);
+
+        if (hs.async_write[0].done and hs.async_write[1].done) {
+            _ = self.hover_squares.swapRemove(i);
+            self.checkHoverAsyncWrites(alloc);
+        }
     }
 }
 
 pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
     for (self.consumers_popups.items[0..]) |*p| {
-        checkAsyncWrites(self, args.allocator, p);
+        checkAsyncWrites(self, args.allocator, &p.hs);
     }
 
     for (self.producer_popups.items[0..]) |*p| {
-        checkAsyncWrites(self, args.allocator, p);
+        checkAsyncWrites(self, args.allocator, &p.hs);
     }
+
+    self.checkHoverAsyncWrites(args.allocator);
 
     var popup = getPopup(self, args.mouse.grid_pos) catch {
         closeAllPopups(self, gctx, args);
@@ -397,13 +410,11 @@ pub fn display(self: *Self, gctx: *zgpu.GraphicsContext, args: popupArgs) void {
         popup.hs.async_write = .{
             .{
                 .start = popup.open_grid[0],
-                .val = popup.open_grid[0],
                 .end = popup.open_grid[1],
                 .done = false,
             },
             .{
                 .start = popup.open_grid[2],
-                .val = popup.open_grid[2],
                 .end = popup.open_grid[3],
                 .done = false,
             },

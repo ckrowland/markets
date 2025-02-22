@@ -15,8 +15,12 @@ const Callbacks = @import("callbacks.zig");
 pub fn update(demo: *DemoState) void {
     const gctx = demo.gctx;
     const sd = demo.gctx.swapchain_descriptor;
-    Gui.setupWindowPos(sd, .{ .x = 0, .y = 0 });
-    Gui.setupWindowSize(sd, .{ .x = 0.25, .y = 0.75 });
+
+    var pos = Gui.setupWindowPos(sd, .{ .x = 0, .y = 0 });
+    var size = Gui.setupWindowSize(sd, .{ .x = 0.25, .y = 0.75 });
+    zgui.setNextWindowPos(.{ .x = pos[0], .y = pos[1] });
+    zgui.setNextWindowSize(.{ .w = size[0], .h = size[1] });
+
     const flags = zgui.WindowFlags.no_decoration;
     if (zgui.begin("0", .{ .flags = flags })) {
         zgui.pushIntId(2);
@@ -25,10 +29,10 @@ pub fn update(demo: *DemoState) void {
     }
     zgui.end();
 
-    const pos: Gui.Pos = .{ .x = 0, .y = 0.75, .margin = .{ .top = false } };
-    const size: Gui.Pos = .{ .x = 1, .y = 0.25, .margin = .{ .top = false } };
-    Gui.setupWindowPos(sd, pos);
-    Gui.setupWindowSize(sd, size);
+    pos = Gui.setupWindowPos(sd, .{ .x = 0, .y = 0.75, .margin = .{ .top = false } });
+    size = Gui.setupWindowSize(sd, .{ .x = 1, .y = 0.25, .margin = .{ .top = false } });
+    zgui.setNextWindowPos(.{ .x = pos[0], .y = pos[1] });
+    zgui.setNextWindowSize(.{ .w = size[0], .h = size[1] });
     if (zgui.begin("1", .{ .flags = flags })) {
         zgui.pushIntId(3);
         plots(demo);

@@ -1,5 +1,4 @@
 const std = @import("std");
-const zgui = @import("zgui");
 const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 
@@ -15,7 +14,7 @@ pub const Pos = struct {
     } = .{},
 };
 
-pub fn setupWindowPos(sd: wgpu.SwapChainDescriptor, pos: Pos) void {
+pub fn setupWindowPos(sd: wgpu.SwapChainDescriptor, pos: Pos) [2]f32 {
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
     const margin_x = width * pos.margin.percent;
@@ -31,10 +30,11 @@ pub fn setupWindowPos(sd: wgpu.SwapChainDescriptor, pos: Pos) void {
     if (pos.margin.top) {
         y += pos_margin_pixels;
     }
-    zgui.setNextWindowPos(.{ .x = x, .y = y });
+
+    return .{ x, y };
 }
 
-pub fn setupWindowSize(sd: wgpu.SwapChainDescriptor, size: Pos) void {
+pub fn setupWindowSize(sd: wgpu.SwapChainDescriptor, size: Pos) [2]f32 {
     const width = @as(f32, @floatFromInt(sd.width));
     const height = @as(f32, @floatFromInt(sd.height));
     const margin_x = width * size.margin.percent;
@@ -56,5 +56,5 @@ pub fn setupWindowSize(sd: wgpu.SwapChainDescriptor, size: Pos) void {
     if (size.margin.bottom) {
         h -= size_margin_pixels;
     }
-    zgui.setNextWindowSize(.{ .w = w, .h = h });
+    return .{ w, h };
 }

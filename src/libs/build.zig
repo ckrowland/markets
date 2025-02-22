@@ -4,11 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const zgui = b.dependency("zgui", .{
-        .target = target,
-        .backend = .glfw_wgpu,
-        .with_implot = true,
-    });
     const zgpu = b.dependency("zgpu", .{
         .target = target,
     });
@@ -34,10 +29,6 @@ pub fn build(b: *std.Build) void {
             .{
                 .name = "zgpu",
                 .module = zgpu.module("root"),
-            },
-            .{
-                .name = "zgui",
-                .module = zgui.module("root"),
             },
         },
         .target = target,

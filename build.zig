@@ -127,9 +127,6 @@ pub fn buildNative(
     exe.root_module.addImport("zgpu", zgpu.module("root"));
     exe.linkLibrary(zgpu.artifact("zdawn"));
 
-    const zemscripten = b.dependency("zemscripten", .{});
-    exe.root_module.addImport("zemscripten", zemscripten.module("dummy"));
-
     const zmath = b.dependency("zmath", .{
         .target = options.target,
     });
@@ -139,7 +136,9 @@ pub fn buildNative(
         .target = options.target,
     });
     exe.root_module.addImport("zstbi", zstbi.module("root"));
-    exe.linkLibrary(zstbi.artifact("zstbi"));
+
+    const zpool = b.dependency("zpool", .{});
+    exe.root_module.addImport("zpool", zpool.module("root"));
 
     const zgui = b.dependency("zgui", .{
         .target = options.target,
@@ -147,7 +146,6 @@ pub fn buildNative(
         .with_implot = true,
     });
     exe.root_module.addImport("zgui", zgui.module("root"));
-    exe.linkLibrary(zgui.artifact("imgui"));
 
     const install_content_step = b.addInstallDirectory(.{
         .source_dir = b.path("content"),
@@ -201,7 +199,9 @@ pub fn buildWeb(
         .target = options.target,
     });
     exe.root_module.addImport("zstbi", zstbi.module("root"));
-    exe.linkLibrary(zstbi.artifact("zstbi"));
+
+    const zpool = b.dependency("zpool", .{});
+    exe.root_module.addImport("zpool", zpool.module("root"));
 
     const zgui = b.dependency("zgui", .{
         .target = options.target,
@@ -209,7 +209,6 @@ pub fn buildWeb(
         .with_implot = true,
     });
     exe.root_module.addImport("zgui", zgui.module("root"));
-    exe.linkLibrary(zgui.artifact("imgui"));
 
     const my_libs = b.dependency("my_libs", .{ .target = options.target });
     exe.root_module.addImport("shapes", my_libs.module("shapes"));
@@ -233,7 +232,6 @@ pub fn buildWeb(
     settings.put("MALLOC", @tagName(.emmalloc)) catch unreachable;
     settings.put("ALLOW_MEMORY_GROWTH", "1") catch unreachable;
     settings.put("EXIT_RUNTIME", "0") catch unreachable;
-
     exe.root_module.stack_protector = false;
     exe.linkLibC();
     const emcc_step = zems.emccStep(b, exe, .{

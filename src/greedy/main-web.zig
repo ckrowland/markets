@@ -1,6 +1,7 @@
 const std = @import("std");
+const zglfw = @import("zglfw");
 const zemscripten = @import("zemscripten");
-const variable = @import("main.zig");
+const slider = @import("main.zig");
 pub const panic = zemscripten.panic;
 pub const std_options = std.Options{
     .logFn = zemscripten.log,
@@ -13,19 +14,25 @@ export fn main() c_int {
 }
 
 var initialized = false;
-var demo: variable.DemoState = undefined;
+var demo: slider.DemoState = undefined;
 var gpa = zemscripten.EmmalocAllocator{};
 const allocator = gpa.allocator();
 
 export fn mainLoopCallback() void {
     if (initialized == false) {
-        demo = variable.init(allocator) catch |err| {
-            std.log.err("variable.init failed with error: {s}", .{@errorName(err)});
+        demo = slider.init(allocator) catch |err| {
+            std.log.err("slider.init failed with error: {s}", .{@errorName(err)});
             return;
         };
         initialized = true;
+
+        var width: f64 = 0;
+        var height: f64 = 0;
+        const result = zemscripten.getElementCssSize("#canvas", &width, &height);
+        if (result != .success) unreachable;
+        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
     }
-    variable.updateAndRender(&demo) catch |err| {
+    slider.updateAndRender(&demo) catch |err| {
         std.log.err("sdl_demo.tick failed with error: {s}", .{@errorName(err)});
     };
 }
@@ -39,15 +46,15 @@ pub fn resizeCallback(
     _ = event;
     var width: f64 = 0;
     var height: f64 = 0;
-    const variable_demo: *variable.DemoState = @ptrCast(@alignCast(user_data.?));
+    const slider_demo: *slider.DemoState = @ptrCast(@alignCast(user_data.?));
     const result = zemscripten.getElementCssSize("#canvas", &width, &height);
     if (result != .success) return 0;
 
-    variable_demo.window.setSize(@intFromFloat(width), @intFromFloat(height));
-    if (variable_demo.gctx.present() == .swap_chain_resized) {
-        variable_demo.content_scale = variable.getContentScale(variable_demo.window);
-        variable.setImguiContentScale(variable_demo.content_scale);
-        variable.updateAspectRatio(variable_demo);
+    zglfw.setSize(slider_demo.window, @intFromFloat(width), @intFromFloat(height));
+    if (slider_demo.gctx.present() == .swap_chain_resized) {
+        slider_demo.content_scale = slider.getContentScale(slider_demo.window);
+        slider.setImguiContentScale(slider_demo.content_scale);
+        slider.updateAspectRatio(slider_demo);
     }
 
     return 1;

@@ -8,17 +8,13 @@
         "src",
     },
     .dependencies = .{
-        .zgui = .{
-            .url = "https://github.com/zig-gamedev/zgui/archive/refs/heads/main.tar.gz",
-            .hash = "1220e4a659899a9b99eec44ed85280fd7a9d87b38587759d3b9a918619d491fe78b4",
-        },
         .zmath = .{
-            .url = "https://github.com/zig-gamedev/zmath/archive/fb075f0f2f90d6d938a5959a3a79700cdec155c2.tar.gz",
+            .url = "https://github.com/zig-gamedev/zmath/archive/24cdd20f9da09bd1ce7b552907eeaba9bafea59d.tar.gz",
             .hash = "1220081d55b58b968d953db1afc2fb01b2f5733929144e69522461ce25fa6450d84e",
         },
         .zgpu = .{
-            .url = "https://github.com/zig-gamedev/zgpu/archive/refs/heads/main.tar.gz",
-            .hash = "1220e44b32228e968d57e32e2c6a72b80d39b6ebc8ecfbdc9b1d527f94e0b075f976",
+            .url = "https://github.com/zig-gamedev/zgpu/archive/987809eff7cb47901192a6d41dc67486e3211f21.tar.gz",
+            .hash = "1220777b1f964f666f5e990412f34c7dd36b6c399ff15920754f842df297425dffa5",
         },
     },
 }

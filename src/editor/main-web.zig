@@ -24,6 +24,8 @@ export fn mainLoopCallback() void {
             std.log.err("editor.init failed with error: {s}", .{@errorName(err)});
             return;
         };
+        zglfw.windowHint(.client_api, .no_api);
+        zglfw.windowHint(.scale_to_monitor, true);
         var width: f64 = 0;
         var height: f64 = 0;
         const result = zemscripten.getElementCssSize("#canvas", &width, &height);
@@ -31,7 +33,6 @@ export fn mainLoopCallback() void {
         zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
 
         initialized = true;
-        std.log.err("initialized", .{});
     }
     editor.updateAndRender(&demo) catch |err| {
         std.log.err("sdl_demo.tick failed with error: {s}", .{@errorName(err)});

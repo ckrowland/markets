@@ -1,5 +1,5 @@
 const std = @import("std");
-const variable = @import("main.zig");
+const random = @import("main.zig");
 
 pub fn main() !void {
     { // Change current working directory to where the executable is located.
@@ -12,10 +12,10 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var demo = try variable.init(allocator);
-    defer variable.deinit(&demo);
+    var demo = try random.init(allocator);
+    defer random.deinit(&demo);
 
     while (demo.window.shouldClose() == false) {
-        try variable.updateAndRender(&demo);
+        try random.updateAndRender(&demo);
     }
 }
