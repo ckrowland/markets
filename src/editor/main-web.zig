@@ -24,14 +24,7 @@ export fn mainLoopCallback() void {
             std.log.err("editor.init failed with error: {s}", .{@errorName(err)});
             return;
         };
-        zglfw.windowHint(.client_api, .no_api);
-        zglfw.windowHint(.scale_to_monitor, true);
-        var width: f64 = 0;
-        var height: f64 = 0;
-        const result = zemscripten.getElementCssSize("#canvas", &width, &height);
-        if (result != .success) unreachable;
-        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
-
+        _ = resizeCallback(0, undefined, &demo);
         initialized = true;
     }
     editor.updateAndRender(&demo) catch |err| {

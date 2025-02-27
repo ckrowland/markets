@@ -24,11 +24,7 @@ export fn mainLoopCallback() void {
             std.log.err("variable.init failed with error: {s}", .{@errorName(err)});
             return;
         };
-        var width: f64 = 0;
-        var height: f64 = 0;
-        const result = zemscripten.getElementCssSize("#canvas", &width, &height);
-        if (result != .success) unreachable;
-        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
+        _ = resizeCallback(0, undefined, &demo);
         initialized = true;
     }
     variable.updateAndRender(&demo) catch |err| {

@@ -275,6 +275,10 @@ fn plots(demo: *DemoState) void {
 
 fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+    zgui.bulletText(
+        "{d:.3} ms/frame ({d:.1} fps)",
+        .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+    );
     const pressedColor = [4]f32{ 0.0, 0.5, 1.0, 1.0 };
     const size = 3 * zgui.getFontSize();
     const buttonSize = [2]f32{ size, size };

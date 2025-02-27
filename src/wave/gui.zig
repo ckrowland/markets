@@ -282,6 +282,10 @@ pub fn slidersFromMap(
 }
 
 pub fn parameters(demo: *DemoState) void {
+    zgui.bulletText(
+        "{d:.3} ms/frame ({d:.1} fps)",
+        .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+    );
     var it = demo.sliders.iterator();
     while (it.next()) |entry| {
         const slider = entry.value_ptr;

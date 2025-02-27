@@ -24,16 +24,11 @@ export fn mainLoopCallback() void {
             std.log.err("slider.init failed with error: {s}", .{@errorName(err)});
             return;
         };
+        _ = resizeCallback(0, undefined, &demo);
         initialized = true;
-
-        var width: f64 = 0;
-        var height: f64 = 0;
-        const result = zemscripten.getElementCssSize("#canvas", &width, &height);
-        if (result != .success) unreachable;
-        zglfw.setSize(demo.window, @intFromFloat(width), @intFromFloat(height));
     }
     slider.updateAndRender(&demo) catch |err| {
-        std.log.err("sdl_demo.tick failed with error: {s}", .{@errorName(err)});
+        std.log.err("slider.tick failed with error: {s}", .{@errorName(err)});
     };
 }
 
