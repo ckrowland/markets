@@ -1,6 +1,0 @@
-*.swp
-imgui.ini
-.zig-cache/
-zig-out/
-.DS_Store
-apps/
