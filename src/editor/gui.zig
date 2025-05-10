@@ -376,18 +376,14 @@ fn coloredButton(
 ) void {
     const tex_id = gctx.lookupResource(textureView).?;
     const id = @tagName(buttonState);
-    const pixel_size = .{
-        .w = size[0],
-        .h = size[1],
-    };
     if (guiState.selection == buttonState) {
         zgui.pushStyleColor4f(.{ .idx = .button, .c = color });
         defer zgui.popStyleColor(.{});
-        if (zgui.imageButton(id, tex_id, pixel_size)) {
+        if (zgui.imageButton(id, tex_id, .{ .w = size[0], .h = size[1] })) {
             guiState.selection = .none;
         }
     } else {
-        if (zgui.imageButton(id, tex_id, pixel_size)) {
+        if (zgui.imageButton(id, tex_id, .{ .w = size[0], .h = size[1] })) {
             guiState.selection = buttonState;
         }
     }

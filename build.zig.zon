@@ -1,5 +1,6 @@
 .{
-    .name = "Visual Simulations",
+    .name = .visual_simulations,
+    .fingerprint = 0xdc8930d8a253e8e,
     .version = "0.2.0",
     .minimum_zig_version = "0.14.0",
     .paths = .{""},
