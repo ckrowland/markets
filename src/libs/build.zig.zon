@@ -1,7 +1,7 @@
 .{
     .name = "square",
     .version = "0.1.0",
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.14.1",
     .paths = .{
         "build.zig",
         "build.zig.zon",
@@ -9,12 +9,12 @@
     },
     .dependencies = .{
         .zmath = .{
-            .url = "https://github.com/zig-gamedev/zmath/archive/24cdd20f9da09bd1ce7b552907eeaba9bafea59d.tar.gz",
-            .hash = "1220081d55b58b968d953db1afc2fb01b2f5733929144e69522461ce25fa6450d84e",
+            .url = "https://github.com/zig-gamedev/zmath/archive/6a0747fe6834e58793500e05953c4c6ca045d3e1.tar.gz",
+            .hash = "zmath-0.11.0-dev-wjwivTArAwDIkHSuSiU3KuBvxh7igjJjJMqYRfy3hihO",
         },
         .zgpu = .{
-            .url = "https://github.com/zig-gamedev/zgpu/archive/987809eff7cb47901192a6d41dc67486e3211f21.tar.gz",
-            .hash = "1220777b1f964f666f5e990412f34c7dd36b6c399ff15920754f842df297425dffa5",
+            .url = "https://github.com/zig-gamedev/zgpu/archive/d860e2b4a333cacffb168fab49a233c5d2f1bca2.tar.gz",
+            .hash = "zgpu-0.12.0-dev-nqFT5EKgCADkhwAf97_pfSOmPWEguKmljSECs9ihpFS7",
         },
     },
 }

@@ -93,6 +93,7 @@ pub fn build(b: *std.Build) !void {
         }
     }
 }
+
 pub fn buildNative(
     b: *std.Build,
     comptime root_source_file: [:0]const u8,
@@ -236,7 +237,10 @@ pub fn buildWeb(
     exe.linkLibC();
     const emcc_step = zems.emccStep(b, exe, .{
         .optimize = options.optimize,
-        .flags = zems.emccDefaultFlags(b.allocator, options.optimize),
+        .flags = zems.emccDefaultFlags(b.allocator, .{
+            .optimize = options.optimize,
+            .fsanitize = true,
+        }),
         .settings = settings,
         .use_preload_plugins = true,
         .embed_paths = &.{
