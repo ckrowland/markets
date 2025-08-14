@@ -327,17 +327,23 @@ pub fn parameters(demo: *DemoState) void {
 pub fn timeline(demo: *DemoState) void {
     const size = zgui.getWindowSize();
     const margin = 15;
-    const plot_size = .{ .w = size[0] - margin, .h = size[1] - margin };
+    const plot_size: zgui.plot.BeginPlot = .{
+        .w = size[0] - margin,
+        .h = size[1] - margin,
+    };
 
     if (zgui.plot.beginPlot("", plot_size)) {
         defer zgui.plot.endPlot();
 
-        const flags = .{ .label = "", .flags = .{ .auto_fit = true } };
+        const flags: zgui.plot.SetupAxis = .{
+            .label = "",
+            .flags = .{ .auto_fit = true },
+        };
         zgui.plot.setupAxis(.x1, flags);
         zgui.plot.setupAxis(.y1, flags);
 
-        const location_flags = .{ .north = true, .east = true };
-        const legend_flags = .{ .no_buttons = true };
+        const location_flags: zgui.plot.PlotLocation = .{ .north = true, .east = true };
+        const legend_flags: zgui.plot.LegendFlags = .{ .no_buttons = true };
         zgui.plot.setupLegend(location_flags, legend_flags);
 
         var it = demo.sliders.iterator();
@@ -365,8 +371,10 @@ pub fn timeline(demo: *DemoState) void {
 }
 
 fn plotWave(wave: *Wave, plot_name: [:0]const u8) void {
-    const values = .{ .xv = wave.xv.items, .yv = wave.yv.items };
-    zgui.plot.plotLine(plot_name, f64, values);
+    zgui.plot.plotLine(plot_name, f64, .{
+        .xv = wave.xv.items,
+        .yv = wave.yv.items,
+    });
 }
 
 fn plotRadianLine(radian: f64) void {
@@ -374,8 +382,11 @@ fn plotRadianLine(radian: f64) void {
     const y1y2 = .{ 0, 1000 };
 
     //_reserved0 hides line from legend
-    const line = .{ .xv = &x1x2, .yv = &y1y2, .flags = .{ ._reserved0 = true } };
-    zgui.plot.plotLine("Vertical Line", f64, line);
+    zgui.plot.plotLine("Vertical Line", f64, .{
+        .xv = &x1x2,
+        .yv = &y1y2,
+        .flags = .{ ._reserved0 = true },
+    });
 }
 
 fn lightenColor(color: [4]f32, amount: f32) [4]f32 {
@@ -391,13 +402,12 @@ fn dragTopPoint(demo: *DemoState, wave: *Wave, id: u32) void {
     var color = zgui.plot.getLastItemColor();
     color = lightenColor(color, 0.3);
 
-    const flags = .{
+    if (zgui.plot.dragPoint(@intCast(id), .{
         .x = &wave.x_max,
         .y = &wave.scaled_max,
         .col = color,
         .size = 4 * demo.content_scale,
-    };
-    if (zgui.plot.dragPoint(@intCast(id), flags)) {
+    })) {
         const scaled_diff = wave.scaled_max - wave.scaled_mid;
         const scaled_min = wave.scaled_mid - scaled_diff;
         const min_outside = scaled_min < 0 or scaled_min > 1000;
@@ -427,13 +437,12 @@ fn dragMidPoint(demo: *DemoState, wave: *Wave, id: u32) void {
     color = lightenColor(color, 0.3);
     var zero: f64 = 0;
 
-    const flags = .{
+    if (zgui.plot.dragPoint(@intCast(id + 1000), .{
         .x = &zero,
         .y = &wave.scaled_mid,
         .col = color,
         .size = 4 * demo.content_scale,
-    };
-    if (zgui.plot.dragPoint(@intCast(id + 1000), flags)) {
+    })) {
         const scaled_max = wave.scaled_mid + wave.scaled_diff;
         const scaled_min = wave.scaled_mid - wave.scaled_diff;
         const min_outside = scaled_min < 0 or scaled_min > 1000;
@@ -566,10 +575,10 @@ fn buttons(demo: *DemoState) void {
 
 pub fn plots(demo: *DemoState) void {
     const size = zgui.getWindowSize();
-    const margin = 15;
-    const plot_size = .{ .w = size[0] - margin, .h = size[1] - margin };
-
-    if (zgui.plot.beginPlot("", plot_size)) {
+    if (zgui.plot.beginPlot("", .{
+        .w = size[0] - 15,
+        .h = size[1] - 15,
+    })) {
         defer zgui.plot.endPlot();
 
         var y_flags: zgui.plot.AxisFlags = .{ .auto_fit = true };
@@ -577,22 +586,23 @@ pub fn plots(demo: *DemoState) void {
             y_flags = .{ .lock_min = true };
         }
 
-        const x_axis = .{ .label = "", .flags = .{ .auto_fit = true } };
-        const y_axis = .{ .label = "", .flags = y_flags };
-        zgui.plot.setupAxis(.x1, x_axis);
-        zgui.plot.setupAxis(.y1, y_axis);
+        zgui.plot.setupAxis(.x1, .{ .label = "", .flags = .{ .auto_fit = true } });
+        zgui.plot.setupAxis(.y1, .{ .label = "", .flags = y_flags });
         zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
 
         demo.params.plot_hovered = zgui.plot.isPlotHovered();
 
         const stats = demo.stats;
-        const nt = .{ .v = stats.num_transactions.items[0..] };
-        const ec = .{ .v = stats.num_empty_consumers.items[0..] };
-        const tpi = .{ .v = stats.num_total_producer_inventory.items[0..] };
 
-        zgui.plot.plotLineValues("Transactions", u32, nt);
-        zgui.plot.plotLineValues("Empty Consumers", u32, ec);
-        zgui.plot.plotLineValues("Total Producer Inventory", u32, tpi);
+        zgui.plot.plotLineValues("Transactions", u32, .{
+            .v = stats.num_transactions.items[0..],
+        });
+        zgui.plot.plotLineValues("Empty Consumers", u32, .{
+            .v = stats.num_empty_consumers.items[0..],
+        });
+        zgui.plot.plotLineValues("Total Producer Inventory", u32, .{
+            .v = stats.num_total_producer_inventory.items[0..],
+        });
     }
 }
 

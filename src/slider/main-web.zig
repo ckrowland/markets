@@ -45,7 +45,7 @@ pub fn resizeCallback(
     const result = zemscripten.getElementCssSize("#canvas", &width, &height);
     if (result != .success) return 0;
 
-    zglfw.setSize(slider_demo.window, @intFromFloat(width), @intFromFloat(height));
+    zglfw.setWindowSize(slider_demo.window, @intFromFloat(width), @intFromFloat(height));
     if (slider_demo.gctx.present() == .swap_chain_resized) {
         slider_demo.content_scale = slider.getContentScale(slider_demo.window);
         slider.setImguiContentScale(slider_demo.content_scale);

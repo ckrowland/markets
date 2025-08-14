@@ -45,12 +45,12 @@ pub fn update(demo: *DemoState) void {
     Wgpu.checkObjBufState(Consumer, &demo.buffers.data.consumers.mapping);
 
     if (demo.running) {
-        gctx.queue.writeBuffer(
-            gctx.lookupResource(demo.stats.obj_buf.buf).?,
-            3 * @sizeOf(u32),
-            f32,
-            &.{ random.float(f32), random.float(f32), random.float(f32) },
-        );
+        //gctx.queue.writeBuffer(
+        //    gctx.lookupResource(demo.stats.obj_buf.buf).?,
+        //    3 * @sizeOf(u32),
+        //    f32,
+        //    &.{ random.float(f32), random.float(f32), random.float(f32) },
+        //);
         const current_time = @as(f32, @floatCast(gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
