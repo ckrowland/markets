@@ -699,3 +699,22 @@ pub fn getContentScale(window: *zglfw.Window) f32 {
     if (emscripten) return 1;
     return @max(content_scale[0], content_scale[1]);
 }
+
+pub fn main() !void {
+    { // Change current working directory to where the executable is located.
+        var buffer: [1024]u8 = undefined;
+        const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
+        try std.posix.chdir(path);
+    }
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var demo = try init(allocator);
+    defer deinit(&demo);
+
+    while (demo.window.shouldClose() == false) {
+        try updateAndRender(&demo);
+    }
+}

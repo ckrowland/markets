@@ -611,3 +611,22 @@ pub fn updateAspectRatio(demo: *DemoState) void {
     demo.push_coord_update = false;
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
 }
+
+pub fn main() !void {
+    { // Change current working directory to where the executable is located.
+        var buffer: [1024]u8 = undefined;
+        const path = std.fs.selfExeDirPath(buffer[0..]) catch ".";
+        try std.posix.chdir(path);
+    }
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var demo = try init(allocator);
+    defer deinit(&demo);
+
+    while (demo.window.shouldClose() == false) {
+        try updateAndRender(&demo);
+    }
+}

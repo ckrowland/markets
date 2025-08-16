@@ -1,7 +1,7 @@
 # Markets
 
 Visually simulate markets of basic consumers and producers.
-Built on [zig-gamedev](https://github.com/michal-z/zig-gamedev/).
+Built on [zig-gamedev](https://github.com/zig-gamedev/zig-gamedev/).
 Download from the latest release or build from source.
 
 ## Random Resource Simulation
@@ -53,13 +53,8 @@ Download from the latest release or build from source.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-# Run natively
+
 zig build slider-run
 zig build editor-run
 zig build wave-run
-
-# Run in browser
-zig build -Dtarget=wasm32-emscripten slider-web-emrun
-zig build -Dtarget=wasm32-emscripten editor-web-emrun
-zig build -Dtarget=wasm32-emscripten wave-web-emrun
 ```

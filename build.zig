@@ -9,30 +9,21 @@ const Options = struct {
 const Demo = struct {
     name: []const u8,
     native: [:0]const u8,
-    web: [:0]const u8,
 };
 
 pub const Demos = [_]Demo{
     Demo{
         .name = "slider",
-        .native = "src/slider/main-native.zig",
-        .web = "src/slider/main-web.zig",
+        .native = "src/slider/main.zig",
     },
     Demo{
         .name = "editor",
-        .native = "src/editor/main-native.zig",
-        .web = "src/editor/main-web.zig",
+        .native = "src/editor/main.zig",
     },
     Demo{
         .name = "wave",
-        .native = "src/wave/main-native.zig",
-        .web = "src/wave/main-web.zig",
+        .native = "src/wave/main.zig",
     },
-    //Demo{
-    //    .name = "greedy",
-    //    .native = "src/greedy/main-native.zig",
-    //    .web = "src/greedy/main-web.zig",
-    //},
 };
 
 pub fn build(b: *std.Build) !void {
@@ -41,56 +32,25 @@ pub fn build(b: *std.Build) !void {
         .target = b.standardTargetOptions(.{}),
     };
 
-    if (options.target.result.os.tag == .emscripten) {
-        if (b.sysroot == null) {
-            b.sysroot = b.dependency("emsdk", .{}).path("upstream/emscripten/cache/sysroot").getPath(b);
-            std.log.info("sysroot set to \"{s}\"", .{b.sysroot.?});
+    inline for (Demos) |d| {
+        const exe = buildNative(b, d.native, options);
+
+        // TODO: Problems with LTO on Windows.
+        if (exe.rootModuleTarget().os.tag == .windows) {
+            exe.want_lto = false;
         }
-        const zemscripten = @import("zemscripten");
-        const activate_emsdk_step = zemscripten.activateEmsdkStep(b);
-        inline for (Demos) |d| {
-            const emcc_step = buildWeb(b, d.web, options);
-            emcc_step.dependOn(activate_emsdk_step);
 
-            const html_filename = try std.fmt.allocPrint(b.allocator, "{s}.html", .{d.name});
-            const emrun_step = zemscripten.emrunStep(
-                b,
-                b.getInstallPath(.{ .custom = "web" }, html_filename),
-                &.{"--no_browser"},
-            );
-            emrun_step.dependOn(emcc_step);
-
-            b.step(
-                d.name ++ "-web",
-                "Build '" ++ d.name ++ "' sample as a web app",
-            ).dependOn(emcc_step);
-
-            b.step(
-                d.name ++ "-web-emrun",
-                "Build '" ++ d.name ++ "' sample as a web app and serve locally using `emrun`",
-            ).dependOn(emrun_step);
+        if (exe.root_module.optimize == .ReleaseFast) {
+            exe.root_module.strip = true;
         }
-    } else {
-        inline for (Demos) |d| {
-            const exe = buildNative(b, d.native, options);
 
-            // TODO: Problems with LTO on Windows.
-            if (exe.rootModuleTarget().os.tag == .windows) {
-                exe.want_lto = false;
-            }
+        const install_exe = b.addInstallArtifact(exe, .{});
+        b.getInstallStep().dependOn(&install_exe.step);
+        b.step(d.name, "Build '" ++ d.name ++ "' demo").dependOn(&install_exe.step);
 
-            if (exe.root_module.optimize == .ReleaseFast) {
-                exe.root_module.strip = true;
-            }
-
-            const install_exe = b.addInstallArtifact(exe, .{});
-            b.getInstallStep().dependOn(&install_exe.step);
-            b.step(d.name, "Build '" ++ d.name ++ "' demo").dependOn(&install_exe.step);
-
-            const run_cmd = b.addRunArtifact(exe);
-            run_cmd.step.dependOn(&install_exe.step);
-            b.step(d.name ++ "-run", "Run '" ++ d.name ++ "' demo").dependOn(&run_cmd.step);
-        }
+        const run_cmd = b.addRunArtifact(exe);
+        run_cmd.step.dependOn(&install_exe.step);
+        b.step(d.name ++ "-run", "Run '" ++ d.name ++ "' demo").dependOn(&run_cmd.step);
     }
 }
 
@@ -163,98 +123,6 @@ pub fn buildNative(
     }
 
     return exe;
-}
-
-pub fn buildWeb(
-    b: *std.Build,
-    comptime root_source_file: [:0]const u8,
-    options: anytype,
-) *std.Build.Step {
-    const exe = b.addStaticLibrary(.{
-        .name = "Simulations",
-        .root_source_file = b.path(root_source_file),
-        .target = options.target,
-        .optimize = options.optimize,
-    });
-
-    const zglfw = b.dependency("zglfw", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zglfw", zglfw.module("root"));
-
-    @import("zgpu").addLibraryPathsTo(exe);
-    const zgpu = b.dependency("zgpu", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zgpu", zgpu.module("root"));
-
-    const zemscripten = b.dependency("zemscripten", .{});
-    exe.root_module.addImport("zemscripten", zemscripten.module("root"));
-
-    const zmath = b.dependency("zmath", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zmath", zmath.module("root"));
-
-    const zstbi = b.dependency("zstbi", .{
-        .target = options.target,
-    });
-    exe.root_module.addImport("zstbi", zstbi.module("root"));
-
-    const zpool = b.dependency("zpool", .{});
-    exe.root_module.addImport("zpool", zpool.module("root"));
-
-    const zgui = b.dependency("zgui", .{
-        .target = options.target,
-        .backend = .glfw_wgpu,
-        .with_implot = true,
-    });
-    exe.root_module.addImport("zgui", zgui.module("root"));
-
-    const my_libs = b.dependency("my_libs", .{ .target = options.target });
-    exe.root_module.addImport("shapes", my_libs.module("shapes"));
-    exe.root_module.addImport("gui", my_libs.module("gui"));
-    exe.root_module.addImport("camera", my_libs.module("camera"));
-    exe.root_module.addImport("statistics", my_libs.module("statistics"));
-    exe.root_module.addImport("consumer", my_libs.module("consumer"));
-    exe.root_module.addImport("producer", my_libs.module("producer"));
-    exe.root_module.addImport("wgpu", my_libs.module("wgpu"));
-
-    const zems = @import("zemscripten");
-
-    //Add profect specific emcc flags
-    var settings = zems.emccDefaultSettings(b.allocator, .{
-        .optimize = options.optimize,
-    });
-    settings.put("ASYNCIFY", "1") catch unreachable;
-    settings.put("USE_OFFSET_CONVERTER", "1") catch unreachable;
-    settings.put("USE_GLFW", "3") catch unreachable;
-    settings.put("USE_WEBGPU", "1") catch unreachable;
-    settings.put("MALLOC", @tagName(.emmalloc)) catch unreachable;
-    settings.put("ALLOW_MEMORY_GROWTH", "1") catch unreachable;
-    settings.put("EXIT_RUNTIME", "0") catch unreachable;
-    exe.root_module.stack_protector = false;
-    exe.linkLibC();
-    const emcc_step = zems.emccStep(b, exe, .{
-        .optimize = options.optimize,
-        .flags = zems.emccDefaultFlags(b.allocator, .{
-            .optimize = options.optimize,
-            .fsanitize = true,
-        }),
-        .settings = settings,
-        .use_preload_plugins = true,
-        .embed_paths = &.{
-            .{
-                .src_path = "content",
-                .virtual_path = "/content",
-            },
-        },
-        .preload_paths = &.{},
-        .install_dir = .{ .custom = "web" },
-        .shell_file_path = "content/html/shell_minimal.html",
-    });
-
-    return emcc_step;
 }
 
 //
