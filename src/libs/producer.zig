@@ -10,8 +10,8 @@ home: [4]f32,
 color: [4]f32 = .{ 1, 1, 1, 0 },
 production_rate: u32 = 300,
 inventory: i32 = 0,
+available_inventory: i32 = 0,
 max_inventory: u32 = 10000,
-_padding1: u32 = 0,
 
 pub const z_pos = 0;
 pub fn generateBulk(

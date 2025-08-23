@@ -6,7 +6,6 @@ const Shapes = @import("shapes");
 const Gui = @import("gui");
 const Main = @import("main.zig");
 const DemoState = Main.DemoState;
-const Statistics = @import("statistics");
 const Consumer = @import("consumer");
 const Producer = @import("producer");
 const Wgpu = @import("wgpu");
@@ -122,7 +121,14 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },
     )) {
         const num_producers = demo.params.num_producers;
-        demo.stats.setNum(gctx, num_producers.new, .producers);
+
+        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        gctx.queue.writeBuffer(
+            resource,
+            2 * @sizeOf(u32),
+            u32,
+            &.{num_producers.new},
+        );
 
         if (num_producers.old >= num_producers.new) {
             demo.buffers.data.producers.mapping.num_structs = num_producers.new;
@@ -167,11 +173,11 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
 
     if (zgui.sliderScalar(
         "##dr",
-        u32,
+        i32,
         .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
     )) {
         const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, @sizeOf(f32), u32, &.{demo.params.demand_rate});
+        gctx.queue.writeBuffer(resource, @sizeOf(i32), i32, &.{demo.params.demand_rate});
     }
 
     zgui.text("Max Producer Inventory", .{});
@@ -199,7 +205,14 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         .max = 10000,
     })) {
         const num_consumers = demo.params.num_consumers;
-        demo.stats.setNum(gctx, num_consumers.new, .consumers);
+
+        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        gctx.queue.writeBuffer(
+            resource,
+            @sizeOf(u32),
+            u32,
+            &.{num_consumers.new},
+        );
 
         if (num_consumers.old >= num_consumers.new) {
             demo.buffers.data.consumers.mapping.num_structs = num_consumers.new;
@@ -229,7 +242,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     if (zgui.sliderScalar("##cs", f32, .{
         .v = &demo.params.consumer_radius,
         .min = 1,
-        .max = 3,
+        .max = 12,
     })) {
         demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
             gctx,

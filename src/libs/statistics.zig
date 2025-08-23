@@ -1,14 +1,12 @@
 const std = @import("std");
-const array = std.ArrayList;
-const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const Wgpu = @import("wgpu");
 const Self = @This();
 
-num_transactions: array(u32),
+num_transactions: std.ArrayList(u32),
 second: f32 = 0,
-num_empty_consumers: array(u32),
-num_total_producer_inventory: array(u32),
+num_empty_consumers: std.ArrayList(u32),
+num_total_producer_inventory: std.ArrayList(u32),
 obj_buf: Wgpu.ObjectBuffer(u32),
 
 pub const NUM_STATS = 8;
@@ -22,9 +20,9 @@ pub fn init(gctx: *zgpu.GraphicsContext, allocator: std.mem.Allocator) Self {
         NUM_STATS,
     );
     return Self{
-        .num_transactions = array(u32).init(allocator),
-        .num_empty_consumers = array(u32).init(allocator),
-        .num_total_producer_inventory = array(u32).init(allocator),
+        .num_transactions = std.ArrayList(u32).init(allocator),
+        .num_empty_consumers = std.ArrayList(u32).init(allocator),
+        .num_total_producer_inventory = std.ArrayList(u32).init(allocator),
         .obj_buf = stats_object,
     };
 }
@@ -56,11 +54,4 @@ pub fn setNum(
     const resource = gctx.lookupResource(self.obj_buf.buf).?;
     const offset = @intFromEnum(param) * @sizeOf(u32);
     gctx.queue.writeBuffer(resource, offset, u32, &.{num});
-}
-
-pub fn generateAndFillRandomColor(gctx: *zgpu.GraphicsContext, buf: zgpu.BufferHandle) void {
-    const resource = gctx.lookupResource(buf).?;
-    const offset = 4 * @sizeOf(u32);
-    const color = [3]f32{ random.float(f32), random.float(f32), random.float(f32) };
-    gctx.queue.writeBuffer(resource, offset, [3]f32, &.{color});
 }

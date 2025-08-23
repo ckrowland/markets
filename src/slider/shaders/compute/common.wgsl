@@ -13,7 +13,7 @@ struct Consumer {
 
 struct ConsumerParams{
   moving_rate: f32,
-  demand_rate: u32,
+  demand_rate: i32,
 }
 
 struct Producer {
@@ -22,6 +22,7 @@ struct Producer {
   color: vec4<f32>,
   production_rate: u32,
   inventory: atomic<i32>,
+  available_inventory: atomic<i32>,
   max_inventory: u32,
 }
 

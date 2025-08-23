@@ -3,7 +3,6 @@ const zgpu = @import("zgpu");
 const Wgpu = @import("wgpu");
 const Consumer = @import("consumer");
 const Producer = @import("producer");
-const Statistics = @import("statistics");
 const Camera = @import("camera");
 
 pub fn numTransactions(args: Wgpu.CallbackArgs(u32)) void {

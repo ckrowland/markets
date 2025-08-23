@@ -37,19 +37,18 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
         // At Producer
         let pid = c.producer_id;
-        let i_demand_rate = i32(demand_rate);
-        let old_val = atomicSub(&producers[pid].inventory, i_demand_rate);
+        let old_val = atomicSub(&producers[pid].inventory, demand_rate);
 
         // Went negative, revert inventory
-        if (i_demand_rate > old_val) {
-            atomicAdd(&producers[pid].inventory, i_demand_rate);
+        if (demand_rate > old_val) {
+            atomicAdd(&producers[pid].inventory, demand_rate);
             return;
         }
 
         consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
         consumers[index].destination = c.home;
         consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
-        consumers[index].inventory += demand_rate;
+        consumers[index].inventory += u32(demand_rate);
         consumers[index].producer_id = -1;
         stats.transactions += u32(1);
     }
@@ -57,33 +56,34 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
 fn search_for_producer(index: u32){
     let c = consumers[index];
-    var pid = find_nearest_stocked_producer(c);
-    let moving_rate = consumer_params.moving_rate;
-    if (pid == -1) {
-        consumers[index].destination = c.home;
-        consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
-        return;
-    }
-    let p_pos = producers[pid].home;  
-    consumers[index].destination = p_pos;
-    consumers[index].step_size = step_sizes(c.position.xy, p_pos.xy, moving_rate);
-    consumers[index].producer_id = pid;
-}
 
-// Returns the pid of nearest stocked producer, -1 for failure
-fn find_nearest_stocked_producer(c: Consumer) -> i32 {
     var closest_producer = vec4(10000.0, 10000.0, 0.0, 0.0);
     var shortest_distance = 100000.0;
+    var prev_shortest_distance = 0.0;
     var pid: i32 = -1;
+
     for(var i: u32 = 0; i < stats.num_producers; i++){
-        let dist = distance(c.home, producers[i].home);
-        let inventory = u32(atomicLoad(&producers[i].inventory));
-        let is_shortest_dist = dist < shortest_distance;
-        let is_stocked = inventory > consumer_params.demand_rate;
-        if (is_shortest_dist && is_stocked) {
-            shortest_distance = dist;
-            pid = i32(i);
+        shortest_distance = 100000.0;
+        for (var j: u32 = 0; j < stats.num_producers; j++) {
+            let dist = distance(c.home, producers[j].home);
+            if (dist < shortest_distance && dist > prev_shortest_distance) {
+                shortest_distance = dist;
+                pid = i32(j);
+            }
+        }
+        prev_shortest_distance = shortest_distance;
+
+        let demand_rate = consumer_params.demand_rate;
+        let pre_inventory = atomicSub(&producers[pid].available_inventory, demand_rate);
+
+        // Not enough in inventory
+        if (demand_rate > pre_inventory) {
+            atomicAdd(&producers[pid].available_inventory, demand_rate);
+        } else {
+            consumers[index].destination = producers[pid].home;
+            consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, consumer_params.moving_rate);
+            consumers[index].producer_id = pid;
+            return;
         }
     }
-    return pid;
 }

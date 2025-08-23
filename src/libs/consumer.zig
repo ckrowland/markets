@@ -19,7 +19,7 @@ _padding1: u32 = 0,
 
 pub const Params = struct {
     moving_rate: f32 = 0,
-    demand_rate: u32 = 0,
+    demand_rate: i32 = 0,
 };
 
 pub const z_pos = 0;

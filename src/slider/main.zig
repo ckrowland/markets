@@ -4,7 +4,6 @@ const zgpu = @import("zgpu");
 const wgpu = zgpu.wgpu;
 const zgui = @import("zgui");
 const zm = @import("zmath");
-const Statistics = @import("statistics");
 const Callbacks = @import("callbacks.zig");
 const gui = @import("gui.zig");
 const Wgpu = @import("wgpu");
@@ -18,15 +17,13 @@ pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
 pub const NUM_CONSUMER_SIDES = 40;
 pub const PRODUCER_WIDTH = 40;
+pub const NUM_STATS = 8;
 
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     window: *zglfw.Window,
     allocator: std.mem.Allocator,
     running: bool = false,
-    push_coord_update: bool = false,
-    push_restart: bool = false,
-    resize_started: bool = false,
     content_scale: f32,
     render_pipelines: struct {
         circle: zgpu.RenderPipelineHandle,
@@ -57,7 +54,13 @@ pub const DemoState = struct {
     depth_texture: zgpu.TextureHandle,
     depth_texture_view: zgpu.TextureViewHandle,
     params: Parameters,
-    stats: Statistics,
+    stats: struct {
+        num_transactions: std.ArrayList(u32),
+        second: f32 = 0,
+        num_empty_consumers: std.ArrayList(u32),
+        num_total_producer_inventory: std.ArrayList(u32),
+        obj_buf: Wgpu.ObjectBuffer(u32),
+    },
 };
 
 pub const Parameters = struct {
@@ -71,10 +74,10 @@ pub const Parameters = struct {
         new: u32 = 1000,
     },
     production_rate: u32 = 300,
-    demand_rate: u32 = 100,
+    demand_rate: i32 = 100,
     max_inventory: u32 = 10000,
     moving_rate: f32 = 5.0,
-    consumer_radius: f32 = 1.0,
+    consumer_radius: f32 = 6.0,
     num_consumer_sides: u32 = 20,
     aspect: f32,
 };
@@ -102,7 +105,9 @@ pub fn getContentScale(window: *zglfw.Window) f32 {
 }
 
 pub fn deinit(demo: *DemoState) void {
-    demo.stats.deinit();
+    demo.stats.num_transactions.deinit();
+    demo.stats.num_empty_consumers.deinit();
+    demo.stats.num_total_producer_inventory.deinit();
     zgui.backend.deinit();
     zgui.plot.deinit();
     zgui.deinit();
@@ -175,7 +180,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
     const consumer_params_buf = Wgpu.createBuffer(gctx, u32, 3);
     const r = gctx.lookupResource(consumer_params_buf).?;
     gctx.queue.writeBuffer(r, 0, f32, &.{params.moving_rate});
-    gctx.queue.writeBuffer(r, @sizeOf(f32), u32, &.{params.demand_rate});
+    gctx.queue.writeBuffer(r, @sizeOf(f32), i32, &.{params.demand_rate});
 
     var producer_object = Wgpu.createObjectBuffer(
         gctx,
@@ -193,15 +198,25 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         params.max_inventory,
     );
 
-    var stats = Statistics.init(gctx, allocator);
-    stats.setNum(gctx, params.num_consumers.new, .consumers);
-    stats.setNum(gctx, params.num_producers.new, .producers);
+    const stats_buf = Wgpu.createObjectBuffer(
+        gctx,
+        u32,
+        NUM_STATS,
+        NUM_STATS,
+    );
+    const resource = gctx.lookupResource(stats_buf.buf).?;
+    gctx.queue.writeBuffer(
+        resource,
+        @sizeOf(u32),
+        u32,
+        &.{ params.num_consumers.new, params.num_producers.new },
+    );
 
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
         .consumer = consumer_object.buf,
         .consumer_params = consumer_params_buf,
         .producer = producer_object.buf,
-        .stats = stats.obj_buf.buf,
+        .stats = stats_buf.buf,
     });
     const depth = Wgpu.createDepthTexture(gctx);
 
@@ -296,7 +311,12 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         .depth_texture_view = depth.view,
         .allocator = allocator,
         .params = params,
-        .stats = stats,
+        .stats = .{
+            .num_transactions = std.ArrayList(u32).init(allocator),
+            .num_empty_consumers = std.ArrayList(u32).init(allocator),
+            .num_total_producer_inventory = std.ArrayList(u32).init(allocator),
+            .obj_buf = stats_buf,
+        },
     };
 }
 
@@ -460,18 +480,17 @@ pub fn draw(demo: *DemoState) void {
 }
 
 pub fn update(demo: *DemoState) void {
-    if (demo.push_restart) restartSimulation(demo);
-    if (demo.push_coord_update) updateAspectRatio(demo);
     gui.update(demo);
 }
 
 pub fn restartSimulation(demo: *DemoState) void {
-    const consumer_waiting = demo.buffers.data.consumers.mapping.state != .rest;
-    const producer_waiting = demo.buffers.data.producers.mapping.state != .rest;
-    const stats_waiting = demo.stats.obj_buf.mapping.state != .rest;
-    if (consumer_waiting or producer_waiting or stats_waiting) {
-        demo.push_restart = true;
-        return;
+    if (demo.buffers.data.consumers.mapping.state != .rest or
+        demo.buffers.data.producers.mapping.state != .rest or
+        demo.stats.obj_buf.mapping.state != .rest)
+    {
+        while (demo.window.shouldClose() == false) {
+            try updateAndRender(demo);
+        }
     }
 
     const encoder = demo.gctx.device.createCommandEncoder(null);
@@ -480,7 +499,7 @@ pub fn restartSimulation(demo: *DemoState) void {
     Wgpu.clearObjBuffer(encoder, demo.gctx, Consumer, &demo.buffers.data.consumers);
     Wgpu.clearObjBuffer(encoder, demo.gctx, Producer, &demo.buffers.data.producers);
     Wgpu.clearObjBuffer(encoder, demo.gctx, u32, &demo.stats.obj_buf);
-    demo.stats.obj_buf.mapping.num_structs = Statistics.NUM_STATS;
+    demo.stats.obj_buf.mapping.num_structs = NUM_STATS;
 
     Consumer.generateBulk(
         demo.gctx,
@@ -498,10 +517,16 @@ pub fn restartSimulation(demo: *DemoState) void {
         demo.params.production_rate,
         demo.params.max_inventory,
     );
-    demo.stats.setNum(demo.gctx, demo.params.num_consumers.new, .consumers);
-    demo.stats.setNum(demo.gctx, demo.params.num_producers.new, .producers);
-    demo.stats.clear();
-    demo.push_restart = false;
+    const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
+    demo.gctx.queue.writeBuffer(
+        resource,
+        @sizeOf(u32),
+        u32,
+        &.{ demo.params.num_consumers.new, demo.params.num_producers.new },
+    );
+    demo.stats.num_transactions.clearAndFree();
+    demo.stats.num_empty_consumers.clearAndFree();
+    demo.stats.num_total_producer_inventory.clearAndFree();
 }
 
 pub fn updateDepthTexture(demo: *DemoState) void {
@@ -517,11 +542,12 @@ pub fn updateDepthTexture(demo: *DemoState) void {
 
 pub fn updateAspectRatio(demo: *DemoState) void {
     updateDepthTexture(demo);
-    const consumer_waiting = demo.buffers.data.consumers.mapping.state != .rest;
-    const producer_waiting = demo.buffers.data.producers.mapping.state != .rest;
-    if (consumer_waiting or producer_waiting) {
-        demo.push_coord_update = true;
-        return;
+    if (demo.buffers.data.consumers.mapping.state != .rest or
+        demo.buffers.data.producers.mapping.state != .rest)
+    {
+        while (demo.window.shouldClose() == false) {
+            try updateAndRender(demo);
+        }
     }
     Wgpu.getAllAsync(Consumer, Callbacks.updateConsumerCoords, .{
         .gctx = demo.gctx,
@@ -531,7 +557,6 @@ pub fn updateAspectRatio(demo: *DemoState) void {
         .gctx = demo.gctx,
         .obj_buf = &demo.buffers.data.producers,
     });
-    demo.push_coord_update = false;
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
 }
 
