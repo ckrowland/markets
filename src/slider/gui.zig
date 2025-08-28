@@ -228,6 +228,16 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         demo.params.num_consumers.old = demo.params.num_consumers.new;
     }
 
+    zgui.text("Consumer Income", .{});
+    if (zgui.sliderScalar("##i", u32, .{
+        .v = &demo.params.income,
+        .min = 0,
+        .max = 20,
+    })) {
+        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
+        gctx.queue.writeBuffer(resource, 8, u32, &.{demo.params.income});
+    }
+
     zgui.text("Moving Rate", .{});
     if (zgui.sliderScalar("##mr", f32, .{
         .v = &demo.params.moving_rate,

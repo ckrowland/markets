@@ -9,8 +9,8 @@ absolute_home: [4]i32,
 home: [4]f32,
 color: [4]f32 = .{ 1, 1, 1, 0 },
 production_rate: u32 = 300,
-inventory: i32 = 0,
-available_inventory: i32 = 0,
+inventory: u32 = 0,
+available_inventory: u32 = 0,
 max_inventory: u32 = 10000,
 
 pub const z_pos = 0;

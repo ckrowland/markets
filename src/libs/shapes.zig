@@ -71,3 +71,27 @@ pub fn createCircleVertexBuffer(
     gctx.queue.writeBuffer(gctx.lookupResource(consumer_vertex_buffer).?, 0, [3]f32, consumer_vertex_data[0..]);
     return consumer_vertex_buffer;
 }
+
+pub fn createBarVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32, height: f32) zgpu.BufferHandle {
+    const bar_vb = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .vertex = true },
+        .size = 6 * @sizeOf(f32) * 3,
+    });
+
+    const upper_left = [3]f32{ -width, height, 0.0 };
+    const lower_left = [3]f32{ -width, 0.0, 0.0 };
+    const upper_right = [3]f32{ width, height, 0.0 };
+    const lower_right = [3]f32{ width, 0.0, 0.0 };
+
+    const vertex_array = [6][3]f32{
+        upper_left,
+        lower_left,
+        lower_right,
+        lower_right,
+        upper_right,
+        upper_left,
+    };
+
+    gctx.queue.writeBuffer(gctx.lookupResource(bar_vb).?, 0, [3]f32, vertex_array[0..]);
+    return bar_vb;
+}

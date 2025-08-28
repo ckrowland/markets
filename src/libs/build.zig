@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
     });
 
     _ = b.addModule("gui", .{
-        .root_source_file = b.path("gui-windows.zig"),
+        .root_source_file = b.path("gui_windows.zig"),
         .imports = &.{
             .{
                 .name = "zgpu",

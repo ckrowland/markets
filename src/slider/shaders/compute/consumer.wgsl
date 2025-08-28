@@ -13,6 +13,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     let c = consumers[index];
     let moving_rate = consumer_params.moving_rate;
     let demand_rate = consumer_params.demand_rate;
+    let income = consumer_params.income;
+
 
     consumers[index].position[0] += c.step_size[0];
     consumers[index].position[1] += c.step_size[1];
@@ -24,12 +26,15 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         consumers[index].position = c.destination;
         let at_home = all(c.destination == c.home);
         if (at_home) {
+            if (c.money + income < c.max_money) {
+                consumers[index].money += income;
+            }
             if (c.inventory >= u32(1)) {
                 consumers[index].inventory -= u32(1);
                 return;
             }
             consumers[index].color = vec4(1.0, 0.0, 0.0, 0.0);
-            if (demand_rate > 0) {
+            if (demand_rate > 0 && c.money >= demand_rate) {
                 search_for_producer(index);
             }
             return;
@@ -48,7 +53,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
         consumers[index].destination = c.home;
         consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
-        consumers[index].inventory += u32(demand_rate);
+        consumers[index].inventory += demand_rate;
         consumers[index].producer_id = -1;
         stats.transactions += u32(1);
     }
@@ -56,7 +61,6 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
 fn search_for_producer(index: u32){
     let c = consumers[index];
-
     var closest_producer = vec4(10000.0, 10000.0, 0.0, 0.0);
     var shortest_distance = 100000.0;
     var prev_shortest_distance = 0.0;
@@ -83,6 +87,7 @@ fn search_for_producer(index: u32){
             consumers[index].destination = producers[pid].home;
             consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, consumer_params.moving_rate);
             consumers[index].producer_id = pid;
+            consumers[index].money -= demand_rate;
             return;
         }
     }
