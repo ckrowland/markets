@@ -23,7 +23,7 @@ pub fn update(demo: *DemoState) void {
     const flags = zgui.WindowFlags.no_decoration;
     if (zgui.begin("0", .{ .flags = flags })) {
         zgui.pushIntId(2);
-        parameters(demo, gctx);
+        settings(demo, gctx);
         zgui.popId();
     }
     zgui.end();
@@ -106,180 +106,58 @@ fn plots(demo: *DemoState) void {
     }
 }
 
-fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
-    zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
-    zgui.bulletText(
-        "{d:.3} ms/frame ({d:.1} fps)",
-        .{ demo.gctx.stats.average_cpu_time, demo.gctx.stats.fps },
+fn createSlider(
+    comptime name: [:0]const u8,
+    T: type,
+    slider: *Main.Slider(T),
+) bool {
+    zgui.text(name, .{});
+    return zgui.sliderScalar(
+        "##" ++ name,
+        T,
+        .{
+            .v = &slider.val,
+            .min = slider.min,
+            .max = slider.max,
+        },
     );
+}
 
-    zgui.text("Number Of Producers", .{});
+fn settings(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
+    zgui.text("  {d:.1} fps", .{demo.gctx.stats.fps});
 
-    if (zgui.sliderScalar(
-        "##np",
-        u32,
-        .{ .v = &demo.params.num_producers.new, .min = 1, .max = 100 },
-    )) {
-        const num_producers = demo.params.num_producers;
-
-        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        gctx.queue.writeBuffer(
-            resource,
-            2 * @sizeOf(u32),
-            u32,
-            &.{num_producers.new},
-        );
-
-        if (num_producers.old >= num_producers.new) {
-            demo.buffers.data.producers.mapping.num_structs = num_producers.new;
-        } else {
-            Producer.generateBulk(
-                gctx,
-                demo.buffers.data.producers.buf,
-                &demo.buffers.data.producers.mapping.num_structs,
-                demo.params.aspect,
-                num_producers.new - num_producers.old,
-                demo.params.production_rate,
-                demo.params.max_inventory,
-            );
+    if (zgui.beginTabBar("##tab_bar", .{})) {
+        defer zgui.endTabBar();
+        if (zgui.beginTabItem("Parameters", .{})) {
+            defer zgui.endTabItem();
+            parameters(demo, gctx);
         }
-        demo.params.num_producers.old = demo.params.num_producers.new;
-    }
-
-    zgui.text("Production Rate", .{});
-    if (zgui.sliderScalar(
-        "##pr",
-        u32,
-        .{ .v = &demo.params.production_rate, .min = 1, .max = 1000 },
-    )) {
-        for (0..demo.buffers.data.producers.mapping.num_structs) |i| {
-            gctx.queue.writeBuffer(
-                gctx.lookupResource(demo.buffers.data.producers.buf).?,
-                i * @sizeOf(Producer) + @offsetOf(Producer, "production_rate"),
-                u32,
-                &.{demo.params.production_rate},
-            );
+        if (zgui.beginTabItem("Extras", .{})) {
+            defer zgui.endTabItem();
+            extras(demo, gctx);
         }
+        zgui.dummy(.{ .w = 1.0, .h = 20.0 });
+        buttons(demo);
     }
+}
 
-    zgui.text("Demand Rate", .{});
-    zgui.sameLine(.{});
-    zgui.textDisabled("(?)", .{});
-    if (zgui.isItemHovered(.{})) {
-        _ = zgui.beginTooltip();
-        zgui.textUnformatted("How much consumers take from producers on a trip.");
-        zgui.endTooltip();
-    }
-
-    if (zgui.sliderScalar(
-        "##dr",
-        i32,
-        .{ .v = &demo.params.demand_rate, .min = 1, .max = 1000 },
-    )) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, @sizeOf(i32), i32, &.{demo.params.demand_rate});
-    }
-
-    zgui.text("Max Producer Inventory", .{});
-    if (zgui.sliderScalar("##mi", u32, .{
-        .v = &demo.params.max_inventory,
-        .min = 10,
-        .max = 10000,
-    })) {
-        for (0..demo.buffers.data.producers.mapping.num_structs) |i| {
-            gctx.queue.writeBuffer(
-                gctx.lookupResource(demo.buffers.data.producers.buf).?,
-                i * @sizeOf(Producer) + @offsetOf(Producer, "max_inventory"),
-                u32,
-                &.{demo.params.max_inventory},
-            );
-        }
-    }
-
-    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
-
-    zgui.text("Number of Consumers", .{});
-    if (zgui.sliderScalar("##nc", u32, .{
-        .v = &demo.params.num_consumers.new,
-        .min = 1,
-        .max = 10000,
-    })) {
-        const num_consumers = demo.params.num_consumers;
-
-        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        gctx.queue.writeBuffer(
-            resource,
-            @sizeOf(u32),
-            u32,
-            &.{num_consumers.new},
-        );
-
-        if (num_consumers.old >= num_consumers.new) {
-            demo.buffers.data.consumers.mapping.num_structs = num_consumers.new;
-        } else {
-            Consumer.generateBulk(
-                gctx,
-                demo.buffers.data.consumers.buf,
-                &demo.buffers.data.consumers.mapping.num_structs,
-                demo.params.aspect,
-                num_consumers.new - num_consumers.old,
-            );
-        }
-        demo.params.num_consumers.old = demo.params.num_consumers.new;
-    }
-
-    zgui.text("Consumer Income", .{});
-    if (zgui.sliderScalar("##i", u32, .{
-        .v = &demo.params.income,
-        .min = 0,
-        .max = 20,
-    })) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, 8, u32, &.{demo.params.income});
-    }
-
-    zgui.text("Moving Rate", .{});
-    if (zgui.sliderScalar("##mr", f32, .{
-        .v = &demo.params.moving_rate,
-        .min = 1.0,
-        .max = 20,
-    })) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, 0, f32, &.{demo.params.moving_rate});
-    }
-
-    zgui.text("Consumer Size", .{});
-    if (zgui.sliderScalar("##cs", f32, .{
-        .v = &demo.params.consumer_radius,
-        .min = 1,
-        .max = 12,
-    })) {
-        demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
-            gctx,
-            40,
-            demo.params.consumer_radius,
-        );
-    }
-
+fn buttons(demo: *DemoState) void {
     if (zgui.button("Start", .{})) {
         demo.running = true;
     }
+    zgui.sameLine(.{});
     if (zgui.button("Stop", .{})) {
         demo.running = false;
     }
+    zgui.sameLine(.{});
     if (zgui.button("Restart", .{})) {
         demo.running = true;
         Main.restartSimulation(demo);
     }
     if (zgui.button("Supply Shock", .{})) {
-        for (0..demo.buffers.data.producers.mapping.num_structs) |i| {
-            gctx.queue.writeBuffer(
-                gctx.lookupResource(demo.buffers.data.producers.buf).?,
-                i * @sizeOf(Producer) + @offsetOf(Producer, "inventory"),
-                i32,
-                &.{0},
-            );
-        }
+        const producers = demo.buffers.data.producers;
+        producers.updateI32Field(demo.gctx, 0, "inventory");
     }
 
     zgui.sameLine(.{});
@@ -288,5 +166,120 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         _ = zgui.beginTooltip();
         zgui.textUnformatted("Set all producer inventory to 0.");
         zgui.endTooltip();
+    }
+}
+
+fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const producers = demo.buffers.data.producers;
+
+    const np = &demo.params.num_producers;
+    if (createSlider("Numbers of Producers", u32, &np.slider)) {
+        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        gctx.queue.writeBuffer(
+            resource,
+            2 * @sizeOf(u32),
+            u32,
+            &.{np.slider.val},
+        );
+
+        if (np.old >= np.slider.val) {
+            demo.buffers.data.producers.mapping.num_structs = np.slider.val;
+        } else {
+            Producer.generateBulk(
+                gctx,
+                demo.buffers.data.producers.buf,
+                &demo.buffers.data.producers.mapping.num_structs,
+                demo.params.aspect,
+                np.slider.val - np.old,
+                .{
+                    .max_inventory = demo.params.max_inventory.val,
+                    .production_cost = demo.params.production_cost.val,
+                    .price = demo.params.price.val,
+                },
+            );
+        }
+        np.old = np.slider.val;
+    }
+
+    const pc = &demo.params.production_cost;
+    if (createSlider("Production Cost", i32, pc)) {
+        producers.updateI32Field(demo.gctx, pc.val, "production_cost");
+    }
+
+    const price = &demo.params.price;
+    if (createSlider("Price", i32, price)) {
+        producers.updateI32Field(demo.gctx, price.val, "price");
+    }
+
+    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
+
+    const nc = &demo.params.num_consumers;
+    if (createSlider("Numbers of Consumers", u32, &nc.slider)) {
+        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        gctx.queue.writeBuffer(
+            resource,
+            @sizeOf(u32),
+            u32,
+            &.{nc.slider.val},
+        );
+
+        if (nc.old >= nc.slider.val) {
+            demo.buffers.data.consumers.mapping.num_structs = nc.slider.val;
+        } else {
+            Consumer.generateBulk(
+                gctx,
+                demo.buffers.data.consumers.buf,
+                &demo.buffers.data.consumers.mapping.num_structs,
+                demo.params.aspect,
+                nc.slider.val - nc.old,
+            );
+        }
+        nc.old = nc.slider.val;
+    }
+
+    //zgui.textDisabled("(?)", .{});
+    //if (zgui.isItemHovered(.{})) {
+    //    _ = zgui.beginTooltip();
+    //    zgui.textUnformatted(
+    //        "How much consumers demand from a producer.",
+    //    );
+    //    zgui.endTooltip();
+    //}
+    //zgui.sameLine(.{});
+    if (createSlider("Demand Rate", i32, &demo.params.demand_rate)) {
+        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
+        gctx.queue.writeBuffer(
+            resource,
+            @sizeOf(i32),
+            i32,
+            &.{demo.params.demand_rate.val},
+        );
+    }
+
+    if (createSlider("Consumer Income", i32, &demo.params.income)) {
+        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
+        gctx.queue.writeBuffer(resource, 8, i32, &.{demo.params.income.val});
+    }
+}
+
+fn extras(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+    const producers = demo.buffers.data.producers;
+    const mpi = &demo.params.max_inventory;
+    if (createSlider("Max Producer Inventory", i32, mpi)) {
+        producers.updateI32Field(demo.gctx, mpi.val, "max_inventory");
+    }
+
+    if (createSlider("Moving Rate", f32, &demo.params.moving_rate)) {
+        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
+        gctx.queue.writeBuffer(resource, 0, f32, &.{demo.params.moving_rate.val});
+    }
+
+    const cr = &demo.params.consumer_radius;
+    if (createSlider("Consumer Size", f32, cr)) {
+        demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
+            gctx,
+            40,
+            cr.val,
+        );
     }
 }

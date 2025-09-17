@@ -27,6 +27,22 @@ pub fn ObjectBuffer(comptime T: type) type {
     return struct {
         buf: zgpu.BufferHandle,
         mapping: MappingBuffer(T),
+
+        pub fn updateI32Field(
+            self: ObjectBuffer(T),
+            gctx: *zgpu.GraphicsContext,
+            val: i32,
+            comptime name: [:0]const u8,
+        ) void {
+            for (0..self.mapping.num_structs) |i| {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(self.buf).?,
+                    i * @sizeOf(T) + @offsetOf(T, name),
+                    i32,
+                    &.{val},
+                );
+            }
+        }
     };
 }
 

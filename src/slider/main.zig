@@ -18,6 +18,71 @@ pub const MAX_NUM_CONSUMERS = 10000;
 pub const NUM_CONSUMER_SIDES = 40;
 pub const NUM_STATS = 8;
 
+pub fn Slider(comptime T: type) type {
+    return struct {
+        val: T,
+        min: T,
+        max: T,
+    };
+}
+
+pub const Parameters = struct {
+    max_num_stats: u32 = 3,
+    num_producers: struct {
+        old: u32 = 2,
+        slider: Slider(u32) = Slider(u32){
+            .min = 1,
+            .val = 2,
+            .max = 100,
+        },
+    },
+    num_consumers: struct {
+        old: u32 = 150,
+        slider: Slider(u32) = Slider(u32){
+            .min = 0,
+            .val = 150,
+            .max = 10000,
+        },
+    },
+    production_cost: Slider(i32) = Slider(i32){
+        .min = 0,
+        .val = 5,
+        .max = 10,
+    },
+    demand_rate: Slider(i32) = Slider(i32){
+        .min = 1,
+        .val = 100,
+        .max = 1000,
+    },
+    max_inventory: Slider(i32) = Slider(i32){
+        .min = 5000,
+        .val = 10000,
+        .max = 10000,
+    },
+    income: Slider(i32) = Slider(i32){
+        .min = 0,
+        .val = 10,
+        .max = 20,
+    },
+    price: Slider(i32) = Slider(i32){
+        .min = 0,
+        .val = 5,
+        .max = 10,
+    },
+    moving_rate: Slider(f32) = Slider(f32){
+        .min = 1,
+        .val = 20,
+        .max = 100,
+    },
+    consumer_radius: Slider(f32) = Slider(f32){
+        .min = 1,
+        .val = 6,
+        .max = 12,
+    },
+    num_consumer_sides: u32 = 20,
+    aspect: f32,
+};
+
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     window: *zglfw.Window,
@@ -25,10 +90,16 @@ pub const DemoState = struct {
     running: bool = false,
     content_scale: f32,
     render_pipelines: struct {
-        circle: zgpu.RenderPipelineHandle,
-        background_money_bar: zgpu.RenderPipelineHandle,
-        money_bar: zgpu.RenderPipelineHandle,
-        square: zgpu.RenderPipelineHandle,
+        consumer: struct {
+            circle: zgpu.RenderPipelineHandle,
+            background_money_bar: zgpu.RenderPipelineHandle,
+            money_bar: zgpu.RenderPipelineHandle,
+        },
+        producer: struct {
+            square: zgpu.RenderPipelineHandle,
+            background_money_bar: zgpu.RenderPipelineHandle,
+            money_bar: zgpu.RenderPipelineHandle,
+        },
     },
     compute_pipelines: struct {
         consumer: zgpu.ComputePipelineHandle,
@@ -63,26 +134,6 @@ pub const DemoState = struct {
         num_total_producer_inventory: std.ArrayList(u32),
         obj_buf: Wgpu.ObjectBuffer(u32),
     },
-};
-
-pub const Parameters = struct {
-    max_num_stats: u32 = 3,
-    num_producers: struct {
-        old: u32 = 2,
-        new: u32 = 2,
-    },
-    num_consumers: struct {
-        old: u32 = 150,
-        new: u32 = 150,
-    },
-    production_rate: u32 = 300,
-    demand_rate: i32 = 100,
-    max_inventory: u32 = 10000,
-    income: u32 = 10,
-    moving_rate: f32 = 5.0,
-    consumer_radius: f32 = 6.0,
-    num_consumer_sides: u32 = 20,
-    aspect: f32,
 };
 
 pub fn updateAndRender(demo: *DemoState) !void {
@@ -178,13 +229,13 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         consumer_object.buf,
         &consumer_object.mapping.num_structs,
         params.aspect,
-        params.num_consumers.new,
+        params.num_consumers.slider.val,
     );
     const consumer_params_buf = Wgpu.createBuffer(gctx, u32, 3);
     const r = gctx.lookupResource(consumer_params_buf).?;
-    gctx.queue.writeBuffer(r, 0, f32, &.{params.moving_rate});
-    gctx.queue.writeBuffer(r, 4, i32, &.{params.demand_rate});
-    gctx.queue.writeBuffer(r, 8, u32, &.{params.income});
+    gctx.queue.writeBuffer(r, 0, f32, &.{params.moving_rate.val});
+    gctx.queue.writeBuffer(r, 4, i32, &.{params.demand_rate.val});
+    gctx.queue.writeBuffer(r, 8, i32, &.{params.income.val});
 
     var producer_object = Wgpu.createObjectBuffer(
         gctx,
@@ -197,9 +248,12 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         producer_object.buf,
         &producer_object.mapping.num_structs,
         params.aspect,
-        params.num_producers.new,
-        params.production_rate,
-        params.max_inventory,
+        params.num_producers.slider.val,
+        .{
+            .max_inventory = params.max_inventory.val,
+            .production_cost = params.production_cost.val,
+            .price = params.price.val,
+        },
     );
 
     const stats_buf = Wgpu.createObjectBuffer(
@@ -213,7 +267,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         resource,
         @sizeOf(u32),
         u32,
-        &.{ params.num_consumers.new, params.num_producers.new },
+        &.{ params.num_consumers.slider.val, params.num_producers.slider.val },
     );
 
     const compute_bind_group = Wgpu.createComputeBindGroup(gctx, .{
@@ -236,40 +290,60 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         .window = window,
         .content_scale = getContentScale(window),
         .render_pipelines = .{
-            .circle = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
-                .vs = @embedFile("shaders/vertex/consumer.wgsl"),
-                .inst_type = Consumer,
-                .inst_attrs = &.{
-                    .{ .name = "position", .type = [4]f32 },
-                    .{ .name = "color", .type = [4]f32 },
-                },
-            }),
-            .background_money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
-                .vs = @embedFile("shaders/vertex/background_money_bar.wgsl"),
-                .inst_type = Consumer,
-                .inst_attrs = &.{
-                    .{ .name = "home", .type = [4]f32 },
-                },
-            }),
-            .money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
-                .vs = @embedFile("shaders/vertex/money_bar.wgsl"),
-                .inst_type = Consumer,
-                .inst_attrs = &.{
-                    .{ .name = "home", .type = [4]f32 },
-                    .{ .name = "money", .type = u32 },
-                    .{ .name = "max_money", .type = u32 },
-                },
-            }),
-            .square = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
-                .vs = @embedFile("shaders/vertex/producer.wgsl"),
-                .inst_type = Producer,
-                .inst_attrs = &.{
-                    .{ .name = "home", .type = [4]f32 },
-                    .{ .name = "color", .type = [4]f32 },
-                    .{ .name = "inventory", .type = u32 },
-                    .{ .name = "max_inventory", .type = u32 },
-                },
-            }),
+            .consumer = .{
+                .circle = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/consumer/circle.wgsl"),
+                    .inst_type = Consumer,
+                    .inst_attrs = &.{
+                        .{ .name = "position", .type = [4]f32 },
+                        .{ .name = "color", .type = [4]f32 },
+                    },
+                }),
+                .background_money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/consumer/background_money_bar.wgsl"),
+                    .inst_type = Consumer,
+                    .inst_attrs = &.{
+                        .{ .name = "home", .type = [4]f32 },
+                    },
+                }),
+                .money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/consumer/money_bar.wgsl"),
+                    .inst_type = Consumer,
+                    .inst_attrs = &.{
+                        .{ .name = "home", .type = [4]f32 },
+                        .{ .name = "money", .type = u32 },
+                        .{ .name = "max_money", .type = u32 },
+                    },
+                }),
+            },
+            .producer = .{
+                .square = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/producer/square.wgsl"),
+                    .inst_type = Producer,
+                    .inst_attrs = &.{
+                        .{ .name = "home", .type = [4]f32 },
+                        .{ .name = "color", .type = [4]f32 },
+                        .{ .name = "inventory", .type = u32 },
+                        .{ .name = "max_inventory", .type = u32 },
+                    },
+                }),
+                .background_money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/producer/background_money_bar.wgsl"),
+                    .inst_type = Producer,
+                    .inst_attrs = &.{
+                        .{ .name = "home", .type = [4]f32 },
+                    },
+                }),
+                .money_bar = Wgpu.createRenderPipeline(gctx, bind_group_layout, .{
+                    .vs = @embedFile("shaders/vertex/producer/money_bar.wgsl"),
+                    .inst_type = Producer,
+                    .inst_attrs = &.{
+                        .{ .name = "home", .type = [4]f32 },
+                        .{ .name = "money", .type = u32 },
+                        .{ .name = "max_money", .type = u32 },
+                    },
+                }),
+            },
         },
         .compute_pipelines = .{
             .producer = Wgpu.createComputePipeline(gctx, .{
@@ -300,7 +374,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
                 .circle = Shapes.createCircleVertexBuffer(
                     gctx,
                     NUM_CONSUMER_SIDES,
-                    params.consumer_radius,
+                    params.consumer_radius.val,
                 ),
                 .square = Shapes.createSquareVertexBuffer(gctx, 40),
                 .bar = Shapes.createBarVertexBuffer(gctx, 6, 80),
@@ -392,10 +466,12 @@ pub fn draw(demo: *DemoState) void {
 
             const cib_info = gctx.lookupResourceInfo(demo.buffers.index.circle) orelse break :pass;
 
-            const square_rp = gctx.lookupResource(demo.render_pipelines.square) orelse break :pass;
-            const circle_rp = gctx.lookupResource(demo.render_pipelines.circle) orelse break :pass;
-            const money_bar_rp = gctx.lookupResource(demo.render_pipelines.money_bar) orelse break :pass;
-            const background_money_bar_rp = gctx.lookupResource(demo.render_pipelines.background_money_bar) orelse break :pass;
+            const square_rp = gctx.lookupResource(demo.render_pipelines.producer.square) orelse break :pass;
+            const circle_rp = gctx.lookupResource(demo.render_pipelines.consumer.circle) orelse break :pass;
+            const c_money_bar_rp = gctx.lookupResource(demo.render_pipelines.consumer.money_bar) orelse break :pass;
+            const c_background_money_bar_rp = gctx.lookupResource(demo.render_pipelines.consumer.background_money_bar) orelse break :pass;
+            const p_money_bar_rp = gctx.lookupResource(demo.render_pipelines.producer.money_bar) orelse break :pass;
+            const p_background_money_bar_rp = gctx.lookupResource(demo.render_pipelines.producer.background_money_bar) orelse break :pass;
 
             const render_bind_group = gctx.lookupResource(demo.bind_groups.render) orelse break :pass;
             const depth_view = gctx.lookupResource(demo.depth_texture_view) orelse break :pass;
@@ -428,22 +504,20 @@ pub fn draw(demo: *DemoState) void {
             const xOffset = width / 4;
             const height = @as(f32, @floatFromInt(sd.height));
             const yOffset = height / 4;
+
             pass.setViewport(xOffset, 0, width - xOffset, height - yOffset, 0, 1);
 
             var mem = gctx.uniformsAllocate(zm.Mat, 1);
             mem.slice[0] = cam_world_to_clip;
             pass.setBindGroup(0, render_bind_group, &.{mem.offset});
 
-            const num_indices_circle = @as(
-                u32,
-                @intCast(cib_info.size / @sizeOf(f32)),
-            );
-            pass.setPipeline(background_money_bar_rp);
+            const num_indices_circle = @as(u32, @intCast(cib_info.size / 4));
+            pass.setPipeline(c_background_money_bar_rp);
             pass.setVertexBuffer(0, bvb_info.gpuobj.?, 0, bvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.draw(6, num_consumers, 0, 0);
 
-            pass.setPipeline(money_bar_rp);
+            pass.setPipeline(c_money_bar_rp);
             pass.setVertexBuffer(0, bvb_info.gpuobj.?, 0, bvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.draw(6, num_consumers, 0, 0);
@@ -453,6 +527,16 @@ pub fn draw(demo: *DemoState) void {
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
             pass.drawIndexed(num_indices_circle, num_consumers, 0, 0, 0);
+
+            pass.setPipeline(p_background_money_bar_rp);
+            pass.setVertexBuffer(0, bvb_info.gpuobj.?, 0, bvb_info.size);
+            pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
+            pass.draw(6, num_producers, 0, 0);
+
+            pass.setPipeline(p_money_bar_rp);
+            pass.setVertexBuffer(0, bvb_info.gpuobj.?, 0, bvb_info.size);
+            pass.setVertexBuffer(1, pb_info.gpuobj.?, 0, pb_info.size);
+            pass.draw(6, num_producers, 0, 0);
 
             pass.setPipeline(square_rp);
             pass.setVertexBuffer(0, svb_info.gpuobj.?, 0, svb_info.size);
@@ -521,16 +605,19 @@ pub fn restartSimulation(demo: *DemoState) void {
         demo.buffers.data.producers.buf,
         &demo.buffers.data.producers.mapping.num_structs,
         demo.params.aspect,
-        demo.params.num_producers.new,
-        demo.params.production_rate,
-        demo.params.max_inventory,
+        demo.params.num_producers.slider.val,
+        .{
+            .max_inventory = demo.params.max_inventory.val,
+            .production_cost = demo.params.production_cost.val,
+            .price = demo.params.price.val,
+        },
     );
     const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
     demo.gctx.queue.writeBuffer(
         resource,
         @sizeOf(u32),
         u32,
-        &.{ demo.params.num_consumers.new, demo.params.num_producers.new },
+        &.{ demo.params.num_consumers.slider.val, demo.params.num_producers.slider.val },
     );
     demo.stats.num_transactions.clearAndFree();
     demo.stats.num_empty_consumers.clearAndFree();
