@@ -10,16 +10,15 @@ home: [4]f32 = .{ 0, 0, 0, 0 },
 destination: [4]f32 = .{ 0, 0, 0, 0 },
 color: [4]f32 = .{ 1, 0, 0, 0 },
 step_size: [2]f32 = .{ 0, 0 },
-inventory: i32 = 0,
-money: i32 = 0,
-max_money: i32 = 10000,
+inventory: u32 = 0,
+money: u32 = 0,
+max_money: u32 = 10000,
 radius: f32 = 20.0,
 producer_id: i32 = -1,
 grouping_id: u32 = 0,
 
 pub const Params = struct {
     moving_rate: f32 = 0,
-    demand_rate: u32 = 0,
     income: u32 = 0,
 };
 

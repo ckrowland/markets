@@ -18,15 +18,28 @@ pub fn numTransactions(args: Wgpu.CallbackArgs(u32)) void {
     args.gctx.queue.writeBuffer(resource, 0, u32, &.{0});
 }
 
-pub fn totalInventory(args: Wgpu.CallbackArgs(Producer)) void {
+pub fn avgProducerInventory(args: Wgpu.CallbackArgs(Producer)) void {
     const slice = args.obj_buf.mapping.staging.slice;
-    var total_inventory: u32 = 0;
+    var avg_inventory: u32 = 0;
     if (slice) |producers| {
         for (producers) |p| {
-            total_inventory += @intCast(p.inventory);
+            avg_inventory += p.inventory;
         }
+        avg_inventory /= @intCast(producers.len);
     }
-    args.stat_array.append(total_inventory) catch unreachable;
+    args.stat_array.append(avg_inventory) catch unreachable;
+}
+
+pub fn avgProducerMoney(args: Wgpu.CallbackArgs(Producer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    var avg_money: u32 = 0;
+    if (slice) |producers| {
+        for (producers) |p| {
+            avg_money += p.money;
+        }
+        avg_money /= @intCast(producers.len);
+    }
+    args.stat_array.append(avg_money) catch unreachable;
 }
 
 pub fn emptyConsumers(args: Wgpu.CallbackArgs(Consumer)) void {

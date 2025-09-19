@@ -64,10 +64,15 @@ pub fn update(demo: *DemoState) void {
                 .obj_buf = &demo.buffers.data.consumers,
                 .stat_array = &demo.stats.num_empty_consumers,
             });
-            Wgpu.getAllAsync(Producer, Callbacks.totalInventory, .{
+            Wgpu.getAllAsync(Producer, Callbacks.avgProducerInventory, .{
                 .gctx = demo.gctx,
                 .obj_buf = &demo.buffers.data.producers,
-                .stat_array = &demo.stats.num_total_producer_inventory,
+                .stat_array = &demo.stats.avg_producer_inventory,
+            });
+            Wgpu.getAllAsync(Producer, Callbacks.avgProducerMoney, .{
+                .gctx = demo.gctx,
+                .obj_buf = &demo.buffers.data.producers,
+                .stat_array = &demo.stats.avg_producer_money,
             });
         }
     }
@@ -99,8 +104,11 @@ fn plots(demo: *DemoState) void {
         zgui.plot.plotLineValues("Empty Consumers", u32, .{
             .v = demo.stats.num_empty_consumers.items[0..],
         });
-        zgui.plot.plotLineValues("Total Producer Inventory", u32, .{
-            .v = demo.stats.num_total_producer_inventory.items[0..],
+        zgui.plot.plotLineValues("Average Producer Inventory", u32, .{
+            .v = demo.stats.avg_producer_inventory.items[0..],
+        });
+        zgui.plot.plotLineValues("Average Producer Money", u32, .{
+            .v = demo.stats.avg_producer_money.items[0..],
         });
         zgui.plot.endPlot();
     }
@@ -157,7 +165,7 @@ fn buttons(demo: *DemoState) void {
     }
     if (zgui.button("Supply Shock", .{})) {
         const producers = demo.buffers.data.producers;
-        producers.updateI32Field(demo.gctx, 0, "inventory");
+        producers.updateU32Field(demo.gctx, 0, "inventory");
     }
 
     zgui.sameLine(.{});
@@ -202,13 +210,13 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     }
 
     const pc = &demo.params.production_cost;
-    if (createSlider("Production Cost", i32, pc)) {
-        producers.updateI32Field(demo.gctx, pc.val, "production_cost");
+    if (createSlider("Production Cost", u32, pc)) {
+        producers.updateU32Field(demo.gctx, pc.val, "production_cost");
     }
 
     const price = &demo.params.price;
-    if (createSlider("Price", i32, price)) {
-        producers.updateI32Field(demo.gctx, price.val, "price");
+    if (createSlider("Price", u32, price)) {
+        producers.updateU32Field(demo.gctx, price.val, "price");
     }
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
@@ -237,36 +245,17 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         nc.old = nc.slider.val;
     }
 
-    //zgui.textDisabled("(?)", .{});
-    //if (zgui.isItemHovered(.{})) {
-    //    _ = zgui.beginTooltip();
-    //    zgui.textUnformatted(
-    //        "How much consumers demand from a producer.",
-    //    );
-    //    zgui.endTooltip();
-    //}
-    //zgui.sameLine(.{});
-    if (createSlider("Demand Rate", i32, &demo.params.demand_rate)) {
+    if (createSlider("Consumer Income", u32, &demo.params.income)) {
         const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(
-            resource,
-            @sizeOf(i32),
-            i32,
-            &.{demo.params.demand_rate.val},
-        );
-    }
-
-    if (createSlider("Consumer Income", i32, &demo.params.income)) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, 8, i32, &.{demo.params.income.val});
+        gctx.queue.writeBuffer(resource, 4, u32, &.{demo.params.income.val});
     }
 }
 
 fn extras(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     const producers = demo.buffers.data.producers;
     const mpi = &demo.params.max_inventory;
-    if (createSlider("Max Producer Inventory", i32, mpi)) {
-        producers.updateI32Field(demo.gctx, mpi.val, "max_inventory");
+    if (createSlider("Max Producer Inventory", u32, mpi)) {
+        producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
     }
 
     if (createSlider("Moving Rate", f32, &demo.params.moving_rate)) {

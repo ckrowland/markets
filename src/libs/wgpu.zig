@@ -28,17 +28,17 @@ pub fn ObjectBuffer(comptime T: type) type {
         buf: zgpu.BufferHandle,
         mapping: MappingBuffer(T),
 
-        pub fn updateI32Field(
+        pub fn updateU32Field(
             self: ObjectBuffer(T),
             gctx: *zgpu.GraphicsContext,
-            val: i32,
+            val: u32,
             comptime name: [:0]const u8,
         ) void {
             for (0..self.mapping.num_structs) |i| {
                 gctx.queue.writeBuffer(
                     gctx.lookupResource(self.buf).?,
                     i * @sizeOf(T) + @offsetOf(T, name),
-                    i32,
+                    u32,
                     &.{val},
                 );
             }
@@ -130,9 +130,11 @@ pub fn checkObjBufState(comptime T: type, buf: *MappingBuffer(T)) void {
     }
 
     if (buf.state == .waiting_for_map_async and buf.staging.slice != null) {
-        const request = buf.requests[buf.remove_idx];
-        buf.remove_idx = (buf.remove_idx + 1) % callback_queue_len;
-        request.func.?(request.args);
+        while (buf.remove_idx != buf.insert_idx) {
+            const request = buf.requests[buf.remove_idx];
+            buf.remove_idx = (buf.remove_idx + 1) % callback_queue_len;
+            request.func.?(request.args);
+        }
         buf.staging.buffer.unmap();
         buf.staging.slice = null;
         buf.state = .rest;

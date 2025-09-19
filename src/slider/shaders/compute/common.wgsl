@@ -5,9 +5,9 @@ struct Consumer {
   destination: vec4<f32>,
   color: vec4<f32>,
   step_size: vec2<f32>,
-  inventory: i32,
-  money: i32,
-  max_money: i32,
+  inventory: u32,
+  money: u32,
+  max_money: u32,
   radius: f32,
   producer_id: i32,
   grouping_id: u32,
@@ -15,20 +15,19 @@ struct Consumer {
 
 struct ConsumerParams{
   moving_rate: f32,
-  demand_rate: i32,
-  income: i32,
+  income: u32,
 }
 
 struct Producer {
   absolute_home: vec4<i32>,
   home: vec4<f32>,
   color: vec4<f32>,
-  inventory: atomic<i32>,
-  max_inventory: i32,
-  money: i32,
-  max_money: i32,
-  price: i32,
-  production_cost: i32,
+  inventory: atomic<u32>,
+  max_inventory: u32,
+  money: u32,
+  max_money: u32,
+  price: u32,
+  production_cost: u32,
 }
 
 struct Stats {

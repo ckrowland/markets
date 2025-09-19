@@ -16,7 +16,7 @@ const emscripten = @import("builtin").target.os.tag == .emscripten;
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
 pub const NUM_CONSUMER_SIDES = 40;
-pub const NUM_STATS = 8;
+pub const NUM_STATS = 9;
 
 pub fn Slider(comptime T: type) type {
     return struct {
@@ -44,27 +44,22 @@ pub const Parameters = struct {
             .max = 10000,
         },
     },
-    production_cost: Slider(i32) = Slider(i32){
+    production_cost: Slider(u32) = Slider(u32){
         .min = 0,
         .val = 5,
         .max = 10,
     },
-    demand_rate: Slider(i32) = Slider(i32){
-        .min = 1,
-        .val = 100,
-        .max = 1000,
-    },
-    max_inventory: Slider(i32) = Slider(i32){
+    max_inventory: Slider(u32) = Slider(u32){
         .min = 5000,
         .val = 10000,
         .max = 10000,
     },
-    income: Slider(i32) = Slider(i32){
+    income: Slider(u32) = Slider(u32){
         .min = 0,
         .val = 10,
         .max = 20,
     },
-    price: Slider(i32) = Slider(i32){
+    price: Slider(u32) = Slider(u32){
         .min = 0,
         .val = 5,
         .max = 10,
@@ -131,7 +126,8 @@ pub const DemoState = struct {
         num_transactions: std.ArrayList(u32),
         second: f32 = 0,
         num_empty_consumers: std.ArrayList(u32),
-        num_total_producer_inventory: std.ArrayList(u32),
+        avg_producer_inventory: std.ArrayList(u32),
+        avg_producer_money: std.ArrayList(u32),
         obj_buf: Wgpu.ObjectBuffer(u32),
     },
 };
@@ -159,9 +155,10 @@ pub fn getContentScale(window: *zglfw.Window) f32 {
 }
 
 pub fn deinit(demo: *DemoState) void {
+    demo.stats.avg_producer_money.deinit();
     demo.stats.num_transactions.deinit();
     demo.stats.num_empty_consumers.deinit();
-    demo.stats.num_total_producer_inventory.deinit();
+    demo.stats.avg_producer_inventory.deinit();
     zgui.backend.deinit();
     zgui.plot.deinit();
     zgui.deinit();
@@ -234,8 +231,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
     const consumer_params_buf = Wgpu.createBuffer(gctx, u32, 3);
     const r = gctx.lookupResource(consumer_params_buf).?;
     gctx.queue.writeBuffer(r, 0, f32, &.{params.moving_rate.val});
-    gctx.queue.writeBuffer(r, 4, i32, &.{params.demand_rate.val});
-    gctx.queue.writeBuffer(r, 8, i32, &.{params.income.val});
+    gctx.queue.writeBuffer(r, 4, u32, &.{params.income.val});
 
     var producer_object = Wgpu.createObjectBuffer(
         gctx,
@@ -371,13 +367,13 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
                 .circle = Shapes.createCircleIndexBuffer(gctx, NUM_CONSUMER_SIDES),
             },
             .vertex = .{
+                .bar = Shapes.createBarVertexBuffer(gctx, 6, 80),
                 .circle = Shapes.createCircleVertexBuffer(
                     gctx,
                     NUM_CONSUMER_SIDES,
                     params.consumer_radius.val,
                 ),
                 .square = Shapes.createSquareVertexBuffer(gctx, 40),
-                .bar = Shapes.createBarVertexBuffer(gctx, 6, 80),
             },
         },
         .depth_texture = depth.texture,
@@ -385,9 +381,10 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         .allocator = allocator,
         .params = params,
         .stats = .{
+            .avg_producer_money = std.ArrayList(u32).init(allocator),
+            .avg_producer_inventory = std.ArrayList(u32).init(allocator),
             .num_transactions = std.ArrayList(u32).init(allocator),
             .num_empty_consumers = std.ArrayList(u32).init(allocator),
-            .num_total_producer_inventory = std.ArrayList(u32).init(allocator),
             .obj_buf = stats_buf,
         },
     };
@@ -612,16 +609,11 @@ pub fn restartSimulation(demo: *DemoState) void {
             .price = demo.params.price.val,
         },
     );
-    const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
-    demo.gctx.queue.writeBuffer(
-        resource,
-        @sizeOf(u32),
-        u32,
-        &.{ demo.params.num_consumers.slider.val, demo.params.num_producers.slider.val },
-    );
+
     demo.stats.num_transactions.clearAndFree();
     demo.stats.num_empty_consumers.clearAndFree();
-    demo.stats.num_total_producer_inventory.clearAndFree();
+    demo.stats.avg_producer_inventory.clearAndFree();
+    demo.stats.avg_producer_money.clearAndFree();
 }
 
 pub fn updateDepthTexture(demo: *DemoState) void {
