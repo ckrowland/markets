@@ -43,10 +43,25 @@ pub fn ObjectBuffer(comptime T: type) type {
                 );
             }
         }
+
+        pub fn append(
+            self: *ObjectBuffer(T),
+            gctx: *zgpu.GraphicsContext,
+            object: T,
+        ) void {
+            const resource = gctx.lookupResource(self.buf).?;
+            gctx.queue.writeBuffer(
+                resource,
+                self.mapping.num_structs * @sizeOf(T),
+                T,
+                &.{object},
+            );
+            self.mapping.num_structs += 1;
+        }
     };
 }
 
-const callback_queue_len: usize = 10;
+pub const callback_queue_len: usize = 10;
 fn MappingBuffer(comptime T: type) type {
     return struct {
         buf: zgpu.BufferHandle,
@@ -82,6 +97,7 @@ fn Callback(comptime T: type) type {
 pub const ComputePipelineInfo = struct {
     cs: [:0]const u8,
     entry_point: [:0]const u8,
+    name: [:0]const u8,
 };
 
 pub fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
@@ -452,7 +468,7 @@ pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, cpi: ComputePipelineIn
     const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
     defer gctx.releaseResource(compute_pl);
 
-    const cs_module = zgpu.createWgslShaderModule(gctx.device, cpi.cs, "cs");
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, cpi.cs, cpi.name);
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{

@@ -42,6 +42,19 @@ pub fn avgProducerMoney(args: Wgpu.CallbackArgs(Producer)) void {
     args.stat_array.append(avg_money) catch unreachable;
 }
 
+//pub fn producerMitosis(args: Wgpu.CallbackArgs(Producer)) void {
+//    const slice = args.obj_buf.mapping.staging.slice;
+//    if (slice) |producers| {
+//        for (producers) |p| {
+//            if (p.money >= p.max_money) {
+//                const new_p = Producer.
+//                //create new producer
+//                //add to producer buffer
+//            }
+//        }
+//    }
+//}
+
 pub fn emptyConsumers(args: Wgpu.CallbackArgs(Consumer)) void {
     const consumers = Wgpu.getMappedData(Consumer, &args.obj_buf.mapping);
     var empty_consumers: u32 = 0;

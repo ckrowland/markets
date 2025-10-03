@@ -67,6 +67,22 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const wgpu = b.addModule("wgpu", .{
+        .root_source_file = b.path("wgpu.zig"),
+        .imports = &.{
+            .{
+                .name = "zgpu",
+                .module = zgpu.module("root"),
+            },
+            .{
+                .name = "zmath",
+                .module = zmath.module("root"),
+            },
+        },
+        .target = target,
+        .optimize = optimize,
+    });
+
     _ = b.addModule("producer", .{
         .root_source_file = b.path("producer.zig"),
         .imports = &.{
@@ -78,21 +94,9 @@ pub fn build(b: *std.Build) void {
                 .name = "camera",
                 .module = camera,
             },
-        },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const wgpu = b.addModule("wgpu", .{
-        .root_source_file = b.path("wgpu.zig"),
-        .imports = &.{
             .{
-                .name = "zgpu",
-                .module = zgpu.module("root"),
-            },
-            .{
-                .name = "zmath",
-                .module = zmath.module("root"),
+                .name = "wgpu",
+                .module = wgpu,
             },
         },
         .target = target,

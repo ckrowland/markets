@@ -74,6 +74,10 @@ pub fn update(demo: *DemoState) void {
                 .obj_buf = &demo.buffers.data.producers,
                 .stat_array = &demo.stats.avg_producer_money,
             });
+            //Wgpu.getAllAsync(Producer, Callbacks.producerMitosis, .{
+            //    .gctx = demo.gctx,
+            //    .obj_buf = &demo.buffers.data.producers,
+            //});
         }
     }
 }
@@ -195,9 +199,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         } else {
             Producer.generateBulk(
                 gctx,
-                demo.buffers.data.producers.buf,
-                &demo.buffers.data.producers.mapping.num_structs,
-                demo.params.aspect,
+                &demo.buffers.data.producers,
                 np.slider.val - np.old,
                 .{
                     .max_inventory = demo.params.max_inventory.val,

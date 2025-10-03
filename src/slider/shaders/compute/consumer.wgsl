@@ -40,44 +40,49 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         // At Producer
         let pid = c.producer_id;
         if (c.money < producers[pid].price) {
-            consumers[index].destination = c.home;
-            consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
-            consumers[index].producer_id = -1;
+            go_home(index);
             return;
         }
 
-        let total_can_buy = u32(c.money / producers[pid].price);
+        var total_can_buy = c.money / producers[pid].price;
         var inv = atomicLoad(&producers[pid].inventory);
-        if (inv >= total_can_buy) {
-            var result = inv - total_can_buy;
-            var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
-            if (cmp.exchanged) {
-                let cost = total_can_buy * producers[pid].price;
-                consumers[index].money -= cost;
-                producers[pid].money += cost;
-                consumers[index].inventory += total_can_buy;
-                consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
-                stats.transactions += u32(1);
-            }
-        } else if (inv > 0) {
-            var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, 0);
-            while (!cmp.exchanged) {
+        var result = inv - total_can_buy;
+        var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
+        while (!cmp.exchanged) {
+            if (cmp.old_value >= total_can_buy) {
+                inv = atomicLoad(&producers[pid].inventory);
+                result = inv - total_can_buy;
+                cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
+            } else {
                 inv = atomicLoad(&producers[pid].inventory);
                 cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, 0);
             }
-
-            let cost = inv * producers[pid].price;
-            consumers[index].money -= cost;
-            producers[pid].money += cost;
-            consumers[index].inventory += inv;
-            consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
-            stats.transactions += u32(1);
         }
 
-        consumers[index].destination = c.home;
-        consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
-        consumers[index].producer_id = -1;
+        var cost = total_can_buy * producers[pid].price;
+        if (cmp.old_value < total_can_buy) {
+            cost = inv * producers[pid].price;
+        }
+        buy(index, cost, total_can_buy);
+        go_home(index);
     }
+}
+
+fn buy(index: u32, cost: u32, amount: u32) {
+    let pid = consumers[index].producer_id;
+    consumers[index].money -= cost;
+    producers[pid].money += cost;
+    consumers[index].inventory += amount;
+    consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
+    stats.transactions += u32(1);
+}
+
+fn go_home(index: u32){
+    let c = consumers[index];
+    let moving_rate = consumer_params.moving_rate;
+    consumers[index].destination = c.home;
+    consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
+    consumers[index].producer_id = -1;
 }
 
 fn search_for_producer(index: u32){

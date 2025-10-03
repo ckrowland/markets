@@ -66,7 +66,7 @@ pub const Parameters = struct {
     },
     moving_rate: Slider(f32) = Slider(f32){
         .min = 1,
-        .val = 20,
+        .val = 10,
         .max = 100,
     },
     consumer_radius: Slider(f32) = Slider(f32){
@@ -241,9 +241,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
     );
     Producer.generateBulk(
         gctx,
-        producer_object.buf,
-        &producer_object.mapping.num_structs,
-        params.aspect,
+        &producer_object,
         params.num_producers.slider.val,
         .{
             .max_inventory = params.max_inventory.val,
@@ -346,11 +344,13 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
                 .cs = @embedFile("shaders/compute/common.wgsl") ++
                     @embedFile("shaders/compute/producer.wgsl"),
                 .entry_point = "main",
+                .name = "producer",
             }),
             .consumer = Wgpu.createComputePipeline(gctx, .{
                 .cs = @embedFile("shaders/compute/common.wgsl") ++
                     @embedFile("shaders/compute/consumer.wgsl"),
                 .entry_point = "main",
+                .name = "consumer",
             }),
         },
         .bind_groups = .{
@@ -599,9 +599,7 @@ pub fn restartSimulation(demo: *DemoState) void {
     );
     Producer.generateBulk(
         demo.gctx,
-        demo.buffers.data.producers.buf,
-        &demo.buffers.data.producers.mapping.num_structs,
-        demo.params.aspect,
+        &demo.buffers.data.producers,
         demo.params.num_producers.slider.val,
         .{
             .max_inventory = demo.params.max_inventory.val,
