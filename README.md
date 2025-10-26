@@ -23,22 +23,12 @@ Download from the latest release or build from source.
 - Data Gathered:
   - Transactions per second
   - Empty Consumers
+  - Avg Producer Inventory
+  - Avg Producer Money
+  - Avg Consumer Inventory
+  - Avg Consumer Money
   - Total Producer Inventory
 - To remove a line from the graph, click it's title in the legend.
-
-## Resource Editor
-
-[editor.webm](https://github.com/ckrowland/simulations/assets/95145274/2c21762f-0dd2-4a00-8d2e-0aad38e83c78)
-
-- Manually place position of consumers and producers.
-- Each producer and consumer grouping has individual parameters.
-
-## Variable Parameters
-
-[variable.webm](https://github.com/ckrowland/simulations/assets/95145274/b7e97f85-6828-42fe-827d-af6ee2bdb049)
-
-- Very similiar to the random simulation.
-- Have input parameters controlled via a wave timeline.
 
 ## Build From Source
 
@@ -53,8 +43,19 @@ Download from the latest release or build from source.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-
 zig build slider-run
-zig build editor-run
-zig build wave-run
 ```
+
+## Resource Editor (Currently Broken)
+
+[editor.webm](https://github.com/ckrowland/simulations/assets/95145274/2c21762f-0dd2-4a00-8d2e-0aad38e83c78)
+
+- Manually place position of consumers and producers.
+- Each producer and consumer grouping has individual parameters.
+
+## Variable Parameters (Currently Broken)
+
+[variable.webm](https://github.com/ckrowland/simulations/assets/95145274/b7e97f85-6828-42fe-827d-af6ee2bdb049)
+
+- Very similiar to the random simulation.
+- Have input parameters controlled via a wave timeline.

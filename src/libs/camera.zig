@@ -11,7 +11,7 @@ pub const FOV_Y: f32 = 0.22 * std.math.pi;
 pub const NEAR_PLANE: f32 = 0.01;
 pub const FAR_PLANE: f32 = 3000.0;
 
-// Grid limits for absolute positions (without aspect ratio)
+// Grid limits for grid positions (without aspect ratio)
 pub const MAX_X: i32 = 1000;
 pub const MIN_X: i32 = -1000;
 pub const MAX_Y: i32 = 1000;
@@ -20,8 +20,8 @@ pub const TOTAL_X: i32 = 2000;
 pub const TOTAL_Y: i32 = 2000;
 
 // Viewport size relative to total window size
-pub const VP_X_SIZE: f32 = 0.75;
-pub const VP_Y_SIZE: f32 = 0.75;
+pub const VP_X_SIZE: f32 = 0.8;
+pub const VP_Y_SIZE: f32 = 0.8;
 
 pub fn getViewportPixelSize(gctx: *zgpu.GraphicsContext) [2]f32 {
     return .{
@@ -35,30 +35,25 @@ pub fn getAspectRatio(gctx: *zgpu.GraphicsContext) f32 {
     return @as(f32, @floatFromInt(sd.width)) / @as(f32, @floatFromInt(sd.height));
 }
 
+// Grid Position: (MIN_X -> MAX_X, MIN_Y -> MAX_Y) never changes, pure grid
+// World Position: Grid Position with x axis multiplied by aspect ratio
+// Pixel Position: World Position as seen from the camera.
+//                 Pixel coordinates rendered.
+
 // Given a world position (grid position with aspect), return grid position
-pub fn getGridFromWorld(gctx: *zgpu.GraphicsContext, world_pos: [4]f32) [4]i32 {
+pub fn getGridFromWorld(gctx: *zgpu.GraphicsContext, world_pos: [4]f32) [4]f32 {
     const aspect = getAspectRatio(gctx);
-    return .{
-        @as(i32, @intFromFloat(world_pos[0] / aspect)),
-        @as(i32, @intFromFloat(world_pos[1])),
-        @as(i32, @intFromFloat(world_pos[2])),
-        @as(i32, @intFromFloat(world_pos[3])),
-    };
+    return .{ world_pos[0] / aspect, world_pos[1], world_pos[2], world_pos[3] };
 }
 
 // Given a grid position, return a world position
-pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]i32) [4]f32 {
+pub fn getWorldPosition(gctx: *zgpu.GraphicsContext, grid_pos: [4]f32) [4]f32 {
     const aspect = getAspectRatio(gctx);
-    return .{
-        @as(f32, @floatFromInt(grid_pos[0])) * aspect,
-        @as(f32, @floatFromInt(grid_pos[1])),
-        @as(f32, @floatFromInt(grid_pos[2])),
-        @as(f32, @floatFromInt(grid_pos[3])),
-    };
+    return .{ grid_pos[0] * aspect, grid_pos[1], grid_pos[2], grid_pos[3] };
 }
 
 // Given a grid position, return a pixel position
-pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]i32) [2]f32 {
+pub fn getPixelPosition(gctx: *zgpu.GraphicsContext, g_pos: [2]f32) [2]f32 {
     const grid_pos = .{ g_pos[0], g_pos[1], 0, 1 };
     const world_pos = zmath.loadArr4(getWorldPosition(gctx, grid_pos));
     const camera_pos = zmath.mul(world_pos, getObjectToClipMat(gctx));
@@ -105,7 +100,5 @@ pub fn getObjectToClipMat(gctx: *zgpu.GraphicsContext) zmath.Mat {
         FAR_PLANE,
     );
 
-    const camWorldToClip = zmath.mul(camWorldToView, camViewToClip);
-    // return zmath.transpose(camWorldToClip);
-    return camWorldToClip;
+    return zmath.mul(camWorldToView, camViewToClip);
 }

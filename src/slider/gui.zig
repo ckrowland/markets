@@ -12,32 +12,36 @@ const Wgpu = @import("wgpu");
 const Callbacks = @import("callbacks.zig");
 
 pub fn update(demo: *DemoState) void {
-    const gctx = demo.gctx;
     const sd = demo.gctx.swapchain_descriptor;
-
-    var pos = Gui.setupWindowPos(sd, .{ .x = 0, .y = 0 });
-    var size = Gui.setupWindowSize(sd, .{ .x = 0.25, .y = 0.75 });
-    zgui.setNextWindowPos(.{ .x = pos[0], .y = pos[1] });
-    zgui.setNextWindowSize(.{ .w = size[0], .h = size[1] });
-
+    Gui.setupWindowPos(sd, .{ .x = 0, .y = 0 });
+    Gui.setupWindowSize(sd, .{ .x = 0.2, .y = 1 });
     const flags = zgui.WindowFlags.no_decoration;
     if (zgui.begin("0", .{ .flags = flags })) {
+        defer zgui.end();
         zgui.pushIntId(2);
-        settings(demo, gctx);
+        settings(demo, demo.gctx);
         zgui.popId();
     }
-    zgui.end();
 
-    pos = Gui.setupWindowPos(sd, .{ .x = 0, .y = 0.75, .margin = .{ .top = false } });
-    size = Gui.setupWindowSize(sd, .{ .x = 1, .y = 0.25, .margin = .{ .top = false } });
-    zgui.setNextWindowPos(.{ .x = pos[0], .y = pos[1] });
-    zgui.setNextWindowSize(.{ .w = size[0], .h = size[1] });
-    if (zgui.begin("1", .{ .flags = flags })) {
-        zgui.pushIntId(3);
-        plots(demo);
-        zgui.popId();
+    //zgui.plot.showDemoWindow(null);
+    Gui.setupWindowPos(sd, .{ .x = 0.2, .y = 0, .margin = .{ .left = false } });
+    Gui.setupWindowSize(sd, .{ .x = 0.8, .y = 1, .margin = .{ .right = false } });
+    if (demo.stats_page.val and demo.stats_page.change) {
+        demo.stats_page.change = false;
     }
-    zgui.end();
+    if (demo.stats_page.val) {
+        //zgui.setNextWindowBgAlpha(.{ .alpha = 0 });
+        //zgui.pushStyleColor1u(.{ .idx = .frame_bg, .c = 0 });
+        //zgui.pushStyleColor1u(.{ .idx = .window_bg, .c = 0 });
+        //defer zgui.popStyleColor(.{});
+        //defer zgui.popStyleColor(.{});
+        if (zgui.begin("Statistics", .{ .popen = &demo.stats_page.val })) {
+            zgui.pushIntId(3);
+            plots(demo);
+            zgui.popId();
+        }
+        defer zgui.end();
+    }
 
     Wgpu.checkObjBufState(u32, &demo.stats.obj_buf.mapping);
     Wgpu.checkObjBufState(Producer, &demo.buffers.data.producers.mapping);
@@ -50,10 +54,15 @@ pub fn update(demo: *DemoState) void {
         //    f32,
         //    &.{ random.float(f32), random.float(f32), random.float(f32) },
         //);
-        const current_time = @as(f32, @floatCast(gctx.stats.time));
+        const current_time = @as(f32, @floatCast(demo.gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
             demo.stats.second = current_time;
+            Wgpu.getAllAsync(Producer, Callbacks.price, .{
+                .gctx = demo.gctx,
+                .obj_buf = &demo.buffers.data.producers,
+                .stat_array = &demo.stats.price,
+            });
             Wgpu.getAllAsync(u32, Callbacks.numTransactions, .{
                 .gctx = demo.gctx,
                 .obj_buf = &demo.stats.obj_buf,
@@ -74,47 +83,86 @@ pub fn update(demo: *DemoState) void {
                 .obj_buf = &demo.buffers.data.producers,
                 .stat_array = &demo.stats.avg_producer_money,
             });
-            //Wgpu.getAllAsync(Producer, Callbacks.producerMitosis, .{
-            //    .gctx = demo.gctx,
-            //    .obj_buf = &demo.buffers.data.producers,
-            //});
+            Wgpu.getAllAsync(Consumer, Callbacks.avgConsumerInventory, .{
+                .gctx = demo.gctx,
+                .obj_buf = &demo.buffers.data.consumers,
+                .stat_array = &demo.stats.avg_consumer_inventory,
+            });
+            Wgpu.getAllAsync(Consumer, Callbacks.avgConsumerMoney, .{
+                .gctx = demo.gctx,
+                .obj_buf = &demo.buffers.data.consumers,
+                .stat_array = &demo.stats.avg_consumer_money,
+            });
         }
     }
 }
 
 fn plots(demo: *DemoState) void {
-    const window_size = zgui.getWindowSize();
-    const margin = 15;
-    const plot_width = window_size[0] - margin;
-    const plot_height = window_size[1] - margin;
+    if (zgui.button("Hide Statistics", .{})) {
+        demo.stats_page.val = !demo.stats_page.val;
+        if (demo.stats_page.val) {
+            demo.stats_page.change = true;
+        }
+    }
 
-    if (zgui.plot.beginPlot("", .{
-        .w = plot_width,
-        .h = plot_height,
-        .flags = .{},
+    if (zgui.button("Start", .{})) {
+        demo.running = true;
+    }
+    zgui.sameLine(.{});
+    if (zgui.button("Stop", .{})) {
+        demo.running = false;
+    }
+    zgui.sameLine(.{});
+    if (zgui.button("Restart", .{})) {
+        demo.running = true;
+        Main.restartSimulation(demo);
+    }
+    zgui.sameLine(.{});
+    if (zgui.button("Supply Shock", .{})) {
+        const producers = demo.buffers.data.producers;
+        producers.updateU32Field(demo.gctx, 0, "inventory");
+    }
+
+    if (zgui.beginTable("Stats", .{ .column = 3 })) {
+        defer zgui.endTable();
+
+        zgui.tableSetupColumn("Statistic", .{ .flags = .{ .width_fixed = true }, .init_width_or_height = 150 });
+        zgui.tableSetupColumn("Value", .{ .flags = .{ .width_fixed = true }, .init_width_or_height = 60 });
+        zgui.tableSetupColumn("Plot", .{});
+        zgui.tableHeadersRow();
+        plotRow("Price", &demo.stats.price);
+        plotRow("Num Transactions", &demo.stats.num_transactions);
+        plotRow("Empty Consumers", &demo.stats.num_empty_consumers);
+        plotRow("Avg. Producer Inventory", &demo.stats.avg_producer_inventory);
+        plotRow("Avg. Producer Money", &demo.stats.avg_producer_money);
+        plotRow("Avg. Consumer Inventory", &demo.stats.avg_consumer_inventory);
+        plotRow("Avg. Consumer Money", &demo.stats.avg_consumer_money);
+    }
+}
+
+fn plotRow(comptime str: [:0]const u8, arr: *std.ArrayList(u32)) void {
+    zgui.tableNextRow(.{});
+    _ = zgui.tableSetColumnIndex(0);
+    zgui.text(str, .{});
+    _ = zgui.tableSetColumnIndex(1);
+    zgui.text("{any}", .{arr.getLastOrNull()});
+    _ = zgui.tableSetColumnIndex(2);
+
+    if (zgui.plot.beginPlot("##" ++ str, .{
+        .h = 150,
     })) {
+        defer zgui.plot.endPlot();
         zgui.plot.setupAxis(.x1, .{
             .label = "",
-            .flags = .{ .auto_fit = true },
+            .flags = .{ .auto_fit = true, .no_label = true, .no_tick_labels = true },
         });
         zgui.plot.setupAxis(.y1, .{
             .label = "",
             .flags = .{ .auto_fit = true },
         });
-        zgui.plot.setupLegend(.{ .north = true, .west = true }, .{});
-        zgui.plot.plotLineValues("Transactions", u32, .{
-            .v = demo.stats.num_transactions.items[0..],
+        zgui.plot.plotLineValues(str, u32, .{
+            .v = arr.items[0..],
         });
-        zgui.plot.plotLineValues("Empty Consumers", u32, .{
-            .v = demo.stats.num_empty_consumers.items[0..],
-        });
-        zgui.plot.plotLineValues("Average Producer Inventory", u32, .{
-            .v = demo.stats.avg_producer_inventory.items[0..],
-        });
-        zgui.plot.plotLineValues("Average Producer Money", u32, .{
-            .v = demo.stats.avg_producer_money.items[0..],
-        });
-        zgui.plot.endPlot();
     }
 }
 
@@ -144,6 +192,7 @@ fn settings(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         if (zgui.beginTabItem("Parameters", .{})) {
             defer zgui.endTabItem();
             parameters(demo, gctx);
+            extras(demo, gctx);
         }
         if (zgui.beginTabItem("Extras", .{})) {
             defer zgui.endTabItem();
@@ -179,13 +228,20 @@ fn buttons(demo: *DemoState) void {
         zgui.textUnformatted("Set all producer inventory to 0.");
         zgui.endTooltip();
     }
+
+    if (zgui.button("Statistics Page", .{})) {
+        demo.stats_page.val = !demo.stats_page.val;
+        if (demo.stats_page.val) {
+            demo.stats_page.change = true;
+        }
+    }
 }
 
 fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     const producers = demo.buffers.data.producers;
 
     const np = &demo.params.num_producers;
-    if (createSlider("Numbers of Producers", u32, &np.slider)) {
+    if (createSlider("Number of Producers", u32, &np.slider)) {
         const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
         gctx.queue.writeBuffer(
             resource,
@@ -224,7 +280,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
     const nc = &demo.params.num_consumers;
-    if (createSlider("Numbers of Consumers", u32, &nc.slider)) {
+    if (createSlider("Number of Consumers", u32, &nc.slider)) {
         const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
         gctx.queue.writeBuffer(
             resource,
@@ -237,10 +293,8 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             demo.buffers.data.consumers.mapping.num_structs = nc.slider.val;
         } else {
             Consumer.generateBulk(
-                gctx,
-                demo.buffers.data.consumers.buf,
-                &demo.buffers.data.consumers.mapping.num_structs,
-                demo.params.aspect,
+                demo.gctx,
+                &demo.buffers.data.consumers,
                 nc.slider.val - nc.old,
             );
         }
@@ -265,12 +319,19 @@ fn extras(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         gctx.queue.writeBuffer(resource, 0, f32, &.{demo.params.moving_rate.val});
     }
 
-    const cr = &demo.params.consumer_radius;
-    if (createSlider("Consumer Size", f32, cr)) {
+    const cs = &demo.params.consumer_size;
+    if (createSlider("Consumer Size", f32, cs)) {
         demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
             gctx,
-            40,
-            cr.val,
+            Main.NUM_CONSUMER_SIDES,
+            cs.val,
+        );
+    }
+    const ps = &demo.params.producer_size;
+    if (createSlider("Producer Size", f32, ps)) {
+        demo.buffers.vertex.square = Shapes.createSquareVertexBuffer(
+            gctx,
+            ps.val,
         );
     }
 }

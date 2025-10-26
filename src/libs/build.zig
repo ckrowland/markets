@@ -7,6 +7,11 @@ pub fn build(b: *std.Build) void {
     const zgpu = b.dependency("zgpu", .{
         .target = target,
     });
+    const zgui = b.dependency("zgui", .{
+        .target = target,
+        .backend = .glfw_wgpu,
+        .with_implot = true,
+    });
     const zmath = b.dependency("zmath", .{
         .target = target,
     });
@@ -30,6 +35,10 @@ pub fn build(b: *std.Build) void {
                 .name = "zgpu",
                 .module = zgpu.module("root"),
             },
+            .{
+                .name = "zgui",
+                .module = zgui.module("root"),
+            },
         },
         .target = target,
         .optimize = optimize,
@@ -37,6 +46,22 @@ pub fn build(b: *std.Build) void {
 
     const camera = b.addModule("camera", .{
         .root_source_file = b.path("camera.zig"),
+        .imports = &.{
+            .{
+                .name = "zgpu",
+                .module = zgpu.module("root"),
+            },
+            .{
+                .name = "zmath",
+                .module = zmath.module("root"),
+            },
+        },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const wgpu = b.addModule("wgpu", .{
+        .root_source_file = b.path("wgpu.zig"),
         .imports = &.{
             .{
                 .name = "zgpu",
@@ -62,21 +87,9 @@ pub fn build(b: *std.Build) void {
                 .name = "camera",
                 .module = camera,
             },
-        },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const wgpu = b.addModule("wgpu", .{
-        .root_source_file = b.path("wgpu.zig"),
-        .imports = &.{
             .{
-                .name = "zgpu",
-                .module = zgpu.module("root"),
-            },
-            .{
-                .name = "zmath",
-                .module = zmath.module("root"),
+                .name = "wgpu",
+                .module = wgpu,
             },
         },
         .target = target,

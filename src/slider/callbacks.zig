@@ -5,6 +5,18 @@ const Consumer = @import("consumer");
 const Producer = @import("producer");
 const Camera = @import("camera");
 
+pub fn price(args: Wgpu.CallbackArgs(Producer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    var avg: u32 = 0;
+    if (slice) |producers| {
+        for (producers) |p| {
+            avg += p.price;
+        }
+        avg /= @intCast(producers.len);
+    }
+    args.stat_array.append(avg) catch unreachable;
+}
+
 pub fn numTransactions(args: Wgpu.CallbackArgs(u32)) void {
     const slice = args.obj_buf.mapping.staging.slice;
 
@@ -42,18 +54,29 @@ pub fn avgProducerMoney(args: Wgpu.CallbackArgs(Producer)) void {
     args.stat_array.append(avg_money) catch unreachable;
 }
 
-//pub fn producerMitosis(args: Wgpu.CallbackArgs(Producer)) void {
-//    const slice = args.obj_buf.mapping.staging.slice;
-//    if (slice) |producers| {
-//        for (producers) |p| {
-//            if (p.money >= p.max_money) {
-//                const new_p = Producer.
-//                //create new producer
-//                //add to producer buffer
-//            }
-//        }
-//    }
-//}
+pub fn avgConsumerInventory(args: Wgpu.CallbackArgs(Consumer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    var avg_inventory: u32 = 0;
+    if (slice) |consumers| {
+        for (consumers) |c| {
+            avg_inventory += c.inventory;
+        }
+        avg_inventory /= @intCast(consumers.len);
+    }
+    args.stat_array.append(avg_inventory) catch unreachable;
+}
+
+pub fn avgConsumerMoney(args: Wgpu.CallbackArgs(Consumer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    var avg_money: u32 = 0;
+    if (slice) |consumers| {
+        for (consumers) |c| {
+            avg_money += c.money;
+        }
+        avg_money /= @intCast(consumers.len);
+    }
+    args.stat_array.append(avg_money) catch unreachable;
+}
 
 pub fn emptyConsumers(args: Wgpu.CallbackArgs(Consumer)) void {
     const consumers = Wgpu.getMappedData(Consumer, &args.obj_buf.mapping);

@@ -10,8 +10,10 @@ pub fn CallbackArgs(comptime T: type) type {
     return struct {
         gctx: *zgpu.GraphicsContext,
         obj_buf: *ObjectBuffer(T),
+        stat_buf: *ObjectBuffer(u32) = undefined,
         stat_array: *std.ArrayList(u32) = undefined,
         popup_idx: usize = 0,
+        gui_slider: *u32 = undefined,
     };
 }
 

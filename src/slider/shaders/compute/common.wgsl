@@ -1,5 +1,5 @@
 struct Consumer {
-  absolute_home: vec4<i32>,
+  absolute_home: vec4<f32>,
   position: vec4<f32>,
   home: vec4<f32>,
   destination: vec4<f32>,
@@ -9,7 +9,7 @@ struct Consumer {
   money: u32,
   max_money: u32,
   radius: f32,
-  producer_id: i32,
+  producer_id: u32,
   grouping_id: u32,
 }
 
@@ -19,7 +19,7 @@ struct ConsumerParams{
 }
 
 struct Producer {
-  absolute_home: vec4<i32>,
+  absolute_home: vec4<f32>,
   home: vec4<f32>,
   color: vec4<f32>,
   inventory: atomic<u32>,

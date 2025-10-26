@@ -57,7 +57,7 @@
         },
         .zgui = .{
             .url = "https://github.com/ckrowland/zgui/archive/refs/heads/main.tar.gz",
-            .hash = "zgui-0.6.0-dev--L6sZDjZaABKzsEnDUfFIa0a0jGyrxATbbHb-lhO9jP1",
+            .hash = "zgui-0.6.0-dev--L6sZMLaaABWbzdeD13q3NqtucVt5naB12Q6nkm-RXIj",
         },
     },
 }

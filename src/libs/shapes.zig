@@ -25,51 +25,63 @@ pub fn createSquareVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.Bu
     return producer_vertex_buffer;
 }
 
-pub fn createCircleIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_vertices: u32) zgpu.BufferHandle {
-    const num_triangles = num_vertices - 1;
-    const consumer_index_buffer = gctx.createBuffer(.{
+pub fn createMoneyCircleIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_sides: u32) zgpu.BufferHandle {
+    const buf = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .index = true },
-        .size = num_triangles * 3 * @sizeOf(u32),
+        .size = num_sides * 2 * @sizeOf(u32),
     });
 
-    const num_indices = num_triangles * 3;
+    const num_indices = num_sides * 2;
     var indices: [num_indices]u32 = undefined;
-    var i: usize = 0;
-    while (i < num_triangles) {
+    for (0..num_sides) |i| {
+        indices[i * 2] = @as(u32, @intCast(i)) + 1;
+        indices[i * 2 + 1] = @as(u32, @intCast(i)) + 2;
+    }
+    indices[num_indices - 1] = 1;
+    const resource = gctx.lookupResource(buf).?;
+    gctx.queue.writeBuffer(resource, 0, u32, indices[0..]);
+    return buf;
+}
+
+pub fn createCircleIndexBuffer(gctx: *zgpu.GraphicsContext, comptime num_sides: u32) zgpu.BufferHandle {
+    const consumer_index_buffer = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .index = true },
+        .size = num_sides * 3 * @sizeOf(u32),
+    });
+
+    const num_indices = num_sides * 3;
+    var indices: [num_indices]u32 = undefined;
+    for (0..num_sides) |i| {
         indices[i * 3] = 0;
         indices[i * 3 + 1] = @as(u32, @intCast(i)) + 1;
         indices[i * 3 + 2] = @as(u32, @intCast(i)) + 2;
-        i += 1;
     }
     indices[num_indices - 1] = 1;
-
     gctx.queue.writeBuffer(gctx.lookupResource(consumer_index_buffer).?, 0, u32, indices[0..]);
     return consumer_index_buffer;
 }
 
 pub fn createCircleVertexBuffer(
     gctx: *zgpu.GraphicsContext,
-    comptime num_vertices: u32,
+    comptime num_sides: u32,
     radius: f32,
 ) zgpu.BufferHandle {
-    const consumer_vertex_buffer = gctx.createBuffer(.{
+    const buf = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
-        .size = num_vertices * @sizeOf(f32) * 3,
+        .size = (num_sides + 1) * @sizeOf(f32) * 3,
     });
-    var consumer_vertex_data: [num_vertices][3]f32 = undefined;
-    const num_sides = @as(f32, num_vertices - 1);
-    const angle = 2 * std.math.pi / num_sides;
-    consumer_vertex_data[0] = [3]f32{ 0, 0, 0 };
-    var i: u32 = 1;
-    while (i < num_vertices) {
-        const current_angle = angle * @as(f32, @floatFromInt(i));
+    var vertices: [num_sides + 1][3]f32 = undefined;
+    const angle = 2 * std.math.pi / @as(f32, num_sides);
+    vertices[0] = [3]f32{ 0, 0, 0 };
+    for (0..num_sides) |i| {
+        const current_angle = angle * @as(f32, @floatFromInt(i + 1));
         const x = @cos(current_angle) * radius;
         const y = @sin(current_angle) * radius;
-        consumer_vertex_data[i] = [3]f32{ x, y, 0 };
-        i += 1;
+        vertices[i + 1] = [3]f32{ x, y, 0 };
     }
-    gctx.queue.writeBuffer(gctx.lookupResource(consumer_vertex_buffer).?, 0, [3]f32, consumer_vertex_data[0..]);
-    return consumer_vertex_buffer;
+    const resource = gctx.lookupResource(buf).?;
+    gctx.queue.writeBuffer(resource, 0, [3]f32, vertices[0..]);
+    return buf;
 }
 
 pub fn createBarVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32, height: f32) zgpu.BufferHandle {

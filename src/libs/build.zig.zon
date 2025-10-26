@@ -16,5 +16,9 @@
             .url = "https://github.com/zig-gamedev/zgpu/archive/d860e2b4a333cacffb168fab49a233c5d2f1bca2.tar.gz",
             .hash = "zgpu-0.12.0-dev-nqFT5EKgCADkhwAf97_pfSOmPWEguKmljSECs9ihpFS7",
         },
+        .zgui = .{
+            .url = "https://github.com/ckrowland/zgui/archive/refs/heads/main.tar.gz",
+            .hash = "zgui-0.6.0-dev--L6sZMLaaABWbzdeD13q3NqtucVt5naB12Q6nkm-RXIj",
+        },
     },
 }

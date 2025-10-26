@@ -4,3 +4,5 @@ imgui.ini
 zig-out/
 .DS_Store
 apps/
+src/editor/
+src/wave/

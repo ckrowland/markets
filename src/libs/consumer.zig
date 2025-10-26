@@ -2,9 +2,10 @@ const std = @import("std");
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const Camera = @import("camera");
+const Wgpu = @import("wgpu");
 const Self = @This();
 
-absolute_home: [4]i32 = .{ 0, 0, 0, 0 },
+absolute_home: [4]f32 = .{ 0, 0, 0, 0 },
 position: [4]f32 = .{ 0, 0, 0, 0 },
 home: [4]f32 = .{ 0, 0, 0, 0 },
 destination: [4]f32 = .{ 0, 0, 0, 0 },
@@ -13,8 +14,8 @@ step_size: [2]f32 = .{ 0, 0 },
 inventory: u32 = 0,
 money: u32 = 0,
 max_money: u32 = 10000,
-radius: f32 = 20.0,
-producer_id: i32 = -1,
+radius: f32 = 10.0,
+producer_id: u32 = 0,
 grouping_id: u32 = 0,
 
 pub const Params = struct {
@@ -25,34 +26,23 @@ pub const Params = struct {
 pub const z_pos = 0;
 pub fn generateBulk(
     gctx: *zgpu.GraphicsContext,
-    buf: zgpu.BufferHandle,
-    num_structs: *u32,
-    aspect: f32,
+    obj_buf: *Wgpu.ObjectBuffer(Self),
     num: u32,
 ) void {
     for (0..num) |_| {
         const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
         const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
-        const f_x = @as(f32, @floatFromInt(x)) * aspect;
+        const a_x = @as(f32, @floatFromInt(x));
+        const f_x = @as(f32, @floatFromInt(x)) * Camera.getAspectRatio(gctx);
         const f_y = @as(f32, @floatFromInt(y));
-        const home = [4]f32{ f_x, f_y, z_pos, 1 };
-        var consumers: [1]Self = .{
-            .{
-                .absolute_home = .{ x, y, z_pos, 1 },
-                .position = home,
-                .home = home,
-                .destination = home,
-            },
-        };
-
-        const resource = gctx.lookupResource(buf).?;
-        gctx.queue.writeBuffer(
-            resource,
-            num_structs.* * @sizeOf(Self),
-            Self,
-            consumers[0..],
-        );
-        num_structs.* += 1;
+        const grid_pos = [4]f32{ a_x, f_y, z_pos, 1 };
+        const world_pos = [4]f32{ f_x, f_y, z_pos, 1 };
+        obj_buf.append(gctx, .{
+            .absolute_home = grid_pos,
+            .position = world_pos,
+            .home = world_pos,
+            .destination = world_pos,
+        });
     }
 }
 
