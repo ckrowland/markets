@@ -240,6 +240,7 @@ fn buttons(demo: *DemoState) void {
 fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     const producers = demo.buffers.data.producers;
 
+    zgui.bulletText("Producer Settings", .{});
     const np = &demo.params.num_producers;
     if (createSlider("Number of Producers", u32, &np.slider)) {
         const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
@@ -261,6 +262,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
                     .max_inventory = demo.params.max_inventory.val,
                     .production_cost = demo.params.production_cost.val,
                     .price = demo.params.price.val,
+                    .max_money = demo.params.max_producer_money.val,
                 },
             );
         }
@@ -273,12 +275,22 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     }
 
     const price = &demo.params.price;
-    if (createSlider("Price", u32, price)) {
+    if (createSlider("Price Sold", u32, price)) {
         producers.updateU32Field(demo.gctx, price.val, "price");
+    }
+
+    const mpm = &demo.params.max_producer_money;
+    if (createSlider("Max Producer Money", u32, mpm)) {
+        producers.updateU32Field(demo.gctx, mpm.val, "max_money");
+    }
+    const mpi = &demo.params.max_inventory;
+    if (createSlider("Max Inventory", u32, mpi)) {
+        producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
     }
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
+    zgui.bulletText("Consumer Settings", .{});
     const nc = &demo.params.num_consumers;
     if (createSlider("Number of Consumers", u32, &nc.slider)) {
         const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
@@ -296,42 +308,45 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
                 demo.gctx,
                 &demo.buffers.data.consumers,
                 nc.slider.val - nc.old,
+                .{
+                    .income = demo.params.income.val,
+                    .moving_rate = demo.params.moving_rate.val,
+                    .max_money = demo.params.max_consumer_money.val,
+                },
             );
         }
         nc.old = nc.slider.val;
     }
 
-    if (createSlider("Consumer Income", u32, &demo.params.income)) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, 4, u32, &.{demo.params.income.val});
+    const consumers = demo.buffers.data.consumers;
+    const ci = &demo.params.income;
+    if (createSlider("Income", u32, &demo.params.income)) {
+        consumers.updateU32Field(demo.gctx, ci.val, "income");
+    }
+
+    const mcm = &demo.params.max_consumer_money;
+    if (createSlider("Max Consumer Money", u32, mcm)) {
+        consumers.updateU32Field(demo.gctx, mcm.val, "max_money");
+    }
+
+    const mr = &demo.params.moving_rate;
+    if (createSlider("Moving Rate", f32, mr)) {
+        consumers.updateF32Field(demo.gctx, mr.val, "moving_rate");
     }
 }
 
 fn extras(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
-    const producers = demo.buffers.data.producers;
-    const mpi = &demo.params.max_inventory;
-    if (createSlider("Max Producer Inventory", u32, mpi)) {
-        producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
-    }
-
-    if (createSlider("Moving Rate", f32, &demo.params.moving_rate)) {
-        const resource = gctx.lookupResource(demo.buffers.data.consumer_params).?;
-        gctx.queue.writeBuffer(resource, 0, f32, &.{demo.params.moving_rate.val});
-    }
-
     const cs = &demo.params.consumer_size;
-    if (createSlider("Consumer Size", f32, cs)) {
+    if (createSlider("Agent Size", f32, cs)) {
         demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
             gctx,
             Main.NUM_CONSUMER_SIDES,
             cs.val,
         );
-    }
-    const ps = &demo.params.producer_size;
-    if (createSlider("Producer Size", f32, ps)) {
+        demo.params.producer_size.val = demo.params.consumer_size.val;
         demo.buffers.vertex.square = Shapes.createSquareVertexBuffer(
             gctx,
-            ps.val,
+            demo.params.producer_size.val,
         );
     }
 }

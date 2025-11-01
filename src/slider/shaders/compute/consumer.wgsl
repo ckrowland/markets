@@ -11,8 +11,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     }
 
     let c = consumers[index];
-    let moving_rate = consumer_params.moving_rate;
-    let income = consumer_params.income;
+    let moving_rate = c.moving_rate;
+    let income = c.income;
 
     consumers[index].position[0] += c.step_size[0];
     consumers[index].position[1] += c.step_size[1];
@@ -39,58 +39,52 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
         // At Producer
         let pid = c.producer_id;
+        var inv = atomicLoad(&producers[pid].inventory);
         var total_can_buy = c.money / producers[pid].price;
-        if (total_can_buy < 1) {
+        var can_buy = min(inv, total_can_buy);
+        if (can_buy < 1) {
             go_home(index);
             return;
         }
 
-        var inv = atomicLoad(&producers[pid].inventory);
-        if (total_can_buy <= inv) {
-            var result = inv - total_can_buy;
-            var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
-            while (!cmp.exchanged) {
-                if (cmp.old_value < total_can_buy) {
-                    break;
-                }
-                inv = atomicLoad(&producers[pid].inventory);
-                result = inv - total_can_buy;
-                cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
-            }
-            if (cmp.exchanged) {
-                var cost = total_can_buy * producers[pid].price;
-                buy(index, cost, total_can_buy);
-                go_home(index);
-                return;
-            }
-        }
-
-        inv = atomicLoad(&producers[pid].inventory);
-        var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, 0);
+        var result = inv - can_buy;
+        var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         while (!cmp.exchanged) {
             inv = atomicLoad(&producers[pid].inventory);
-            cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, 0);
+            result = inv - can_buy;
+            cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         }
-        let cost = inv * producers[pid].price;
-        buy(index, cost, inv);
+        buy(index, producers[pid].price, can_buy);
+        if (can_buy <= 0) {
+          consumers[index].color = vec4(0.0, 0.0, 1.0, 0.0);
+        }
         go_home(index);
+        return;
     }
 }
 
-fn buy(index: u32, cost: u32, amount: u32) {
+fn buy(index: u32, price: u32, amount: u32) {
+    let cost = price * amount;
     let pid = consumers[index].producer_id;
     consumers[index].money -= cost;
-    producers[pid].money += cost;
     consumers[index].inventory += amount;
     consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
     stats.transactions += u32(1);
+
+    var money = atomicLoad(&producers[pid].money);
+    let mm = producers[pid].max_money;
+    var result = min(mm, money + cost);
+    var cmp = atomicCompareExchangeWeak(&producers[pid].money, money, result);
+    while (!cmp.exchanged) {
+        money = atomicLoad(&producers[pid].money);
+        result = min(mm, money + cost);
+    }
 }
 
 fn go_home(index: u32) {
     let c = consumers[index];
-    let moving_rate = consumer_params.moving_rate;
     consumers[index].destination = c.home;
-    consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, moving_rate);
+    consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, c.moving_rate);
 }
 
 fn search_for_producer(index: u32) {
@@ -106,6 +100,6 @@ fn search_for_producer(index: u32) {
     }
 
     consumers[index].destination = producers[pid].home;
-    consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, consumer_params.moving_rate);
+    consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, c.moving_rate);
     consumers[index].producer_id = pid;
 }

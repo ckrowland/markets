@@ -46,6 +46,22 @@ pub fn ObjectBuffer(comptime T: type) type {
             }
         }
 
+        pub fn updateF32Field(
+            self: ObjectBuffer(T),
+            gctx: *zgpu.GraphicsContext,
+            val: f32,
+            comptime name: [:0]const u8,
+        ) void {
+            for (0..self.mapping.num_structs) |i| {
+                gctx.queue.writeBuffer(
+                    gctx.lookupResource(self.buf).?,
+                    i * @sizeOf(T) + @offsetOf(T, name),
+                    f32,
+                    &.{val},
+                );
+            }
+        }
+
         pub fn append(
             self: *ObjectBuffer(T),
             gctx: *zgpu.GraphicsContext,
@@ -243,6 +259,7 @@ pub fn clearObjBuffer(encoder: wgpu.CommandEncoder, gctx: *Gctx, comptime T: typ
     encoder.clearBuffer(buf, 0, @intCast(buf_info.size));
     encoder.clearBuffer(map_buf, 0, @intCast(map_buf_info.size));
 
+    obj_buf.mapping.requests = undefined;
     obj_buf.mapping.insert_idx = 0;
     obj_buf.mapping.remove_idx = 0;
     obj_buf.mapping.state = .rest;
@@ -320,14 +337,12 @@ pub fn createComputeBindGroupLayout(gctx: *Gctx) zgpu.BindGroupLayoutHandle {
         zgpu.bufferEntry(0, .{ .compute = true }, .storage, false, 0),
         zgpu.bufferEntry(1, .{ .compute = true }, .storage, false, 0),
         zgpu.bufferEntry(2, .{ .compute = true }, .storage, false, 0),
-        zgpu.bufferEntry(3, .{ .compute = true }, .storage, false, 0),
     });
 }
 
 // Bind Groups
 pub const computeBindGroup = struct {
     consumer: zgpu.BufferHandle,
-    consumer_params: zgpu.BufferHandle,
     producer: zgpu.BufferHandle,
     stats: zgpu.BufferHandle,
 };
@@ -337,7 +352,6 @@ pub fn createComputeBindGroup(gctx: *Gctx, args: computeBindGroup) zgpu.BindGrou
     defer gctx.releaseResource(compute_bgl);
 
     const c_info = gctx.lookupResourceInfo(args.consumer) orelse unreachable;
-    const cp_info = gctx.lookupResourceInfo(args.consumer_params) orelse unreachable;
     const p_info = gctx.lookupResourceInfo(args.producer) orelse unreachable;
     const s_info = gctx.lookupResourceInfo(args.stats) orelse unreachable;
 
@@ -350,18 +364,12 @@ pub fn createComputeBindGroup(gctx: *Gctx, args: computeBindGroup) zgpu.BindGrou
         },
         .{
             .binding = 1,
-            .buffer_handle = args.consumer_params,
-            .offset = 0,
-            .size = cp_info.size,
-        },
-        .{
-            .binding = 2,
             .buffer_handle = args.producer,
             .offset = 0,
             .size = p_info.size,
         },
         .{
-            .binding = 3,
+            .binding = 2,
             .buffer_handle = args.stats,
             .offset = 0,
             .size = s_info.size,
@@ -392,7 +400,7 @@ pub const RenderPipelineInfo = struct {
 
 pub fn createRenderPipeline(
     gctx: *zgpu.GraphicsContext,
-    bind_group_layout: zgpu.BindGroupLayoutHandle,
+    bgls: []const zgpu.BindGroupLayoutHandle,
     comptime args: RenderPipelineInfo,
 ) zgpu.RenderPipelineHandle {
     const vs_module = zgpu.createWgslShaderModule(gctx.device, args.vs, "vs");
@@ -459,7 +467,7 @@ pub fn createRenderPipeline(
         },
     };
 
-    const pipeline_layout = gctx.createPipelineLayout(&.{bind_group_layout});
+    const pipeline_layout = gctx.createPipelineLayout(bgls);
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 

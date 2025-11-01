@@ -6,15 +6,15 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     }
     let max_inventory = producers[index].max_inventory;
     let pc = producers[index].production_cost;
+    var money = atomicLoad(&producers[index].money);
 
-    if (pc == 0) {
+    let max_resources_can_produce = u32(money / pc);
+    let inv = atomicLoad(&producers[index].inventory);
+    if (inv > max_inventory) {
         atomicStore(&producers[index].inventory, max_inventory);
         return;
     }
-
-    let max_resources_can_produce = u32(producers[index].money / pc);
-    let inv = atomicLoad(&producers[index].inventory);
     let rate = min(max_resources_can_produce, max_inventory - inv);
     atomicAdd(&producers[index].inventory, rate);
-    producers[index].money -= rate * producers[index].production_cost;
+    atomicSub(&producers[index].money, rate * pc);
 }

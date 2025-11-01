@@ -11,7 +11,7 @@ color: [4]f32 = .{ 1, 1, 1, 0 },
 inventory: u32 = 5000,
 max_inventory: u32,
 money: u32 = 5000,
-max_money: u32 = 10000,
+max_money: u32,
 price: u32,
 production_cost: u32,
 _padding1: u32 = 0,
@@ -38,6 +38,7 @@ pub fn generateBulk(
             .max_inventory = p.max_inventory,
             .production_cost = p.production_cost,
             .price = p.price,
+            .max_money = p.max_money,
         });
     }
 }

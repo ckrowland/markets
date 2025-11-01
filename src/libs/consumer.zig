@@ -13,21 +13,21 @@ color: [4]f32 = .{ 1, 0, 0, 0 },
 step_size: [2]f32 = .{ 0, 0 },
 inventory: u32 = 0,
 money: u32 = 0,
-max_money: u32 = 10000,
-radius: f32 = 10.0,
+max_money: u32,
+income: u32,
+moving_rate: f32,
 producer_id: u32 = 0,
 grouping_id: u32 = 0,
-
-pub const Params = struct {
-    moving_rate: f32 = 0,
-    income: u32 = 0,
-};
+_padding0: u32 = 0,
+_padding1: u32 = 0,
+_padding2: u32 = 0,
 
 pub const z_pos = 0;
 pub fn generateBulk(
     gctx: *zgpu.GraphicsContext,
     obj_buf: *Wgpu.ObjectBuffer(Self),
     num: u32,
+    params: Self,
 ) void {
     for (0..num) |_| {
         const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
@@ -42,6 +42,9 @@ pub fn generateBulk(
             .position = world_pos,
             .home = world_pos,
             .destination = world_pos,
+            .moving_rate = params.moving_rate,
+            .income = params.income,
+            .max_money = params.max_money,
         });
     }
 }
@@ -65,7 +68,6 @@ pub fn createAndAppend(
         .home = home,
         .destination = home,
         .color = consumer.color,
-        .radius = consumer.radius,
         .grouping_id = consumer.grouping_id,
     };
     const resource = gctx.lookupResource(buf).?;
@@ -76,15 +78,4 @@ pub fn createAndAppend(
         &.{c},
     );
     num_structs.* += 1;
-}
-
-pub fn setParamsBuf(
-    gctx: *zgpu.GraphicsContext,
-    buf: zgpu.BufferHandle,
-    mr: f32,
-    mdr: u32,
-) void {
-    const r = gctx.lookupResource(buf).?;
-    gctx.queue.writeBuffer(r, 0, f32, &.{mr});
-    gctx.queue.writeBuffer(r, 4, u32, &.{mdr});
 }
