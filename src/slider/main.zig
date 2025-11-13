@@ -22,6 +22,7 @@ pub fn Slider(comptime T: type) type {
         val: T,
         min: T,
         max: T,
+        help: [:0]const u8 = "",
     };
 }
 
@@ -38,21 +39,31 @@ pub const Parameters = struct {
         .min = 1,
         .val = 1,
         .max = 5,
+        .help = "The amount of money a Producer is required to spend to create a resource.",
     },
     price: Slider(u32) = Slider(u32){
         .min = 1,
         .val = 2,
         .max = 5,
+        .help = "The amount of money a consumer must spend to purchase a resource.",
     },
     max_inventory: Slider(u32) = Slider(u32){
         .min = 5000,
         .val = 5000,
         .max = 10000,
+        .help = "The maximum amount of resources a Producer can hold.",
     },
     max_producer_money: Slider(u32) = Slider(u32){
         .min = 5000,
         .val = 40000,
         .max = 80000,
+        .help = "The maximum amount of money a Producer can hold.",
+    },
+    decay_rate: Slider(u32) = Slider(u32){
+        .min = 0,
+        .val = 10,
+        .max = 100,
+        .help = "The amount of inventory that spoils in a Producers inventory every frame.",
     },
 
     num_consumers: struct {
@@ -67,16 +78,18 @@ pub const Parameters = struct {
         .min = 0,
         .val = 20,
         .max = 20,
+        .help = "The amount of money a consumer receives every frame.",
     },
     max_consumer_money: Slider(u32) = Slider(u32){
         .min = 5000,
         .val = 10000,
         .max = 20000,
+        .help = "The maximum amount of money a Consumer can hold.",
     },
     moving_rate: Slider(f32) = Slider(f32){
         .min = 1,
-        .val = 10,
-        .max = 100,
+        .val = 8,
+        .max = 50,
     },
     consumer_size: Slider(f32) = Slider(f32){
         .min = 1,
@@ -86,7 +99,7 @@ pub const Parameters = struct {
     producer_size: Slider(f32) = Slider(f32){
         .min = 1,
         .val = 5,
-        .max = 10,
+        .max = 20,
     },
     num_consumer_sides: u32 = 20,
     aspect: f32,
@@ -95,12 +108,13 @@ pub const Parameters = struct {
 pub const DemoState = struct {
     gctx: *zgpu.GraphicsContext,
     window: *zglfw.Window,
+    imgui_windows: struct {
+        sliders: gui.Window,
+        statistics: gui.Window,
+        help: gui.Window,
+    },
     allocator: std.mem.Allocator,
     running: bool = false,
-    stats_page: struct {
-        val: bool = false,
-        change: bool = false,
-    } = .{},
     content_scale: f32,
     render_pipelines: struct {
         consumer: struct {
@@ -162,11 +176,6 @@ pub fn updateAndRender(demo: *DemoState) !void {
     gui.update(demo);
     draw(demo);
     demo.window.swapBuffers();
-}
-
-pub fn setImguiContentScale(scale: f32) void {
-    zgui.getStyle().* = zgui.Style.init();
-    zgui.getStyle().scaleAllSizes(scale);
 }
 
 pub fn getContentScale(window: *zglfw.Window) f32 {
@@ -232,6 +241,40 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         @intFromEnum(wgpu.TextureFormat.undef),
     );
 
+    const dark_grey = .{ 0.2, 0.2, 0.2, 1 };
+    const medium_grey = .{ 0.4, 0.4, 0.4, 1 };
+    const light_grey = .{ 0.6, 0.6, 0.6, 1 };
+    const white = .{ 1, 1, 1, 1 };
+
+    zgui.getStyle().*.setColor(.separator, dark_grey);
+    zgui.getStyle().*.setColor(.separator_active, light_grey);
+    zgui.getStyle().*.setColor(.separator_hovered, medium_grey);
+
+    zgui.getStyle().*.setColor(.resize_grip, dark_grey);
+    zgui.getStyle().*.setColor(.resize_grip_active, dark_grey);
+    zgui.getStyle().*.setColor(.resize_grip_hovered, dark_grey);
+
+    zgui.getStyle().*.setColor(.frame_bg, dark_grey);
+    zgui.getStyle().*.setColor(.frame_bg_active, medium_grey);
+    zgui.getStyle().*.setColor(.frame_bg_hovered, medium_grey);
+
+    zgui.getStyle().*.setColor(.slider_grab, light_grey);
+    zgui.getStyle().*.setColor(.slider_grab_active, light_grey);
+
+    zgui.getStyle().*.setColor(.tab, dark_grey);
+    zgui.getStyle().*.setColor(.tab_hovered, medium_grey);
+    zgui.getStyle().*.setColor(.tab_selected, medium_grey);
+
+    zgui.getStyle().*.setColor(.button, dark_grey);
+    zgui.getStyle().*.setColor(.button_hovered, medium_grey);
+    zgui.getStyle().*.setColor(.button_active, light_grey);
+
+    zgui.getStyle().*.setColor(.title_bg, dark_grey);
+    zgui.getStyle().*.setColor(.title_bg_active, medium_grey);
+    zgui.getStyle().*.setColor(.title_bg_collapsed, dark_grey);
+
+    zgui.plot.getStyle().*.setColor(.line, white);
+
     const params = Parameters{
         .aspect = Camera.getAspectRatio(gctx),
         .num_producers = .{},
@@ -260,6 +303,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
             .production_cost = params.production_cost.val,
             .price = params.price.val,
             .max_money = params.max_producer_money.val,
+            .decay_rate = params.decay_rate.val,
         },
     );
 
@@ -308,6 +352,32 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
     return DemoState{
         .gctx = gctx,
         .window = window,
+        .imgui_windows = .{
+            .sliders = gui.Window{
+                .pos = .{ .x = 0, .y = 0 },
+                .size = .{ .x = 0.2, .y = 1 },
+                .window_fn = &gui.settings,
+                .window_flags = .{
+                    .no_move = true,
+                    .no_title_bar = true,
+                    .no_resize = true,
+                    .no_scrollbar = true,
+                    .no_collapse = true,
+                },
+            },
+            .statistics = gui.Window{
+                .pos = .{ .x = 0.2, .y = 0, .margin = .{ .left = false } },
+                .size = .{ .x = 0.8, .y = 1, .margin = .{ .right = false } },
+                .window_fn = &gui.plots,
+                .p_open = false,
+            },
+            .help = gui.Window{
+                .pos = .{ .x = 0.2, .y = 0, .margin = .{ .left = false } },
+                .size = .{ .x = 0.8, .y = 1, .margin = .{ .right = false } },
+                .window_fn = &gui.help,
+                .p_open = false,
+            },
+        },
         .content_scale = getContentScale(window),
         .render_pipelines = .{
             .consumer = .{
@@ -540,19 +610,19 @@ pub fn draw(demo: *DemoState) void {
             price.slice[0] = demo.params.price.val;
             pass.setBindGroup(1, price_bg, &.{price.offset});
 
-            const num_circle_indices: u32 = @intCast(cib_info.size / 4);
-            pass.setPipeline(circle_rp);
-            pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
-            pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
-            pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
-            pass.drawIndexed(num_circle_indices, num_consumers, 0, 0, 0);
-
             const num_money_circle_indices: u32 = @intCast(mcib_info.size / 4);
             pass.setPipeline(c_money_circle_rp);
             pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
             pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
             pass.setIndexBuffer(mcib_info.gpuobj.?, .uint32, 0, mcib_info.size);
             pass.drawIndexed(num_money_circle_indices, num_consumers, 0, 0, 0);
+
+            const num_circle_indices: u32 = @intCast(cib_info.size / 4);
+            pass.setPipeline(circle_rp);
+            pass.setVertexBuffer(0, cvb_info.gpuobj.?, 0, cvb_info.size);
+            pass.setVertexBuffer(1, cb_info.gpuobj.?, 0, cb_info.size);
+            pass.setIndexBuffer(cib_info.gpuobj.?, .uint32, 0, cib_info.size);
+            pass.drawIndexed(num_circle_indices, num_consumers, 0, 0, 0);
 
             var pc = gctx.uniformsAllocate(u32, 1);
             pc.slice[0] = demo.params.production_cost.val;
@@ -594,7 +664,6 @@ pub fn draw(demo: *DemoState) void {
 
     if (demo.gctx.present() == .swap_chain_resized) {
         demo.content_scale = getContentScale(demo.window);
-        zgui.getStyle().* = zgui.Style.init();
         zgui.getStyle().scaleAllSizes(demo.content_scale);
         updateAspectRatio(demo);
     }
@@ -628,6 +697,7 @@ pub fn restartSimulation(demo: *DemoState) void {
             .production_cost = demo.params.production_cost.val,
             .price = demo.params.price.val,
             .max_money = demo.params.max_producer_money.val,
+            .decay_rate = demo.params.decay_rate.val,
         },
     );
 
@@ -669,6 +739,9 @@ pub fn updateAspectRatio(demo: *DemoState) void {
         .obj_buf = &demo.buffers.data.producers,
     });
     demo.params.aspect = Camera.getAspectRatio(demo.gctx);
+    demo.imgui_windows.sliders.change = true;
+    demo.imgui_windows.statistics.change = true;
+    demo.imgui_windows.help.change = true;
 }
 
 pub fn main() !void {

@@ -32,7 +32,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
                 consumers[index].inventory -= 1;
                 return;
             }
-            consumers[index].color = vec4(1.0, 0.0, 0.0, 0.0);
+            consumers[index].color = red;
             search_for_producer(index);
             return;
         }
@@ -43,7 +43,7 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var total_can_buy = c.money / producers[pid].price;
         var can_buy = min(inv, total_can_buy);
         if (can_buy < 1) {
-            go_home(index);
+            //go_home(index);
             return;
         }
 
@@ -51,13 +51,11 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         while (!cmp.exchanged) {
             inv = atomicLoad(&producers[pid].inventory);
+            can_buy = min(inv, total_can_buy);
             result = inv - can_buy;
             cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         }
         buy(index, producers[pid].price, can_buy);
-        if (can_buy <= 0) {
-          consumers[index].color = vec4(0.0, 0.0, 1.0, 0.0);
-        }
         go_home(index);
         return;
     }
@@ -68,17 +66,9 @@ fn buy(index: u32, price: u32, amount: u32) {
     let pid = consumers[index].producer_id;
     consumers[index].money -= cost;
     consumers[index].inventory += amount;
-    consumers[index].color = vec4(0.0, 1.0, 0.0, 0.0);
+    consumers[index].color = green;
     stats.transactions += u32(1);
-
-    var money = atomicLoad(&producers[pid].money);
-    let mm = producers[pid].max_money;
-    var result = min(mm, money + cost);
-    var cmp = atomicCompareExchangeWeak(&producers[pid].money, money, result);
-    while (!cmp.exchanged) {
-        money = atomicLoad(&producers[pid].money);
-        result = min(mm, money + cost);
-    }
+    atomicAdd(&producers[pid].money, cost);
 }
 
 fn go_home(index: u32) {

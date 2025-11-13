@@ -24,6 +24,7 @@ struct Producer {
   max_money: u32,
   price: u32,
   production_cost: u32,
+  decay_rate: u32,
 }
 
 struct Stats {
@@ -33,6 +34,9 @@ struct Stats {
   num_consumer_hovers: u32,
   random_color: vec4<f32>,
 }
+
+const red = vec4(0.9, 0.0, 0.0, 0.0);
+const green = vec4(0.0, 0.7, 0.0, 0.0);
 
 @group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
 @group(0) @binding(1) var<storage, read_write> producers: array<Producer>;

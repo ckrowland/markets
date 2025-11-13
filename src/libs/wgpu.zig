@@ -124,7 +124,10 @@ pub fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
             const usb = @as(*StagingBuffer(T), @ptrCast(@alignCast(userdata)));
             std.debug.assert(usb.slice == null);
             if (status == .success) {
-                usb.slice = usb.buffer.getConstMappedRange(T, 0, usb.num_structs).?;
+                const ptr = usb.buffer.getConstMappedRange(T, 0, usb.num_structs);
+                if (ptr) |p| {
+                    usb.slice = p;
+                }
             } else {
                 std.log.err("[zgpu] Failed to map buffer (code: {any})\n", .{status});
             }

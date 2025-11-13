@@ -11,45 +11,58 @@ const Producer = @import("producer");
 const Wgpu = @import("wgpu");
 const Callbacks = @import("callbacks.zig");
 
-pub fn update(demo: *DemoState) void {
-    const sd = demo.gctx.swapchain_descriptor;
-    Gui.setupWindowPos(sd, .{ .x = 0, .y = 0 });
-    Gui.setupWindowSize(sd, .{ .x = 0.2, .y = 1 });
-    const flags = zgui.WindowFlags.no_decoration;
-    if (zgui.begin("0", .{ .flags = flags })) {
-        defer zgui.end();
-        zgui.pushIntId(2);
-        settings(demo, demo.gctx);
-        zgui.popId();
-    }
+pub const Window = struct {
+    pos: Gui.Pos,
+    size: Gui.Pos,
+    set_window: bool = true,
+    p_open: bool = true,
+    change: bool = false,
+    window_fn: *const fn (demo: *DemoState) void,
+    window_flags: zgui.WindowFlags = .{},
+};
 
-    //zgui.plot.showDemoWindow(null);
-    Gui.setupWindowPos(sd, .{ .x = 0.2, .y = 0, .margin = .{ .left = false } });
-    Gui.setupWindowSize(sd, .{ .x = 0.8, .y = 1, .margin = .{ .right = false } });
-    if (demo.stats_page.val and demo.stats_page.change) {
-        demo.stats_page.change = false;
+fn displayImguiWindow(demo: *DemoState, window: *Window) void {
+    //Make see through
+    //zgui.setNextWindowBgAlpha(.{ .alpha = 0 });
+    //zgui.pushStyleColor1u(.{ .idx = .frame_bg, .c = 0 });
+    //zgui.pushStyleColor1u(.{ .idx = .window_bg, .c = 0 });
+    //defer zgui.popStyleColor(.{});
+    //defer zgui.popStyleColor(.{});
+    if (window.p_open and window.change) {
+        window.change = false;
+        const sd = demo.gctx.swapchain_descriptor;
+        Gui.setupWindowPos(sd, window.pos);
+        Gui.setupWindowSize(sd, window.size);
     }
-    if (demo.stats_page.val) {
-        //zgui.setNextWindowBgAlpha(.{ .alpha = 0 });
-        //zgui.pushStyleColor1u(.{ .idx = .frame_bg, .c = 0 });
-        //zgui.pushStyleColor1u(.{ .idx = .window_bg, .c = 0 });
-        //defer zgui.popStyleColor(.{});
-        //defer zgui.popStyleColor(.{});
-        if (zgui.begin("Statistics", .{ .popen = &demo.stats_page.val })) {
-            zgui.pushIntId(3);
-            plots(demo);
-            zgui.popId();
+    if (window.p_open) {
+        var buf: [100]u8 = undefined;
+        const window_id = std.fmt.bufPrintZ(buf[0..], "##{any}", .{window.window_fn}) catch unreachable;
+        //std.log.debug("{any}", .{window_id});
+        if (zgui.begin(window_id, .{
+            .flags = window.window_flags,
+            .popen = &window.p_open,
+        })) {
+            //zgui.pushIntId(2);
+            window.window_fn(demo);
+            //zgui.popId();
         }
-        defer zgui.end();
+        zgui.end();
     }
+}
+
+pub fn update(demo: *DemoState) void {
+    //zgui.showDemoWindow(null);
+    displayImguiWindow(demo, &demo.imgui_windows.sliders);
+    displayImguiWindow(demo, &demo.imgui_windows.statistics);
+    displayImguiWindow(demo, &demo.imgui_windows.help);
 
     Wgpu.checkObjBufState(u32, &demo.stats.obj_buf.mapping);
     Wgpu.checkObjBufState(Producer, &demo.buffers.data.producers.mapping);
     Wgpu.checkObjBufState(Consumer, &demo.buffers.data.consumers.mapping);
 
     if (demo.running) {
-        //gctx.queue.writeBuffer(
-        //    gctx.lookupResource(demo.stats.obj_buf.buf).?,
+        //demo.gctx.queue.writeBuffer(
+        //    demo.gctx.lookupResource(demo.stats.obj_buf.buf).?,
         //    3 * @sizeOf(u32),
         //    f32,
         //    &.{ random.float(f32), random.float(f32), random.float(f32) },
@@ -97,38 +110,19 @@ pub fn update(demo: *DemoState) void {
     }
 }
 
-fn plots(demo: *DemoState) void {
+pub fn plots(demo: *DemoState) void {
     if (zgui.button("Hide Statistics", .{})) {
-        demo.stats_page.val = !demo.stats_page.val;
-        if (demo.stats_page.val) {
-            demo.stats_page.change = true;
+        demo.imgui_windows.statistics.p_open = !demo.imgui_windows.statistics.p_open;
+        if (demo.imgui_windows.statistics.p_open) {
+            demo.imgui_windows.statistics.change = true;
         }
     }
 
-    if (zgui.button("Start", .{})) {
-        demo.running = true;
-    }
-    zgui.sameLine(.{});
-    if (zgui.button("Stop", .{})) {
-        demo.running = false;
-    }
-    zgui.sameLine(.{});
-    if (zgui.button("Restart", .{})) {
-        demo.running = true;
-        Main.restartSimulation(demo);
-    }
-    zgui.sameLine(.{});
-    if (zgui.button("Supply Shock", .{})) {
-        const producers = demo.buffers.data.producers;
-        producers.updateU32Field(demo.gctx, 0, "inventory");
-    }
-
-    if (zgui.beginTable("Stats", .{ .column = 3 })) {
+    if (zgui.beginTable("Stats", .{ .column = 2 })) {
         defer zgui.endTable();
 
-        zgui.tableSetupColumn("Statistic", .{ .flags = .{ .width_fixed = true }, .init_width_or_height = 150 });
         zgui.tableSetupColumn("Value", .{ .flags = .{ .width_fixed = true }, .init_width_or_height = 60 });
-        zgui.tableSetupColumn("Plot", .{});
+        zgui.tableSetupColumn("Plot", .{ .flags = .{} });
         zgui.tableHeadersRow();
         plotRow("Price", &demo.stats.price);
         plotRow("Num Transactions", &demo.stats.num_transactions);
@@ -143,10 +137,10 @@ fn plots(demo: *DemoState) void {
 fn plotRow(comptime str: [:0]const u8, arr: *std.ArrayList(u32)) void {
     zgui.tableNextRow(.{});
     _ = zgui.tableSetColumnIndex(0);
-    zgui.text(str, .{});
-    _ = zgui.tableSetColumnIndex(1);
+    //zgui.text(str, .{});
     zgui.text("{any}", .{arr.getLastOrNull()});
-    _ = zgui.tableSetColumnIndex(2);
+    _ = zgui.tableSetColumnIndex(1);
+    //_ = zgui.tableSetColumnIndex(2);
 
     if (zgui.plot.beginPlot("##" ++ str, .{
         .h = 150,
@@ -171,7 +165,16 @@ fn createSlider(
     T: type,
     slider: *Main.Slider(T),
 ) bool {
-    zgui.text(name, .{});
+    zgui.textWrapped(name, .{});
+    if (!std.mem.eql(u8, "", slider.help)) {
+        zgui.sameLine(.{});
+        zgui.textDisabled("(?)", .{});
+        if (zgui.isItemHovered(.{})) {
+            _ = zgui.beginTooltip();
+            zgui.textUnformatted(slider.help);
+            zgui.endTooltip();
+        }
+    }
     return zgui.sliderScalar(
         "##" ++ name,
         T,
@@ -183,7 +186,7 @@ fn createSlider(
     );
 }
 
-fn settings(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+pub fn settings(demo: *DemoState) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
     zgui.text("  {d:.1} fps", .{demo.gctx.stats.fps});
 
@@ -191,12 +194,12 @@ fn settings(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
         defer zgui.endTabBar();
         if (zgui.beginTabItem("Parameters", .{})) {
             defer zgui.endTabItem();
-            parameters(demo, gctx);
-            extras(demo, gctx);
+            parameters(demo);
+            extras(demo);
         }
         if (zgui.beginTabItem("Extras", .{})) {
             defer zgui.endTabItem();
-            extras(demo, gctx);
+            extras(demo);
         }
         zgui.dummy(.{ .w = 1.0, .h = 20.0 });
         buttons(demo);
@@ -211,7 +214,6 @@ fn buttons(demo: *DemoState) void {
     if (zgui.button("Stop", .{})) {
         demo.running = false;
     }
-    zgui.sameLine(.{});
     if (zgui.button("Restart", .{})) {
         demo.running = true;
         Main.restartSimulation(demo);
@@ -230,21 +232,28 @@ fn buttons(demo: *DemoState) void {
     }
 
     if (zgui.button("Statistics Page", .{})) {
-        demo.stats_page.val = !demo.stats_page.val;
-        if (demo.stats_page.val) {
-            demo.stats_page.change = true;
+        demo.imgui_windows.statistics.p_open = !demo.imgui_windows.statistics.p_open;
+        if (demo.imgui_windows.statistics.p_open) {
+            demo.imgui_windows.statistics.change = true;
+        }
+    }
+
+    if (zgui.button("Help Page", .{})) {
+        demo.imgui_windows.help.p_open = !demo.imgui_windows.help.p_open;
+        if (demo.imgui_windows.help.p_open) {
+            demo.imgui_windows.help.change = true;
         }
     }
 }
 
-fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+fn parameters(demo: *DemoState) void {
     const producers = demo.buffers.data.producers;
 
-    zgui.bulletText("Producer Settings", .{});
+    zgui.text("Producer Settings", .{});
     const np = &demo.params.num_producers;
     if (createSlider("Number of Producers", u32, &np.slider)) {
-        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        gctx.queue.writeBuffer(
+        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        demo.gctx.queue.writeBuffer(
             resource,
             2 * @sizeOf(u32),
             u32,
@@ -255,7 +264,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
             demo.buffers.data.producers.mapping.num_structs = np.slider.val;
         } else {
             Producer.generateBulk(
-                gctx,
+                demo.gctx,
                 &demo.buffers.data.producers,
                 np.slider.val - np.old,
                 .{
@@ -263,6 +272,7 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
                     .production_cost = demo.params.production_cost.val,
                     .price = demo.params.price.val,
                     .max_money = demo.params.max_producer_money.val,
+                    .decay_rate = demo.params.decay_rate.val,
                 },
             );
         }
@@ -287,14 +297,18 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     if (createSlider("Max Inventory", u32, mpi)) {
         producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
     }
+    const dr = &demo.params.decay_rate;
+    if (createSlider("Decay Rate", u32, dr)) {
+        producers.updateU32Field(demo.gctx, dr.val, "decay_rate");
+    }
 
     zgui.dummy(.{ .w = 1.0, .h = 40.0 });
 
-    zgui.bulletText("Consumer Settings", .{});
+    zgui.text("Consumer Settings", .{});
     const nc = &demo.params.num_consumers;
     if (createSlider("Number of Consumers", u32, &nc.slider)) {
-        const resource = gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        gctx.queue.writeBuffer(
+        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        demo.gctx.queue.writeBuffer(
             resource,
             @sizeOf(u32),
             u32,
@@ -335,18 +349,48 @@ fn parameters(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
     }
 }
 
-fn extras(demo: *DemoState, gctx: *zgpu.GraphicsContext) void {
+fn extras(demo: *DemoState) void {
     const cs = &demo.params.consumer_size;
     if (createSlider("Agent Size", f32, cs)) {
         demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
-            gctx,
+            demo.gctx,
             Main.NUM_CONSUMER_SIDES,
             cs.val,
         );
         demo.params.producer_size.val = demo.params.consumer_size.val;
         demo.buffers.vertex.square = Shapes.createSquareVertexBuffer(
-            gctx,
+            demo.gctx,
             demo.params.producer_size.val,
         );
     }
+}
+
+pub fn help(demo: *DemoState) void {
+    if (zgui.button("Close Page", .{})) {
+        demo.imgui_windows.help.p_open = !demo.imgui_windows.help.p_open;
+        if (demo.imgui_windows.help.p_open) {
+            demo.imgui_windows.help.change = true;
+        }
+    }
+    zgui.bulletText("Welcome to Economic Visuals!", .{});
+    zgui.text("", .{});
+    zgui.bulletText("This simulation has two basic agents: Consumers and Producers.", .{});
+    zgui.bulletText("Consumers are the circles. Producers are the squares.", .{});
+    zgui.bulletText("Producers create resources and Consumers consume these resources.", .{});
+    zgui.bulletText("The size of both Producers and Consumers grows to show how many resources they currently have.", .{});
+    zgui.bulletText("This is called their inventory.", .{});
+    zgui.bulletText("Whenever Consumers are empty they travel to a Producer and try to buy more resources before returning home.", .{});
+    zgui.bulletText("When Consumers have no inventory they turn red, otherwise they are green.", .{});
+    zgui.text("", .{});
+    zgui.bulletText("Consumers and Producers both have money in this simulation.", .{});
+    zgui.bulletText("Consumers have a constant income.", .{});
+    zgui.bulletText("Producers only receive money when a consumer buys from them.", .{});
+    zgui.bulletText("You can control the price at which this transaction occurs via the Price Sold slider.", .{});
+    zgui.bulletText("Producers must use their money to produce resources at the current Production Cost.", .{});
+    zgui.text("", .{});
+    zgui.bulletText("The grey circle around a consumer shows how much it could buy right now at the current price.", .{});
+    zgui.bulletText("The white square around a producer shows how much it could produce at the current production cost.", .{});
+    zgui.text("", .{});
+    zgui.bulletText("This simulation is still rather basic.", .{});
+    zgui.bulletText("If you have any suggestions, I'd love to hear them!", .{});
 }

@@ -16,5 +16,13 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     }
     let rate = min(max_resources_can_produce, max_inventory - inv);
     atomicAdd(&producers[index].inventory, rate);
+
     atomicSub(&producers[index].money, rate * pc);
+    money = atomicLoad(&producers[index].money);
+    if (money > producers[index].max_money) {
+        atomicStore(&producers[index].money, producers[index].max_money);
+    }
+
+    // Can we sub beyond 0 on a u32?
+    atomicSub(&producers[index].inventory, producers[index].decay_rate);
 }

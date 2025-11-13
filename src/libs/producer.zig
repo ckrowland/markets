@@ -14,8 +14,8 @@ money: u32 = 5000,
 max_money: u32,
 price: u32,
 production_cost: u32,
+decay_rate: u32,
 _padding1: u32 = 0,
-_padding2: u32 = 0,
 
 pub const z_pos = 0;
 pub fn generateBulk(
@@ -39,6 +39,7 @@ pub fn generateBulk(
             .production_cost = p.production_cost,
             .price = p.price,
             .max_money = p.max_money,
+            .decay_rate = p.decay_rate,
         });
     }
 }
