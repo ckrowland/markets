@@ -6,52 +6,29 @@ const Options = struct {
     target: std.Build.ResolvedTarget,
 };
 
-const Demo = struct {
-    name: []const u8,
-    native: [:0]const u8,
-};
-
-pub const Demos = [_]Demo{
-    Demo{
-        .name = "slider",
-        .native = "src/slider/main.zig",
-    },
-    Demo{
-        .name = "editor",
-        .native = "src/editor/main.zig",
-    },
-    Demo{
-        .name = "wave",
-        .native = "src/wave/main.zig",
-    },
-};
-
 pub fn build(b: *std.Build) !void {
     const options = Options{
         .optimize = b.standardOptimizeOption(.{}),
         .target = b.standardTargetOptions(.{}),
     };
 
-    inline for (Demos) |d| {
-        const exe = buildNative(b, d.native, options);
+    const exe = buildNative(b, "src/main.zig", options);
 
-        // TODO: Problems with LTO on Windows.
-        if (exe.rootModuleTarget().os.tag == .windows) {
-            exe.want_lto = false;
-        }
-
-        if (exe.root_module.optimize == .ReleaseFast) {
-            exe.root_module.strip = true;
-        }
-
-        const install_exe = b.addInstallArtifact(exe, .{});
-        b.getInstallStep().dependOn(&install_exe.step);
-        b.step(d.name, "Build '" ++ d.name ++ "' demo").dependOn(&install_exe.step);
-
-        const run_cmd = b.addRunArtifact(exe);
-        run_cmd.step.dependOn(&install_exe.step);
-        b.step(d.name ++ "-run", "Run '" ++ d.name ++ "' demo").dependOn(&run_cmd.step);
+    // TODO: Problems with LTO on Windows.
+    if (exe.rootModuleTarget().os.tag == .windows) {
+        exe.want_lto = false;
     }
+
+    if (exe.root_module.optimize == .ReleaseFast) {
+        exe.root_module.strip = true;
+    }
+
+    const install_exe = b.addInstallArtifact(exe, .{});
+    b.getInstallStep().dependOn(&install_exe.step);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(&install_exe.step);
+    b.step("run", "Run demo").dependOn(&run_cmd.step);
 }
 
 pub fn buildNative(
@@ -60,20 +37,11 @@ pub fn buildNative(
     options: anytype,
 ) *std.Build.Step.Compile {
     const exe = b.addExecutable(.{
-        .name = "Simulations",
+        .name = "exe",
         .root_source_file = b.path(root_source_file),
         .target = options.target,
         .optimize = options.optimize,
     });
-
-    const my_libs = b.dependency("my_libs", .{ .target = options.target });
-    exe.root_module.addImport("shapes", my_libs.module("shapes"));
-    exe.root_module.addImport("gui", my_libs.module("gui"));
-    exe.root_module.addImport("camera", my_libs.module("camera"));
-    exe.root_module.addImport("statistics", my_libs.module("statistics"));
-    exe.root_module.addImport("consumer", my_libs.module("consumer"));
-    exe.root_module.addImport("producer", my_libs.module("producer"));
-    exe.root_module.addImport("wgpu", my_libs.module("wgpu"));
 
     const zglfw = b.dependency("zglfw", .{
         .target = options.target,

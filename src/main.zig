@@ -6,11 +6,11 @@ const zgui = @import("zgui");
 const zm = @import("zmath");
 const Callbacks = @import("callbacks.zig");
 const gui = @import("gui.zig");
-const Wgpu = @import("wgpu");
-const Consumer = @import("consumer");
-const Producer = @import("producer");
-const Camera = @import("camera");
-const Shapes = @import("shapes");
+const Wgpu = @import("libs/wgpu.zig");
+const Consumer = @import("libs/consumer.zig");
+const Producer = @import("libs/producer.zig");
+const Camera = @import("libs/camera.zig");
+const Shapes = @import("libs/shapes.zig");
 
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;

@@ -2,13 +2,13 @@ const std = @import("std");
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
-const Shapes = @import("shapes");
-const Gui = @import("gui");
+const Shapes = @import("libs/shapes.zig");
+const Gui = @import("libs/gui_windows.zig");
 const Main = @import("main.zig");
 const DemoState = Main.DemoState;
-const Consumer = @import("consumer");
-const Producer = @import("producer");
-const Wgpu = @import("wgpu");
+const Consumer = @import("libs/consumer.zig");
+const Producer = @import("libs/producer.zig");
+const Wgpu = @import("libs/wgpu.zig");
 const Callbacks = @import("callbacks.zig");
 
 pub const Window = struct {
@@ -37,14 +37,11 @@ fn displayImguiWindow(demo: *DemoState, window: *Window) void {
     if (window.p_open) {
         var buf: [100]u8 = undefined;
         const window_id = std.fmt.bufPrintZ(buf[0..], "##{any}", .{window.window_fn}) catch unreachable;
-        //std.log.debug("{any}", .{window_id});
         if (zgui.begin(window_id, .{
             .flags = window.window_flags,
             .popen = &window.p_open,
         })) {
-            //zgui.pushIntId(2);
             window.window_fn(demo);
-            //zgui.popId();
         }
         zgui.end();
     }
@@ -137,11 +134,8 @@ pub fn plots(demo: *DemoState) void {
 fn plotRow(comptime str: [:0]const u8, arr: *std.ArrayList(u32)) void {
     zgui.tableNextRow(.{});
     _ = zgui.tableSetColumnIndex(0);
-    //zgui.text(str, .{});
     zgui.text("{any}", .{arr.getLastOrNull()});
     _ = zgui.tableSetColumnIndex(1);
-    //_ = zgui.tableSetColumnIndex(2);
-
     if (zgui.plot.beginPlot("##" ++ str, .{
         .h = 150,
     })) {
@@ -192,10 +186,9 @@ pub fn settings(demo: *DemoState) void {
 
     if (zgui.beginTabBar("##tab_bar", .{})) {
         defer zgui.endTabBar();
-        if (zgui.beginTabItem("Parameters", .{})) {
+        if (zgui.beginTabItem("Settings", .{})) {
             defer zgui.endTabItem();
             parameters(demo);
-            extras(demo);
         }
         if (zgui.beginTabItem("Extras", .{})) {
             defer zgui.endTabItem();

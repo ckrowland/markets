@@ -1,9 +1,9 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
-const Wgpu = @import("wgpu");
-const Consumer = @import("consumer");
-const Producer = @import("producer");
-const Camera = @import("camera");
+const Wgpu = @import("libs/wgpu.zig");
+const Consumer = @import("libs/consumer.zig");
+const Producer = @import("libs/producer.zig");
+const Camera = @import("libs/camera.zig");
 
 pub fn price(args: Wgpu.CallbackArgs(Producer)) void {
     const slice = args.obj_buf.mapping.staging.slice;

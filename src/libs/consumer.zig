@@ -1,8 +1,8 @@
 const std = @import("std");
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
-const Camera = @import("camera");
-const Wgpu = @import("wgpu");
+const Camera = @import("camera.zig");
+const Wgpu = @import("wgpu.zig");
 const Self = @This();
 
 absolute_home: [4]f32 = .{ 0, 0, 0, 0 },
