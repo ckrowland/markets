@@ -43,7 +43,7 @@ Download from the latest release or build from source.
 ```
 git clone https://github.com/ckrowland/simulations.git
 cd simulations
-zig build slider-run
+zig build run
 ```
 
 ## Resource Editor (Currently Broken)
