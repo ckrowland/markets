@@ -519,7 +519,8 @@ pub fn draw(demo: *DemoState) void {
             }
         }
 
-        if (demo.stats.obj_buf.mapping.state == .copy_to_mapped_buffer) {
+        const stat_buf = demo.stats.obj_buf.mapping;
+        if (stat_buf.insert_idx != stat_buf.remove_idx) {
             pass: {
                 const s = gctx.lookupResource(demo.stats.obj_buf.buf) orelse break :pass;
                 const s_info = gctx.lookupResourceInfo(demo.stats.obj_buf.buf) orelse break :pass;
@@ -529,7 +530,8 @@ pub fn draw(demo: *DemoState) void {
             }
         }
 
-        if (demo.buffers.data.producers.mapping.state == .copy_to_mapped_buffer) {
+        const p_buf = demo.buffers.data.producers.mapping;
+        if (p_buf.insert_idx != p_buf.remove_idx) {
             pass: {
                 const p = gctx.lookupResource(data.producers.buf) orelse break :pass;
                 const p_info = gctx.lookupResourceInfo(data.producers.buf) orelse break :pass;
@@ -539,7 +541,8 @@ pub fn draw(demo: *DemoState) void {
             }
         }
 
-        if (demo.buffers.data.consumers.mapping.state == .copy_to_mapped_buffer) {
+        const c_buf = demo.buffers.data.consumers.mapping;
+        if (c_buf.insert_idx != c_buf.remove_idx) {
             pass: {
                 const c = gctx.lookupResource(data.consumers.buf) orelse break :pass;
                 const c_info = gctx.lookupResourceInfo(data.consumers.buf) orelse break :pass;

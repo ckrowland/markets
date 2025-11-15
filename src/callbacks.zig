@@ -120,3 +120,17 @@ pub fn updateConsumerCoords(args: Wgpu.CallbackArgs(Consumer)) void {
         }
     }
 }
+
+pub fn updateConsumerMoney(args: Wgpu.CallbackArgs(Consumer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    const buf = args.gctx.lookupResource(args.obj_buf.buf).?;
+
+    if (slice) |consumers| {
+        for (consumers, 0..) |c, i| {
+            if (c.money > c.max_money) {
+                const offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "money");
+                args.gctx.queue.writeBuffer(buf, offset, u32, &.{c.max_money});
+            }
+        }
+    }
+}

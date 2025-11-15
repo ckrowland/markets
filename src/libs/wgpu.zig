@@ -92,9 +92,7 @@ fn MappingBuffer(comptime T: type) type {
         staging: StagingBuffer(T),
         state: enum {
             rest,
-            copy_to_mapped_buffer,
             call_map_async,
-            waiting_for_map_async,
         } = .rest,
         num_structs: u32,
     };
@@ -148,7 +146,6 @@ pub fn getAllAsync(
     map_ptr.requests[map_ptr.insert_idx].func = callback;
     map_ptr.requests[map_ptr.insert_idx].args = args;
     map_ptr.insert_idx = (map_ptr.insert_idx + 1) % callback_queue_len;
-    map_ptr.state = .copy_to_mapped_buffer;
 }
 
 pub fn checkObjBufState(comptime T: type, buf: *MappingBuffer(T)) void {
@@ -162,11 +159,16 @@ pub fn checkObjBufState(comptime T: type, buf: *MappingBuffer(T)) void {
             GenCallback(T),
             @as(*anyopaque, @ptrCast(&buf.staging)),
         );
-        buf.state = .waiting_for_map_async;
-        return;
-    }
 
-    if (buf.state == .waiting_for_map_async and buf.staging.slice != null) {
+        // Wait for all outstanding mapAsync() calls to complete.
+        wait_loop: while (true) {
+            gctx.device.tick();
+            if (buf.staging.slice == null) {
+                continue :wait_loop;
+            }
+            break;
+        }
+
         while (buf.remove_idx != buf.insert_idx) {
             const request = buf.requests[buf.remove_idx];
             buf.remove_idx = (buf.remove_idx + 1) % callback_queue_len;
@@ -280,6 +282,7 @@ pub fn createBuffer(
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .copy_src = true, .vertex = true, .storage = true },
         .size = num * @sizeOf(T),
+        .label = @typeName(T) ++ " objects",
     });
 }
 
@@ -291,6 +294,7 @@ pub fn createMappedBuffer(
     return gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .map_read = true },
         .size = num * @sizeOf(T),
+        .label = @typeName(T) ++ " mapped",
     });
 }
 

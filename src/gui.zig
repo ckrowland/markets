@@ -48,14 +48,14 @@ fn displayImguiWindow(demo: *DemoState, window: *Window) void {
 }
 
 pub fn update(demo: *DemoState) void {
+    Wgpu.checkObjBufState(u32, &demo.stats.obj_buf.mapping);
+    Wgpu.checkObjBufState(Producer, &demo.buffers.data.producers.mapping);
+    Wgpu.checkObjBufState(Consumer, &demo.buffers.data.consumers.mapping);
+
     //zgui.showDemoWindow(null);
     displayImguiWindow(demo, &demo.imgui_windows.sliders);
     displayImguiWindow(demo, &demo.imgui_windows.statistics);
     displayImguiWindow(demo, &demo.imgui_windows.help);
-
-    Wgpu.checkObjBufState(u32, &demo.stats.obj_buf.mapping);
-    Wgpu.checkObjBufState(Producer, &demo.buffers.data.producers.mapping);
-    Wgpu.checkObjBufState(Consumer, &demo.buffers.data.consumers.mapping);
 
     if (demo.running) {
         //demo.gctx.queue.writeBuffer(
@@ -283,7 +283,7 @@ fn parameters(demo: *DemoState) void {
     }
 
     const mpm = &demo.params.max_producer_money;
-    if (createSlider("Max Producer Money", u32, mpm)) {
+    if (createSlider("Max Money", u32, mpm)) {
         producers.updateU32Field(demo.gctx, mpm.val, "max_money");
     }
     const mpi = &demo.params.max_inventory;
@@ -332,8 +332,12 @@ fn parameters(demo: *DemoState) void {
     }
 
     const mcm = &demo.params.max_consumer_money;
-    if (createSlider("Max Consumer Money", u32, mcm)) {
+    if (createSlider("Max Money", u32, mcm)) {
         consumers.updateU32Field(demo.gctx, mcm.val, "max_money");
+        Wgpu.getAllAsync(Consumer, Callbacks.updateConsumerMoney, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.data.consumers,
+        });
     }
 
     const mr = &demo.params.moving_rate;
