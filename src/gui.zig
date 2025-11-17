@@ -169,8 +169,13 @@ fn createSlider(
             zgui.endTooltip();
         }
     }
+    //FIXE THIS
+    //const r = random.int(u32);
+    var buf: [1000]u8 = undefined;
+    const id = std.fmt.bufPrintZ(buf[0..], "##{any}{any}", .{ slider.help, name }) catch unreachable;
     return zgui.sliderScalar(
-        "##" ++ name,
+        id,
+        //"##" ++ name,
         T,
         .{
             .v = &slider.val,
@@ -263,6 +268,7 @@ fn parameters(demo: *DemoState) void {
                 .{
                     .max_inventory = demo.params.max_inventory.val,
                     .production_cost = demo.params.production_cost.val,
+                    .max_production_rate = demo.params.max_production_rate.val,
                     .price = demo.params.price.val,
                     .max_money = demo.params.max_producer_money.val,
                     .decay_rate = demo.params.decay_rate.val,
@@ -282,14 +288,29 @@ fn parameters(demo: *DemoState) void {
         producers.updateU32Field(demo.gctx, price.val, "price");
     }
 
+    const mpr = &demo.params.max_production_rate;
+    if (createSlider("Max Production Rate", u32, mpr)) {
+        producers.updateU32Field(demo.gctx, mpr.val, "max_production_rate");
+    }
+
     const mpm = &demo.params.max_producer_money;
     if (createSlider("Max Money", u32, mpm)) {
         producers.updateU32Field(demo.gctx, mpm.val, "max_money");
+        Wgpu.getAllAsync(Producer, Callbacks.updateProducerMoney, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.data.producers,
+        });
     }
+
     const mpi = &demo.params.max_inventory;
     if (createSlider("Max Inventory", u32, mpi)) {
         producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
+        Wgpu.getAllAsync(Producer, Callbacks.updateProducerInventory, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.data.producers,
+        });
     }
+
     const dr = &demo.params.decay_rate;
     if (createSlider("Decay Rate", u32, dr)) {
         producers.updateU32Field(demo.gctx, dr.val, "decay_rate");
@@ -348,16 +369,18 @@ fn parameters(demo: *DemoState) void {
 
 fn extras(demo: *DemoState) void {
     const cs = &demo.params.consumer_size;
-    if (createSlider("Agent Size", f32, cs)) {
+    if (createSlider("Consumer Size", f32, cs)) {
         demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
             demo.gctx,
             Main.NUM_CONSUMER_SIDES,
             cs.val,
         );
-        demo.params.producer_size.val = demo.params.consumer_size.val;
+    }
+    const ps = &demo.params.producer_size;
+    if (createSlider("Producer Size", f32, ps)) {
         demo.buffers.vertex.square = Shapes.createSquareVertexBuffer(
             demo.gctx,
-            demo.params.producer_size.val,
+            ps.val,
         );
     }
 }
@@ -376,17 +399,20 @@ pub fn help(demo: *DemoState) void {
     zgui.bulletText("Producers create resources and Consumers consume these resources.", .{});
     zgui.bulletText("The size of both Producers and Consumers grows to show how many resources they currently have.", .{});
     zgui.bulletText("This is called their inventory.", .{});
-    zgui.bulletText("Whenever Consumers are empty they travel to a Producer and try to buy more resources before returning home.", .{});
     zgui.bulletText("When Consumers have no inventory they turn red, otherwise they are green.", .{});
+    zgui.bulletText("Whenever Consumers are empty they travel to a Producer and try to buy more resources before returning home.", .{});
+    zgui.bulletText("Consumers choose the Producer which has the largest inventory from which they can buy.", .{});
+    zgui.bulletText("If two Producers have the same inventory then the closest Producer is chosen.", .{});
     zgui.text("", .{});
     zgui.bulletText("Consumers and Producers both have money in this simulation.", .{});
     zgui.bulletText("Consumers have a constant income.", .{});
     zgui.bulletText("Producers only receive money when a consumer buys from them.", .{});
-    zgui.bulletText("You can control the price at which this transaction occurs via the Price Sold slider.", .{});
-    zgui.bulletText("Producers must use their money to produce resources at the current Production Cost.", .{});
+    zgui.bulletText("The price at which this transaction occurs is controlled via the Price Sold slider.", .{});
+    zgui.bulletText("Producers use their money to produce resources at the current Production Cost.", .{});
+    zgui.bulletText("To keep things constrained there is a maximum amount of money Consumers and Producers can hold.", .{});
     zgui.text("", .{});
     zgui.bulletText("The grey circle around a consumer shows how much it could buy right now at the current price.", .{});
-    zgui.bulletText("The white square around a producer shows how much it could produce at the current production cost.", .{});
+    zgui.bulletText("The white square around a producer shows how much it could produce right now at the current production cost.", .{});
     zgui.text("", .{});
     zgui.bulletText("This simulation is still rather basic.", .{});
     zgui.bulletText("If you have any suggestions, I'd love to hear them!", .{});

@@ -55,6 +55,12 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             result = inv - can_buy;
             cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         }
+        if (result < 0) {
+            producers[pid].color = vec4(1, 0, 0, 1);
+        }
+        if (can_buy < 0) {
+            producers[pid].color = vec4(1, 0, 0, 1);
+        }
         buy(index, producers[pid].price, can_buy);
         go_home(index);
         return;
@@ -77,7 +83,40 @@ fn go_home(index: u32) {
     consumers[index].step_size = step_sizes(c.position.xy, c.home.xy, c.moving_rate);
 }
 
+struct Metrics {
+    amount_can_buy: u32,
+    distance: f32,
+}
 fn search_for_producer(index: u32) {
+    let c = consumers[index];
+    var metrics: array<Metrics, MAX_NUM_PRODUCERS>;
+    for (var i: u32 = 0; i < stats.num_producers; i++) {
+        var inv = atomicLoad(&producers[i].inventory);
+        metrics[i].amount_can_buy = inv / producers[i].price;
+        metrics[i].distance = distance(c.home, producers[i].home);
+    }
+
+    var largest_transaction: u32 = 0;
+    var pid: u32 = 0;
+    for (var i: u32 = 0; i < stats.num_producers; i++) {
+        if (metrics[i].amount_can_buy == largest_transaction &&
+            metrics[i].distance < metrics[pid].distance) {
+            pid = i;
+        }
+        if (metrics[i].amount_can_buy > largest_transaction) {
+            largest_transaction = metrics[i].amount_can_buy;
+            pid = i;
+        }
+    }
+
+    if (largest_transaction == 0) { return; }
+
+    consumers[index].destination = producers[pid].home;
+    consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, c.moving_rate);
+    consumers[index].producer_id = pid;
+}
+
+fn find_shortest_producer(index: u32) -> u32 {
     let c = consumers[index];
     var shortest_producer: f32 = 1000000;
     var pid: u32 = 0;
@@ -88,8 +127,5 @@ fn search_for_producer(index: u32) {
             pid = i;
         }
     }
-
-    consumers[index].destination = producers[pid].home;
-    consumers[index].step_size = step_sizes(c.position.xy, producers[pid].home.xy, c.moving_rate);
-    consumers[index].producer_id = pid;
+    return pid;
 }

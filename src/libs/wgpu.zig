@@ -114,6 +114,10 @@ pub const ComputePipelineInfo = struct {
     cs: [:0]const u8,
     entry_point: [:0]const u8,
     name: [:0]const u8,
+    constants: struct {
+        max_num_consumers: u32,
+        max_num_producers: u32,
+    },
 };
 
 pub fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
@@ -478,14 +482,22 @@ pub fn createRenderPipeline(
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 
-pub fn createComputePipeline(gctx: *zgpu.GraphicsContext, cpi: ComputePipelineInfo) zgpu.ComputePipelineHandle {
+pub fn createComputePipeline(
+    gctx: *zgpu.GraphicsContext,
+    comptime cpi: ComputePipelineInfo,
+) zgpu.ComputePipelineHandle {
     const compute_bgl = createComputeBindGroupLayout(gctx);
     defer gctx.releaseResource(compute_bgl);
 
     const compute_pl = gctx.createPipelineLayout(&.{compute_bgl});
     defer gctx.releaseResource(compute_pl);
 
-    const cs_module = zgpu.createWgslShaderModule(gctx.device, cpi.cs, cpi.name);
+    const constants_str = std.fmt.comptimePrint(
+        "const MAX_NUM_CONSUMERS={d};const MAX_NUM_PRODUCERS={d};",
+        .{ cpi.constants.max_num_consumers, cpi.constants.max_num_producers },
+    );
+    const cs_str = constants_str ++ cpi.cs;
+    const cs_module = zgpu.createWgslShaderModule(gctx.device, cs_str, cpi.name);
     defer cs_module.release();
 
     const pipeline_descriptor = wgpu.ComputePipelineDescriptor{

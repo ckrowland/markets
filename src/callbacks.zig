@@ -134,3 +134,31 @@ pub fn updateConsumerMoney(args: Wgpu.CallbackArgs(Consumer)) void {
         }
     }
 }
+
+pub fn updateProducerMoney(args: Wgpu.CallbackArgs(Producer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    const buf = args.gctx.lookupResource(args.obj_buf.buf).?;
+
+    if (slice) |producers| {
+        for (producers, 0..) |p, i| {
+            if (p.money > p.max_money) {
+                const offset = i * @sizeOf(Producer) + @offsetOf(Producer, "money");
+                args.gctx.queue.writeBuffer(buf, offset, u32, &.{p.max_money});
+            }
+        }
+    }
+}
+
+pub fn updateProducerInventory(args: Wgpu.CallbackArgs(Producer)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    const buf = args.gctx.lookupResource(args.obj_buf.buf).?;
+
+    if (slice) |producers| {
+        for (producers, 0..) |p, i| {
+            if (p.inventory > p.max_inventory) {
+                const offset = i * @sizeOf(Producer) + @offsetOf(Producer, "inventory");
+                args.gctx.queue.writeBuffer(buf, offset, u32, &.{p.max_inventory});
+            }
+        }
+    }
+}

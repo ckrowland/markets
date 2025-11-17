@@ -12,10 +12,12 @@ const Producer = @import("libs/producer.zig");
 const Camera = @import("libs/camera.zig");
 const Shapes = @import("libs/shapes.zig");
 
+//MAX_NUM constants are also declared in common.wgsl
+//Can we set these with a wgsl uniform or something?
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
-pub const NUM_CONSUMER_SIDES = 20;
 pub const NUM_STATS = 9;
+pub const NUM_CONSUMER_SIDES = 20;
 
 pub fn Slider(comptime T: type) type {
     return struct {
@@ -47,16 +49,22 @@ pub const Parameters = struct {
         .max = 5,
         .help = "The amount of money a consumer must spend to purchase a resource.",
     },
+    max_production_rate: Slider(u32) = Slider(u32){
+        .min = 1,
+        .val = 100,
+        .max = 3000,
+        .help = "The maximum amount of resources a Producer can produce at once.",
+    },
     max_inventory: Slider(u32) = Slider(u32){
         .min = 5000,
         .val = 5000,
-        .max = 10000,
+        .max = 20000,
         .help = "The maximum amount of resources a Producer can hold.",
     },
     max_producer_money: Slider(u32) = Slider(u32){
         .min = 5000,
-        .val = 40000,
-        .max = 80000,
+        .val = 20000,
+        .max = 40000,
         .help = "The maximum amount of money a Producer can hold.",
     },
     decay_rate: Slider(u32) = Slider(u32){
@@ -301,6 +309,7 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
         .{
             .max_inventory = params.max_inventory.val,
             .production_cost = params.production_cost.val,
+            .max_production_rate = params.max_production_rate.val,
             .price = params.price.val,
             .max_money = params.max_producer_money.val,
             .decay_rate = params.decay_rate.val,
@@ -427,12 +436,20 @@ pub fn init(allocator: std.mem.Allocator) !DemoState {
                     @embedFile("shaders/compute/producer.wgsl"),
                 .entry_point = "main",
                 .name = "producer",
+                .constants = .{
+                    .max_num_consumers = MAX_NUM_CONSUMERS,
+                    .max_num_producers = MAX_NUM_PRODUCERS,
+                },
             }),
             .consumer = Wgpu.createComputePipeline(gctx, .{
                 .cs = @embedFile("shaders/compute/common.wgsl") ++
                     @embedFile("shaders/compute/consumer.wgsl"),
                 .entry_point = "main",
                 .name = "consumer",
+                .constants = .{
+                    .max_num_consumers = MAX_NUM_CONSUMERS,
+                    .max_num_producers = MAX_NUM_PRODUCERS,
+                },
             }),
         },
         .bind_groups = .{
@@ -698,6 +715,7 @@ pub fn restartSimulation(demo: *DemoState) void {
         .{
             .max_inventory = demo.params.max_inventory.val,
             .production_cost = demo.params.production_cost.val,
+            .max_production_rate = demo.params.max_production_rate.val,
             .price = demo.params.price.val,
             .max_money = demo.params.max_producer_money.val,
             .decay_rate = demo.params.decay_rate.val,

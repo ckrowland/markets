@@ -14,8 +14,8 @@ money: u32 = 5000,
 max_money: u32,
 price: u32,
 production_cost: u32,
+max_production_rate: u32,
 decay_rate: u32,
-_padding1: u32 = 0,
 
 pub const z_pos = 0;
 pub fn generateBulk(
@@ -37,6 +37,7 @@ pub fn generateBulk(
             .home = world_pos,
             .max_inventory = p.max_inventory,
             .production_cost = p.production_cost,
+            .max_production_rate = p.max_production_rate,
             .price = p.price,
             .max_money = p.max_money,
             .decay_rate = p.decay_rate,

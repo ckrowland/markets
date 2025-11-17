@@ -24,6 +24,7 @@ struct Producer {
   max_money: u32,
   price: u32,
   production_cost: u32,
+  max_production_rate: u32,
   decay_rate: u32,
 }
 
@@ -38,8 +39,8 @@ struct Stats {
 const red = vec4(0.9, 0.0, 0.0, 0.0);
 const green = vec4(0.0, 0.7, 0.0, 0.0);
 
-@group(0) @binding(0) var<storage, read_write> consumers: array<Consumer>;
-@group(0) @binding(1) var<storage, read_write> producers: array<Producer>;
+@group(0) @binding(0) var<storage, read_write> consumers: array<Consumer, MAX_NUM_CONSUMERS>;
+@group(0) @binding(1) var<storage, read_write> producers: array<Producer, MAX_NUM_PRODUCERS>;
 @group(0) @binding(2) var<storage, read_write> stats: Stats;
 
 fn step_sizes(pos: vec2<f32>, dest: vec2<f32>, mr: f32) -> vec2<f32>{
