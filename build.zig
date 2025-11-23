@@ -31,13 +31,12 @@ pub fn build(b: *std.Build) !void {
     b.step("run", "Run demo").dependOn(&run_cmd.step);
 
     var release_step = b.step("release", "create executables for all apps");
-    var build_step = b.step("build", "build executables for all apps");
+    var build_step = b.step("all", "build executables for all apps");
     inline for (.{
         .{ .os = .windows, .arch = .x86_64, .output = "apps/Windows/windows-x86_64" },
         .{ .os = .macos, .arch = .x86_64, .output = "apps/Mac/x86_64/Simulations.app/Contents/MacOS" },
         .{ .os = .macos, .arch = .aarch64, .output = "apps/Mac/aarch64/Simulations.app/Contents/MacOS" },
         .{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/linux-x86_64-gnu" },
-        //.{ .os = .linux, .arch = .aarch64, .output = "apps/Linux/aarch64/linux-aarch64" },
     }) |release| {
         const target = b.resolveTargetQuery(.{
             .cpu_arch = release.arch,
@@ -69,7 +68,7 @@ pub fn build(b: *std.Build) !void {
     const zip_windows = b.addSystemCommand(&.{ "tar", "-cavf" });
     zip_windows.setCwd(b.path("apps/Windows"));
     zip_windows.addArg("windows-x86_64.tar.xz");
-    zip_windows.addArg("Windows-x86_64");
+    zip_windows.addArg("windows-x86_64");
     zip_windows.step.dependOn(build_step);
 
     const zip_linux = b.addSystemCommand(&.{ "tar", "-cavf" });
@@ -184,11 +183,34 @@ pub fn buildNative(
     });
     exe.step.dependOn(&install_content_step.step);
 
-    if (options.target.result.os.tag == .macos) {
-        if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
-            exe.addLibraryPath(system_sdk.path("macos12/usr/lib"));
-            exe.addSystemFrameworkPath(system_sdk.path("macos12/System/Library/Frameworks"));
-        }
+    switch (options.target.result.os.tag) {
+        .windows => {
+            if (options.target.result.cpu.arch.isX86()) {
+                if (options.target.result.abi.isGnu() or options.target.result.abi.isMusl()) {
+                    if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
+                        exe.addLibraryPath(system_sdk.path("windows/lib/x86_64-windows-gnu"));
+                    }
+                }
+            }
+        },
+        .macos => {
+            if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
+                exe.addLibraryPath(system_sdk.path("macos12/usr/lib"));
+                exe.addFrameworkPath(system_sdk.path("macos12/System/Library/Frameworks"));
+            }
+        },
+        .linux => {
+            if (options.target.result.cpu.arch.isX86()) {
+                if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
+                    exe.addLibraryPath(system_sdk.path("linux/lib/x86_64-linux-gnu"));
+                }
+            } else if (options.target.result.cpu.arch == .aarch64) {
+                if (b.lazyDependency("system_sdk", .{})) |system_sdk| {
+                    exe.addLibraryPath(system_sdk.path("linux/lib/aarch64-linux-gnu"));
+                }
+            }
+        },
+        else => {},
     }
 
     return exe;

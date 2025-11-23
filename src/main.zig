@@ -12,8 +12,6 @@ const Producer = @import("libs/producer.zig");
 const Camera = @import("libs/camera.zig");
 const Shapes = @import("libs/shapes.zig");
 
-//MAX_NUM constants are also declared in common.wgsl
-//Can we set these with a wgsl uniform or something?
 pub const MAX_NUM_PRODUCERS = 100;
 pub const MAX_NUM_CONSUMERS = 10000;
 pub const NUM_STATS = 9;
