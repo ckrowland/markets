@@ -33,10 +33,30 @@ pub fn build(b: *std.Build) !void {
     var release_step = b.step("release", "create executables for all apps");
     var build_step = b.step("all", "build executables for all apps");
     inline for (.{
-        .{ .os = .windows, .arch = .x86_64, .output = "apps/Windows/windows-x86_64" },
-        .{ .os = .macos, .arch = .x86_64, .output = "apps/Mac/x86_64/Simulations.app/Contents/MacOS" },
-        .{ .os = .macos, .arch = .aarch64, .output = "apps/Mac/aarch64/Simulations.app/Contents/MacOS" },
-        .{ .os = .linux, .arch = .x86_64, .output = "apps/Linux/linux-x86_64-gnu" },
+        .{
+            .os = .windows,
+            .arch = .x86_64,
+            .bin_output = "apps/windows-x86_64",
+            .zip_output = "apps/windows-x86_64",
+        },
+        .{
+            .os = .macos,
+            .arch = .x86_64,
+            .bin_output = "apps/macos-x86_64/EconomicVisuals.app/Contents/MacOS",
+            .zip_output = "apps/macos-x86_64",
+        },
+        .{
+            .os = .macos,
+            .arch = .aarch64,
+            .bin_output = "apps/macos-aarch64/EconomicVisuals.app/Contents/MacOS",
+            .zip_output = "apps/macos-aarch64",
+        },
+        .{
+            .os = .linux,
+            .arch = .x86_64,
+            .bin_output = "apps/linux-x86_64-gnu",
+            .zip_output = "apps/linux-x86_64-gnu",
+        },
     }) |release| {
         const target = b.resolveTargetQuery(.{
             .cpu_arch = release.arch,
@@ -44,91 +64,45 @@ pub fn build(b: *std.Build) !void {
             .abi = if (release.os == .linux) .gnu else null,
         });
         const release_exe = buildNative(b, "src/main.zig", .{
-            .optimize = .ReleaseFast,
+            .optimize = .ReleaseSafe,
             .target = target,
         });
         if (release.os == .macos) {
             release_exe.headerpad_size = 0x10000;
+            const install_plist = b.addInstallFile(
+                b.path("assets/plist/Info.plist"),
+                "../" ++ release.bin_output ++ "/../Info.plist",
+            );
+            build_step.dependOn(&install_plist.step);
         }
         const install_release = b.addInstallArtifact(release_exe, .{
             .dest_dir = .{
-                .override = .{ .custom = "../" ++ release.output },
+                .override = .{ .custom = "../" ++ release.bin_output },
             },
         });
         build_step.dependOn(&install_release.step);
 
         const install_content_step = b.addInstallDirectory(.{
-            .source_dir = b.path("content"),
-            .install_dir = .{ .custom = "../" ++ release.output },
+            .source_dir = b.path("assets/content"),
+            .install_dir = .{ .custom = "../" ++ release.bin_output },
             .install_subdir = "content",
         });
         build_step.dependOn(&install_content_step.step);
+
+        release_step.dependOn(build_step);
+        const zip = b.addSystemCommand(&.{ "zip", "-r" });
+        zip.setCwd(b.path("apps"));
+        zip.addArg(release.zip_output[5..] ++ ".zip");
+        zip.addArg(release.zip_output[5..]);
+        zip.step.dependOn(build_step);
+        release_step.dependOn(&zip.step);
     }
 
-    const zip_windows = b.addSystemCommand(&.{ "tar", "-cavf" });
-    zip_windows.setCwd(b.path("apps/Windows"));
-    zip_windows.addArg("windows-x86_64.tar.xz");
-    zip_windows.addArg("windows-x86_64");
-    zip_windows.step.dependOn(build_step);
-
-    const zip_linux = b.addSystemCommand(&.{ "tar", "-cavf" });
-    zip_linux.setCwd(b.path("apps/Linux"));
-    zip_linux.addArg("linux-x86_64-gnu.tar.xz");
-    zip_linux.addArg("linux-x86_64-gnu");
-    zip_linux.step.dependOn(build_step);
-
-    const notarize_apps = b.option(
-        bool,
-        "notarize_apps",
-        "Create an apple signed dmg to distribute",
-    ) orelse false;
-
-    if (notarize_apps) {
-        var notarize_step = b.step("notarize", "notarize macos apps");
-        const dev_id = b.option(
-            []const u8,
-            "developer_id",
-            "Name of certificate used for codesigning macos applications",
-        );
-        const apple_id = b.option(
-            []const u8,
-            "apple_id",
-            "Apple Id used with your Apple Developer account.",
-        );
-        const apple_password = b.option(
-            []const u8,
-            "apple_password",
-            "The Apple app specific password used to notarize applications.",
-        );
-        const apple_team_id = b.option(
-            []const u8,
-            "apple_team_id",
-            "The Apple team ID given on you Apple Developer account.",
-        );
-
-        const x86_64 = notarizeMacApp(
-            b,
-            b.path("apps/Mac/x86_64"),
-            dev_id,
-            apple_id,
-            apple_password,
-            apple_team_id,
-        );
-        const aarch64 = notarizeMacApp(
-            b,
-            b.path("apps/Mac/aarch64"),
-            dev_id,
-            apple_id,
-            apple_password,
-            apple_team_id,
-        );
-        notarize_step.dependOn(x86_64);
-        notarize_step.dependOn(aarch64);
-    }
-
-    release_step.dependOn(build_step);
-    release_step.dependOn(&zip_windows.step);
-    release_step.dependOn(&zip_linux.step);
+    //var notarize_step = b.step("notarize", "notarize macos apps");
+    //const x86_64 = notarizeMacApp(b, b.path("apps/Mac/x86_64"));
+    //if (x86_64) |step| {
+    //    notarize_step.dependOn(step);
+    //}
 }
 
 pub fn buildNative(
@@ -177,7 +151,7 @@ pub fn buildNative(
     exe.root_module.addImport("zgui", zgui.module("root"));
 
     const install_content_step = b.addInstallDirectory(.{
-        .source_dir = b.path("content"),
+        .source_dir = b.path("assets/content"),
         .install_dir = .{ .custom = "" },
         .install_subdir = "bin/content",
     });
@@ -219,11 +193,34 @@ pub fn buildNative(
 fn notarizeMacApp(
     b: *std.Build,
     path: std.Build.LazyPath,
-    dev_id: ?[]const u8,
-    apple_id: ?[]const u8,
-    apple_password: ?[]const u8,
-    apple_team_id: ?[]const u8,
-) *std.Build.Step {
+) ?*std.Build.Step {
+    const dev_id = b.option(
+        []const u8,
+        "developer_id",
+        "Name of certificate used for codesigning macos applications",
+    );
+    const apple_id = b.option(
+        []const u8,
+        "apple_id",
+        "Apple Id used with your Apple Developer account.",
+    );
+    const apple_password = b.option(
+        []const u8,
+        "apple_password",
+        "The Apple app specific password used to notarize applications.",
+    );
+    const apple_team_id = b.option(
+        []const u8,
+        "apple_team_id",
+        "The Apple team ID given on your Apple Developer account.",
+    );
+
+    if (dev_id == null) return null;
+    if (apple_id == null) return null;
+    if (apple_password == null) return null;
+    if (apple_team_id == null) return null;
+
+    //rcodesign sign --pem-file ~/certs/private.csr --info-plist-file content/plist/Info.plist apps/Mac/x86_64/EconomicVisuals.app/
     const codesign_app = b.addSystemCommand(&.{
         "codesign",
         "-f",
@@ -237,6 +234,8 @@ fn notarizeMacApp(
     });
     codesign_app.setCwd(path);
 
+    //In apps/Mac/x86_64/
+    //genisoimage -V EconomicVisuals -D -R -apple -no-pad -o EconomicVisuals.dmg ./
     const create_dmg = b.addSystemCommand(&.{
         "hdiutil",
         "create",
