@@ -61,7 +61,7 @@ Download from the latest release or build from source.
 ### Run
 
 ```
-git clone https://github.com/ckrowland/simulations.git
+git clone https://github.com/ckrowland/markets.git
 cd simulations
 zig build run
 ```
