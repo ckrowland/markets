@@ -77,7 +77,7 @@ pub const Parameters = struct {
         slider: Slider(u32) = Slider(u32){
             .min = 1,
             .val = 150,
-            .max = 10000,
+            .max = 5000,
         },
     },
     income: Slider(u32) = Slider(u32){

@@ -10,7 +10,7 @@ struct VertexOut {
     @location(3) inventory: u32,
 ) -> VertexOut {
     var output: VertexOut;
-    let scale = f32(inventory) / 1000.0 + 1.0;
+    let scale = f32(inventory) / 1000.0 + 2.0;
     var x = position[0] + (scale * vertex_position[0]);
     var y = position[1] + (scale * vertex_position[1]);
     output.position_clip = object_to_clip * vec4(x, y, position[2], 1.0);
