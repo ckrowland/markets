@@ -4,10 +4,7 @@ Visually simulate markets of basic consumers and producers.
 Built on [zig-gamedev](https://github.com/zig-gamedev/zig-gamedev/).
 Download from the latest release or build from source.
 
-## Random Resource Simulation
-
-[demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
-
+[demo.webm](https://github.com/user-attachments/assets/bb38bfce-3b98-45b4-92d7-463b8f2eac41)
 - This simulation has two basic agents: Consumers and Producers.
 - Consumers are the circles. Producers are the squares.
 - Producers create resources and Consumers consume these resources.
@@ -36,7 +33,7 @@ Parameters:
 - Producer Max Inventory
 - Decay Rate
 - Number of Consumers
-- Consumer income
+- Consumer Income
 - Consumer Max Money
 - Moving Rate
 
@@ -62,7 +59,7 @@ Data Gathered:
 
 ```
 git clone https://github.com/ckrowland/markets.git
-cd simulations
+cd markets
 zig build run
 ```
 
