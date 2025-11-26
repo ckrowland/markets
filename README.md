@@ -8,23 +8,23 @@ Download from the latest release or build from source.
 
 [demo.webm](https://user-images.githubusercontent.com/95145274/202062756-61222967-26ee-41e1-ba2b-fb9d7d2d41a1.webm)
 
-- This simulation has two basic agents: Consumers and Producers.
-- Consumers are the circles. Producers are the squares.
-- Producers create resources and Consumers consume these resources.
-- The size of both Producers and Consumers grows to show how many resources they currently have.
-- This is called their inventory.
-- When Consumers have no inventory they turn red, otherwise they are green.
-- Whenever Consumers are empty they travel to a Producer and try to buy more resources before returning home.
-- Consumers choose the Producer which has the largest inventory from which they can buy.
-- If two Producers have the same inventory then the closest Producer is chosen.
-- Consumers and Producers both have money in this simulation.
-- Consumers have a constant income.
-- Producers only receive money when a consumer buys from them.
-- The price at which this transaction occurs is controlled via the Price Sold slider.
-- Producers use their money to produce resources at the current Production Cost.
-- To keep things constrained there is a maximum amount of money Consumers and Producers can hold.
-- The grey circle around a consumer shows how much it could buy right now at the current price.
-- The white square around a producer shows how much it could produce right now at the current production cost.
+This simulation has two basic agents: Consumers and Producers.
+Consumers are the circles. Producers are the squares.
+Producers create resources and Consumers consume these resources.
+The size of both Producers and Consumers grows to show how many resources they currently have.
+This is called their inventory.
+When Consumers have no inventory they turn red, otherwise they are green.
+Whenever Consumers are empty they travel to a Producer and try to buy more resources before returning home.
+Consumers choose the Producer which has the largest inventory from which they can buy.
+If two Producers have the same inventory then the closest Producer is chosen.
+Consumers and Producers both have money in this simulation.
+Consumers have a constant income.
+Producers only receive money when a consumer buys from them.
+The price at which this transaction occurs is controlled via the Price Sold slider.
+Producers use their money to produce resources at the current Production Cost.
+To keep things constrained there is a maximum amount of money Consumers and Producers can hold.
+The grey circle around a consumer shows how much it could buy right now at the current price.
+The white square around a producer shows how much it could produce right now at the current production cost.
 
 - Parameters:
 
@@ -35,7 +35,6 @@ Download from the latest release or build from source.
   - Producer Max Money
   - Producer Max Inventory
   - Decay Rate
-
   - Number of Consumers
   - Consumer income
   - Consumer Max Money
