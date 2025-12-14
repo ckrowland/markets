@@ -1,5 +1,4 @@
 struct Consumer {
-  absolute_home: vec4<f32>,
   position: vec4<f32>,
   home: vec4<f32>,
   destination: vec4<f32>,
@@ -15,7 +14,6 @@ struct Consumer {
 }
 
 struct Producer {
-  absolute_home: vec4<f32>,
   home: vec4<f32>,
   color: vec4<f32>,
   inventory: atomic<u32>,
@@ -33,7 +31,9 @@ struct Stats {
   num_consumers: u32,
   num_producers: u32,
   num_consumer_hovers: u32,
-  random_color: vec4<f32>,
+  max_x: u32,
+  max_y: u32,
+  rand_num: vec2<f32>,
 }
 
 const red = vec4(0.9, 0.0, 0.0, 0.0);

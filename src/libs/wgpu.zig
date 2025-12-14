@@ -11,19 +11,39 @@ pub fn CallbackArgs(comptime T: type) type {
         gctx: *zgpu.GraphicsContext,
         obj_buf: *ObjectBuffer(T),
         stat_buf: *ObjectBuffer(u32) = undefined,
+        consumer_num_structs: *u32 = undefined,
+        producer_num_structs: *u32 = undefined,
         stat_array: *std.ArrayList(u32) = undefined,
         popup_idx: usize = 0,
         gui_slider: *u32 = undefined,
     };
 }
 
-//pub const GraphicsObject = struct {
-//    render_pipeline: zgpu.RenderPipelineHandle,
-//    attribute_buffer: zgpu.BufferHandle,
-//    vertex_buffer: zgpu.BufferHandle,
-//    index_buffer: zgpu.BufferHandle,
-//    size_of_struct: u32,
-//};
+pub const GraphicsObject = struct {
+    render_pipeline: zgpu.RenderPipelineHandle,
+    attribute_buffer: zgpu.BufferHandle,
+    vertex_buffer: zgpu.BufferHandle,
+    index_buffer: zgpu.BufferHandle,
+
+    pub fn renderGraphicsObject(
+        self: GraphicsObject,
+        gctx: *zgpu.GraphicsContext,
+        pass: wgpu.RenderPassEncoder,
+        num_objects: u32,
+    ) void {
+        const ib_info = gctx.lookupResourceInfo(self.index_buffer) orelse return;
+        const rp = gctx.lookupResource(self.render_pipeline) orelse return;
+        const vb_info = gctx.lookupResourceInfo(self.vertex_buffer) orelse return;
+        const ab_info = gctx.lookupResourceInfo(self.attribute_buffer) orelse return;
+
+        const num_indices: u32 = @intCast(ib_info.size / 4);
+        pass.setPipeline(rp);
+        pass.setVertexBuffer(0, vb_info.gpuobj.?, 0, vb_info.size);
+        pass.setVertexBuffer(1, ab_info.gpuobj.?, 0, ab_info.size);
+        pass.setIndexBuffer(ib_info.gpuobj.?, .uint32, 0, ib_info.size);
+        pass.drawIndexed(num_indices, num_objects, 0, 0, 0);
+    }
+};
 
 pub fn ObjectBuffer(comptime T: type) type {
     return struct {
@@ -109,16 +129,6 @@ fn StagingBuffer(comptime T: type) type {
 fn Callback(comptime T: type) type {
     return ?*const fn (args: CallbackArgs(T)) void;
 }
-
-pub const ComputePipelineInfo = struct {
-    cs: [:0]const u8,
-    entry_point: [:0]const u8,
-    name: [:0]const u8,
-    constants: struct {
-        max_num_consumers: u32,
-        max_num_producers: u32,
-    },
-};
 
 pub fn GenCallback(comptime T: type) wgpu.BufferMapCallback {
     return struct {
@@ -482,6 +492,15 @@ pub fn createRenderPipeline(
     return gctx.createRenderPipeline(pipeline_layout, pipeline_descriptor);
 }
 
+pub const ComputePipelineInfo = struct {
+    cs: [:0]const u8,
+    entry_point: [:0]const u8,
+    name: [:0]const u8,
+    constants: struct {
+        max_num_consumers: u32,
+        max_num_producers: u32,
+    },
+};
 pub fn createComputePipeline(
     gctx: *zgpu.GraphicsContext,
     comptime cpi: ComputePipelineInfo,
@@ -494,7 +513,10 @@ pub fn createComputePipeline(
 
     const constants_str = std.fmt.comptimePrint(
         "const MAX_NUM_CONSUMERS={d};const MAX_NUM_PRODUCERS={d};",
-        .{ cpi.constants.max_num_consumers, cpi.constants.max_num_producers },
+        .{
+            cpi.constants.max_num_consumers,
+            cpi.constants.max_num_producers,
+        },
     );
     const cs_str = constants_str ++ cpi.cs;
     const cs_module = zgpu.createWgslShaderModule(gctx.device, cs_str, cpi.name);

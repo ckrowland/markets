@@ -2,14 +2,14 @@ const std = @import("std");
 const random = std.crypto.random;
 const zgpu = @import("zgpu");
 const zgui = @import("zgui");
-const Shapes = @import("libs/shapes.zig");
-const Gui = @import("libs/gui_windows.zig");
+const Callbacks = @import("callbacks.zig");
 const Main = @import("main.zig");
-const DemoState = Main.DemoState;
+const Sliders = @import("sliders.zig");
+const Gui = @import("libs/gui_windows.zig");
+const Shapes = @import("libs/shapes.zig");
 const Consumer = @import("libs/consumer.zig");
 const Producer = @import("libs/producer.zig");
 const Wgpu = @import("libs/wgpu.zig");
-const Callbacks = @import("callbacks.zig");
 
 pub const Window = struct {
     pos: Gui.Pos,
@@ -17,11 +17,11 @@ pub const Window = struct {
     set_window: bool = true,
     p_open: bool = true,
     change: bool = false,
-    window_fn: *const fn (demo: *DemoState) void,
+    window_fn: *const fn (demo: *Main) void,
     window_flags: zgui.WindowFlags = .{},
 };
 
-fn displayImguiWindow(demo: *DemoState, window: *Window) void {
+fn displayImguiWindow(demo: *Main, window: *Window) void {
     //Make see through
     //zgui.setNextWindowBgAlpha(.{ .alpha = 0 });
     //zgui.pushStyleColor1u(.{ .idx = .frame_bg, .c = 0 });
@@ -47,10 +47,10 @@ fn displayImguiWindow(demo: *DemoState, window: *Window) void {
     }
 }
 
-pub fn update(demo: *DemoState) void {
+pub fn update(demo: *Main) void {
     Wgpu.checkObjBufState(u32, &demo.stats.obj_buf.mapping);
-    Wgpu.checkObjBufState(Producer, &demo.buffers.data.producers.mapping);
-    Wgpu.checkObjBufState(Consumer, &demo.buffers.data.consumers.mapping);
+    Wgpu.checkObjBufState(Producer, &demo.buffers.producers.mapping);
+    Wgpu.checkObjBufState(Consumer, &demo.buffers.consumers.mapping);
 
     //zgui.showDemoWindow(null);
     displayImguiWindow(demo, &demo.imgui_windows.sliders);
@@ -58,21 +58,35 @@ pub fn update(demo: *DemoState) void {
     displayImguiWindow(demo, &demo.imgui_windows.help);
 
     if (demo.running) {
-        //demo.gctx.queue.writeBuffer(
-        //    demo.gctx.lookupResource(demo.stats.obj_buf.buf).?,
-        //    3 * @sizeOf(u32),
-        //    f32,
-        //    &.{ random.float(f32), random.float(f32), random.float(f32) },
-        //);
+        demo.gctx.queue.writeBuffer(
+            demo.gctx.lookupResource(demo.stats.obj_buf.buf).?,
+            6 * @sizeOf(u32),
+            f32,
+            &.{ random.float(f32), random.float(f32) },
+        );
+        Wgpu.getAllAsync(Producer, Callbacks.price, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.producers,
+            .stat_array = &demo.stats.price,
+            .gui_slider = &demo.params.price.val,
+        });
+        Wgpu.getAllAsync(u32, Callbacks.getNumAgents, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.stats.obj_buf,
+            .consumer_num_structs = &demo.buffers.consumers.mapping.num_structs,
+            .producer_num_structs = &demo.buffers.producers.mapping.num_structs,
+            .gui_slider = &demo.params.num_producers.val,
+        });
         const current_time = @as(f32, @floatCast(demo.gctx.stats.time));
         const seconds_passed = current_time - demo.stats.second;
         if (seconds_passed >= 1) {
             demo.stats.second = current_time;
-            Wgpu.getAllAsync(Producer, Callbacks.price, .{
-                .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.producers,
-                .stat_array = &demo.stats.price,
-            });
+            //Wgpu.getAllAsync(Producer, Callbacks.price, .{
+            //    .gctx = demo.gctx,
+            //    .obj_buf = &demo.buffers.producers,
+            //    .stat_array = &demo.stats.price,
+            //    .gui_slider = &demo.params.price.val,
+            //});
             Wgpu.getAllAsync(u32, Callbacks.numTransactions, .{
                 .gctx = demo.gctx,
                 .obj_buf = &demo.stats.obj_buf,
@@ -80,34 +94,34 @@ pub fn update(demo: *DemoState) void {
             });
             Wgpu.getAllAsync(Consumer, Callbacks.emptyConsumers, .{
                 .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.consumers,
+                .obj_buf = &demo.buffers.consumers,
                 .stat_array = &demo.stats.num_empty_consumers,
             });
             Wgpu.getAllAsync(Producer, Callbacks.avgProducerInventory, .{
                 .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.producers,
+                .obj_buf = &demo.buffers.producers,
                 .stat_array = &demo.stats.avg_producer_inventory,
             });
             Wgpu.getAllAsync(Producer, Callbacks.avgProducerMoney, .{
                 .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.producers,
+                .obj_buf = &demo.buffers.producers,
                 .stat_array = &demo.stats.avg_producer_money,
             });
             Wgpu.getAllAsync(Consumer, Callbacks.avgConsumerInventory, .{
                 .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.consumers,
+                .obj_buf = &demo.buffers.consumers,
                 .stat_array = &demo.stats.avg_consumer_inventory,
             });
             Wgpu.getAllAsync(Consumer, Callbacks.avgConsumerMoney, .{
                 .gctx = demo.gctx,
-                .obj_buf = &demo.buffers.data.consumers,
+                .obj_buf = &demo.buffers.consumers,
                 .stat_array = &demo.stats.avg_consumer_money,
             });
         }
     }
 }
 
-pub fn plots(demo: *DemoState) void {
+pub fn plots(demo: *Main) void {
     if (zgui.button("Hide Statistics", .{})) {
         demo.imgui_windows.statistics.p_open = !demo.imgui_windows.statistics.p_open;
         if (demo.imgui_windows.statistics.p_open) {
@@ -157,7 +171,7 @@ fn plotRow(comptime str: [:0]const u8, arr: *std.ArrayList(u32)) void {
 fn createSlider(
     comptime name: [:0]const u8,
     T: type,
-    slider: *Main.Slider(T),
+    slider: *Sliders.Slider(T),
 ) bool {
     zgui.textWrapped(name, .{});
     if (!std.mem.eql(u8, "", slider.help)) {
@@ -169,13 +183,10 @@ fn createSlider(
             zgui.endTooltip();
         }
     }
-    //FIXE THIS
-    //const r = random.int(u32);
     var buf: [1000]u8 = undefined;
     const id = std.fmt.bufPrintZ(buf[0..], "##{any}{any}", .{ slider.help, name }) catch unreachable;
     return zgui.sliderScalar(
         id,
-        //"##" ++ name,
         T,
         .{
             .v = &slider.val,
@@ -185,26 +196,157 @@ fn createSlider(
     );
 }
 
-pub fn settings(demo: *DemoState) void {
+pub fn settings(demo: *Main) void {
     zgui.pushItemWidth(zgui.getContentRegionAvail()[0]);
     zgui.text("  {d:.1} fps", .{demo.gctx.stats.fps});
 
-    if (zgui.beginTabBar("##tab_bar", .{})) {
-        defer zgui.endTabBar();
-        if (zgui.beginTabItem("Settings", .{})) {
-            defer zgui.endTabItem();
-            parameters(demo);
-        }
-        if (zgui.beginTabItem("Extras", .{})) {
-            defer zgui.endTabItem();
-            extras(demo);
-        }
-        zgui.dummy(.{ .w = 1.0, .h = 20.0 });
-        buttons(demo);
-    }
-}
+    const producers = demo.buffers.producers;
+    zgui.text("Producer Settings", .{});
+    const np = &demo.params.num_producers;
+    if (createSlider("Number of Producers", u32, np)) {
+        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        demo.gctx.queue.writeBuffer(
+            resource,
+            2 * @sizeOf(u32),
+            u32,
+            &.{np.val},
+        );
 
-fn buttons(demo: *DemoState) void {
+        if (np.old.? >= np.val) {
+            demo.buffers.producers.mapping.num_structs = np.val;
+        } else {
+            Producer.generateBulk(
+                demo.gctx,
+                &demo.buffers.producers,
+                np.val - np.old.?,
+                .{
+                    .max_inventory = demo.params.max_inventory.val,
+                    .production_cost = demo.params.production_cost.val,
+                    .max_production_rate = demo.params.max_production_rate.val,
+                    .price = demo.params.price.val,
+                    .max_money = demo.params.max_producer_money.val,
+                    .decay_rate = demo.params.decay_rate.val,
+                },
+            );
+        }
+        np.old.? = np.val;
+    }
+
+    const pc = &demo.params.production_cost;
+    if (createSlider("Production Cost", u32, pc)) {
+        producers.updateU32Field(demo.gctx, pc.val, "production_cost");
+    }
+
+    const price = &demo.params.price;
+    if (createSlider("Price Sold", u32, price)) {
+        producers.updateU32Field(demo.gctx, price.val, "price");
+    }
+
+    const mpr = &demo.params.max_production_rate;
+    if (createSlider("Max Production Rate", u32, mpr)) {
+        producers.updateU32Field(demo.gctx, mpr.val, "max_production_rate");
+    }
+
+    const mpm = &demo.params.max_producer_money;
+    if (createSlider("Max Money", u32, mpm)) {
+        producers.updateU32Field(demo.gctx, mpm.val, "max_money");
+        Wgpu.getAllAsync(Producer, Callbacks.updateProducerMoney, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.producers,
+        });
+    }
+
+    const mpi = &demo.params.max_inventory;
+    if (createSlider("Max Inventory", u32, mpi)) {
+        producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
+        Wgpu.getAllAsync(Producer, Callbacks.updateProducerInventory, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.producers,
+        });
+    }
+
+    const dr = &demo.params.decay_rate;
+    if (createSlider("Decay Rate", u32, dr)) {
+        producers.updateU32Field(demo.gctx, dr.val, "decay_rate");
+    }
+
+    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
+
+    zgui.text("Consumer Settings", .{});
+    const nc = &demo.params.num_consumers;
+    if (createSlider("Number of Consumers", u32, nc)) {
+        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
+        demo.gctx.queue.writeBuffer(
+            resource,
+            @sizeOf(u32),
+            u32,
+            &.{nc.val},
+        );
+
+        if (nc.old.? >= nc.val) {
+            demo.buffers.consumers.mapping.num_structs = nc.val;
+        } else {
+            Consumer.generateBulk(
+                demo.gctx,
+                &demo.buffers.consumers,
+                nc.val - nc.old.?,
+                .{
+                    .income = demo.params.income.val,
+                    .moving_rate = demo.params.moving_rate.val,
+                    .max_money = demo.params.max_consumer_money.val,
+                },
+            );
+        }
+        nc.old.? = nc.val;
+    }
+
+    const consumers = demo.buffers.consumers;
+    const ci = &demo.params.income;
+    if (createSlider("Income", u32, &demo.params.income)) {
+        consumers.updateU32Field(demo.gctx, ci.val, "income");
+    }
+
+    const mcm = &demo.params.max_consumer_money;
+    if (createSlider("Max Money", u32, mcm)) {
+        consumers.updateU32Field(demo.gctx, mcm.val, "max_money");
+        Wgpu.getAllAsync(Consumer, Callbacks.updateConsumerMoney, .{
+            .gctx = demo.gctx,
+            .obj_buf = &demo.buffers.consumers,
+        });
+    }
+
+    const mr = &demo.params.moving_rate;
+    if (createSlider("Moving Rate", f32, mr)) {
+        consumers.updateF32Field(demo.gctx, mr.val, "moving_rate");
+    }
+    const cs = &demo.params.consumer_size;
+    if (createSlider("Consumer Size", f32, cs)) {
+        demo.graphics_objects.consumers.vertex_buffer = Shapes.createCircleVertexBuffer(
+            demo.gctx,
+            Main.NUM_CONSUMER_SIDES,
+            cs.val,
+        );
+        demo.graphics_objects.consumers_money.vertex_buffer = Shapes.createCircleVertexBuffer(
+            demo.gctx,
+            Main.NUM_CONSUMER_SIDES,
+            cs.val,
+        );
+    }
+    const ps = &demo.params.producer_size;
+    if (createSlider("Producer Size", f32, ps)) {
+        demo.graphics_objects.producers.vertex_buffer = Shapes.createRectangleVertexBuffer(
+            demo.gctx,
+            ps.val,
+            ps.val,
+        );
+        demo.graphics_objects.producers_bar.vertex_buffer = Shapes.createRectangleVertexBuffer(
+            demo.gctx,
+            ps.val / 2,
+            ps.val * 6,
+        );
+    }
+    zgui.dummy(.{ .w = 1.0, .h = 20.0 });
+
     if (zgui.button("Start", .{})) {
         demo.running = true;
     }
@@ -217,7 +359,6 @@ fn buttons(demo: *DemoState) void {
         Main.restartSimulation(demo);
     }
     if (zgui.button("Supply Shock", .{})) {
-        const producers = demo.buffers.data.producers;
         producers.updateU32Field(demo.gctx, 0, "inventory");
     }
 
@@ -244,148 +385,7 @@ fn buttons(demo: *DemoState) void {
     }
 }
 
-fn parameters(demo: *DemoState) void {
-    const producers = demo.buffers.data.producers;
-
-    zgui.text("Producer Settings", .{});
-    const np = &demo.params.num_producers;
-    if (createSlider("Number of Producers", u32, &np.slider)) {
-        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        demo.gctx.queue.writeBuffer(
-            resource,
-            2 * @sizeOf(u32),
-            u32,
-            &.{np.slider.val},
-        );
-
-        if (np.old >= np.slider.val) {
-            demo.buffers.data.producers.mapping.num_structs = np.slider.val;
-        } else {
-            Producer.generateBulk(
-                demo.gctx,
-                &demo.buffers.data.producers,
-                np.slider.val - np.old,
-                .{
-                    .max_inventory = demo.params.max_inventory.val,
-                    .production_cost = demo.params.production_cost.val,
-                    .max_production_rate = demo.params.max_production_rate.val,
-                    .price = demo.params.price.val,
-                    .max_money = demo.params.max_producer_money.val,
-                    .decay_rate = demo.params.decay_rate.val,
-                },
-            );
-        }
-        np.old = np.slider.val;
-    }
-
-    const pc = &demo.params.production_cost;
-    if (createSlider("Production Cost", u32, pc)) {
-        producers.updateU32Field(demo.gctx, pc.val, "production_cost");
-    }
-
-    const price = &demo.params.price;
-    if (createSlider("Price Sold", u32, price)) {
-        producers.updateU32Field(demo.gctx, price.val, "price");
-    }
-
-    const mpr = &demo.params.max_production_rate;
-    if (createSlider("Max Production Rate", u32, mpr)) {
-        producers.updateU32Field(demo.gctx, mpr.val, "max_production_rate");
-    }
-
-    const mpm = &demo.params.max_producer_money;
-    if (createSlider("Max Money", u32, mpm)) {
-        producers.updateU32Field(demo.gctx, mpm.val, "max_money");
-        Wgpu.getAllAsync(Producer, Callbacks.updateProducerMoney, .{
-            .gctx = demo.gctx,
-            .obj_buf = &demo.buffers.data.producers,
-        });
-    }
-
-    const mpi = &demo.params.max_inventory;
-    if (createSlider("Max Inventory", u32, mpi)) {
-        producers.updateU32Field(demo.gctx, mpi.val, "max_inventory");
-        Wgpu.getAllAsync(Producer, Callbacks.updateProducerInventory, .{
-            .gctx = demo.gctx,
-            .obj_buf = &demo.buffers.data.producers,
-        });
-    }
-
-    const dr = &demo.params.decay_rate;
-    if (createSlider("Decay Rate", u32, dr)) {
-        producers.updateU32Field(demo.gctx, dr.val, "decay_rate");
-    }
-
-    zgui.dummy(.{ .w = 1.0, .h = 40.0 });
-
-    zgui.text("Consumer Settings", .{});
-    const nc = &demo.params.num_consumers;
-    if (createSlider("Number of Consumers", u32, &nc.slider)) {
-        const resource = demo.gctx.lookupResource(demo.stats.obj_buf.buf).?;
-        demo.gctx.queue.writeBuffer(
-            resource,
-            @sizeOf(u32),
-            u32,
-            &.{nc.slider.val},
-        );
-
-        if (nc.old >= nc.slider.val) {
-            demo.buffers.data.consumers.mapping.num_structs = nc.slider.val;
-        } else {
-            Consumer.generateBulk(
-                demo.gctx,
-                &demo.buffers.data.consumers,
-                nc.slider.val - nc.old,
-                .{
-                    .income = demo.params.income.val,
-                    .moving_rate = demo.params.moving_rate.val,
-                    .max_money = demo.params.max_consumer_money.val,
-                },
-            );
-        }
-        nc.old = nc.slider.val;
-    }
-
-    const consumers = demo.buffers.data.consumers;
-    const ci = &demo.params.income;
-    if (createSlider("Income", u32, &demo.params.income)) {
-        consumers.updateU32Field(demo.gctx, ci.val, "income");
-    }
-
-    const mcm = &demo.params.max_consumer_money;
-    if (createSlider("Max Money", u32, mcm)) {
-        consumers.updateU32Field(demo.gctx, mcm.val, "max_money");
-        Wgpu.getAllAsync(Consumer, Callbacks.updateConsumerMoney, .{
-            .gctx = demo.gctx,
-            .obj_buf = &demo.buffers.data.consumers,
-        });
-    }
-
-    const mr = &demo.params.moving_rate;
-    if (createSlider("Moving Rate", f32, mr)) {
-        consumers.updateF32Field(demo.gctx, mr.val, "moving_rate");
-    }
-}
-
-fn extras(demo: *DemoState) void {
-    const cs = &demo.params.consumer_size;
-    if (createSlider("Consumer Size", f32, cs)) {
-        demo.buffers.vertex.circle = Shapes.createCircleVertexBuffer(
-            demo.gctx,
-            Main.NUM_CONSUMER_SIDES,
-            cs.val,
-        );
-    }
-    const ps = &demo.params.producer_size;
-    if (createSlider("Producer Size", f32, ps)) {
-        demo.buffers.vertex.square = Shapes.createSquareVertexBuffer(
-            demo.gctx,
-            ps.val,
-        );
-    }
-}
-
-pub fn help(demo: *DemoState) void {
+pub fn help(demo: *Main) void {
     if (zgui.button("Close Page", .{})) {
         demo.imgui_windows.help.p_open = !demo.imgui_windows.help.p_open;
         if (demo.imgui_windows.help.p_open) {

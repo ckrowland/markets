@@ -28,6 +28,29 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         consumers[index].position = c.destination;
         let at_home = all(c.destination == c.home);
         if (at_home) {
+            let rich_inv: u32 = 400;
+            let inv_close = c.inventory > rich_inv;
+            let money_close = c.money > c.max_money - 50;
+            if (inv_close && money_close) {
+                var rand_x = stats.rand_num.x * f32(stats.max_x);
+                var rand_y = stats.rand_num.y * f32(stats.max_y);
+                var new_home = c.home;
+                new_home.x = rand_x;
+                new_home.y = rand_y;
+
+                var new_c = c;
+                new_c.position = new_home;
+                new_c.home = new_home;
+                new_c.destination = new_home;
+                new_c.inventory = c.inventory / 2;
+                new_c.money = c.money / 2;
+                consumers[stats.num_consumers] = new_c;
+                stats.num_consumers += 1;
+
+                consumers[index].inventory /= 2;
+                consumers[index].money /= 2;
+            }
+
             if (c.inventory >= 1) {
                 consumers[index].inventory -= 1;
                 return;
@@ -55,12 +78,6 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             result = inv - can_buy;
             cmp = atomicCompareExchangeWeak(&producers[pid].inventory, inv, result);
         }
-        if (result < 0) {
-            producers[pid].color = vec4(1, 0, 0, 1);
-        }
-        if (can_buy < 0) {
-            producers[pid].color = vec4(1, 0, 0, 1);
-        }
         buy(index, producers[pid].price, can_buy);
         go_home(index);
         return;
@@ -75,6 +92,7 @@ fn buy(index: u32, price: u32, amount: u32) {
     consumers[index].color = green;
     stats.transactions += u32(1);
     atomicAdd(&producers[pid].money, cost);
+    producers[pid].price += 20;
 }
 
 fn go_home(index: u32) {

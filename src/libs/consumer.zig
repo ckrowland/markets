@@ -5,7 +5,6 @@ const Camera = @import("camera.zig");
 const Wgpu = @import("wgpu.zig");
 const Self = @This();
 
-absolute_home: [4]f32 = .{ 0, 0, 0, 0 },
 position: [4]f32 = .{ 0, 0, 0, 0 },
 home: [4]f32 = .{ 0, 0, 0, 0 },
 destination: [4]f32 = .{ 0, 0, 0, 0 },
@@ -30,23 +29,38 @@ pub fn generateBulk(
     params: Self,
 ) void {
     for (0..num) |_| {
-        const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
-        const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
-        const a_x = @as(f32, @floatFromInt(x));
-        const f_x = @as(f32, @floatFromInt(x)) * Camera.getAspectRatio(gctx);
+        const x = random.intRangeAtMost(u32, Camera.MIN_X, Camera.MAX_X);
+        const y = random.intRangeAtMost(u32, Camera.MIN_Y, Camera.MAX_Y);
+        const f_x = @as(f32, @floatFromInt(x));
         const f_y = @as(f32, @floatFromInt(y));
-        const grid_pos = [4]f32{ a_x, f_y, z_pos, 1 };
-        const world_pos = [4]f32{ f_x, f_y, z_pos, 1 };
+        const pos = [4]f32{ f_x, f_y, z_pos, 1 };
         obj_buf.append(gctx, .{
-            .absolute_home = grid_pos,
-            .position = world_pos,
-            .home = world_pos,
-            .destination = world_pos,
+            .position = pos,
+            .home = pos,
+            .destination = pos,
             .moving_rate = params.moving_rate,
             .income = params.income,
             .max_money = params.max_money,
         });
     }
+    const world_pos = [4]f32{ 0, 0, z_pos, 1 };
+    obj_buf.append(gctx, .{
+        .position = world_pos,
+        .home = world_pos,
+        .destination = world_pos,
+        .moving_rate = params.moving_rate,
+        .income = params.income,
+        .max_money = params.max_money,
+    });
+    const p = [4]f32{ @floatFromInt(Camera.MAX_X), 2000, z_pos, 1 };
+    obj_buf.append(gctx, .{
+        .position = p,
+        .home = p,
+        .destination = p,
+        .moving_rate = params.moving_rate,
+        .income = params.income,
+        .max_money = params.max_money,
+    });
 }
 
 pub fn createAndAppend(
@@ -56,14 +70,7 @@ pub fn createAndAppend(
     consumer: Self,
 ) void {
     const home: [4]f32 = .{ consumer.home[0], consumer.home[1], z_pos, 1 };
-    const absolute_home: [4]i32 = .{
-        consumer.absolute_home[0],
-        consumer.absolute_home[1],
-        z_pos,
-        1,
-    };
     const c = Self{
-        .absolute_home = absolute_home,
         .position = home,
         .home = home,
         .destination = home,

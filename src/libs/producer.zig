@@ -5,7 +5,6 @@ const Camera = @import("camera.zig");
 const Wgpu = @import("wgpu.zig");
 const Self = @This();
 
-absolute_home: [4]f32 = .{ 0, 0, 0, 0 },
 home: [4]f32 = .{ 0, 0, 0, 0 },
 color: [4]f32 = .{ 1, 1, 1, 0 },
 inventory: u32 = 5000,
@@ -25,15 +24,12 @@ pub fn generateBulk(
     p: Self,
 ) void {
     for (0..num) |_| {
-        const x = random.intRangeAtMost(i32, Camera.MIN_X, Camera.MAX_X);
-        const y = random.intRangeAtMost(i32, Camera.MIN_Y, Camera.MAX_Y);
-        const a_x = @as(f32, @floatFromInt(x));
-        const f_x = @as(f32, @floatFromInt(x)) * Camera.getAspectRatio(gctx);
+        const x = random.intRangeAtMost(u32, Camera.MIN_X, Camera.MAX_X);
+        const y = random.intRangeAtMost(u32, Camera.MIN_Y, Camera.MAX_Y);
+        const f_x = @as(f32, @floatFromInt(x));
         const f_y = @as(f32, @floatFromInt(y));
-        const grid_pos = [4]f32{ a_x, f_y, z_pos, 1 };
         const world_pos = [4]f32{ f_x, f_y, z_pos, 1 };
         obj_buf.append(gctx, .{
-            .absolute_home = grid_pos,
             .home = world_pos,
             .max_inventory = p.max_inventory,
             .production_cost = p.production_cost,

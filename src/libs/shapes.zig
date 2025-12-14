@@ -1,16 +1,28 @@
 const std = @import("std");
 const zgpu = @import("zgpu");
 
-pub fn createSquareVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.BufferHandle {
+pub fn createRectangleIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
+    const buf = gctx.createBuffer(.{
+        .usage = .{ .copy_dst = true, .index = true },
+        .size = 6 * @sizeOf(u32),
+    });
+
+    var indices: [6]u32 = .{ 0, 1, 2, 2, 3, 0 };
+    const resource = gctx.lookupResource(buf).?;
+    gctx.queue.writeBuffer(resource, 0, u32, indices[0..]);
+    return buf;
+}
+
+pub fn createRectangleVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32, height: f32) zgpu.BufferHandle {
     const buf = gctx.createBuffer(.{
         .usage = .{ .copy_dst = true, .vertex = true },
         .size = 4 * @sizeOf(f32) * 3,
     });
 
-    const upper_left = [3]f32{ -width, width, 0.0 };
-    const lower_left = [3]f32{ -width, -width, 0.0 };
-    const upper_right = [3]f32{ width, width, 0.0 };
-    const lower_right = [3]f32{ width, -width, 0.0 };
+    const upper_left = [3]f32{ -width, height, 0.0 };
+    const lower_left = [3]f32{ -width, -height, 0.0 };
+    const upper_right = [3]f32{ width, height, 0.0 };
+    const lower_right = [3]f32{ width, -height, 0.0 };
 
     const vertex_array = [4][3]f32{
         upper_left,
@@ -21,18 +33,6 @@ pub fn createSquareVertexBuffer(gctx: *zgpu.GraphicsContext, width: f32) zgpu.Bu
 
     const resource = gctx.lookupResource(buf).?;
     gctx.queue.writeBuffer(resource, 0, [3]f32, vertex_array[0..]);
-    return buf;
-}
-
-pub fn createSquareIndexBuffer(gctx: *zgpu.GraphicsContext) zgpu.BufferHandle {
-    const buf = gctx.createBuffer(.{
-        .usage = .{ .copy_dst = true, .index = true },
-        .size = 6 * @sizeOf(u32),
-    });
-
-    var indices: [6]u32 = .{ 0, 1, 2, 2, 3, 0 };
-    const resource = gctx.lookupResource(buf).?;
-    gctx.queue.writeBuffer(resource, 0, u32, indices[0..]);
     return buf;
 }
 

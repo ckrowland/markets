@@ -1,9 +1,19 @@
 const std = @import("std");
+const zglfw = @import("zglfw");
 const zgpu = @import("zgpu");
 const Wgpu = @import("libs/wgpu.zig");
 const Consumer = @import("libs/consumer.zig");
 const Producer = @import("libs/producer.zig");
 const Camera = @import("libs/camera.zig");
+
+pub fn getNumAgents(args: Wgpu.CallbackArgs(u32)) void {
+    const slice = args.obj_buf.mapping.staging.slice;
+    if (slice) |stats| {
+        args.consumer_num_structs.* = stats[1];
+        args.producer_num_structs.* = stats[2];
+        args.gui_slider.* = stats[2];
+    }
+}
 
 pub fn price(args: Wgpu.CallbackArgs(Producer)) void {
     const slice = args.obj_buf.mapping.staging.slice;
@@ -14,7 +24,8 @@ pub fn price(args: Wgpu.CallbackArgs(Producer)) void {
         }
         avg /= @intCast(producers.len);
     }
-    args.stat_array.append(avg) catch unreachable;
+    //args.stat_array.append(avg) catch unreachable;
+    args.gui_slider.* = avg;
 }
 
 pub fn numTransactions(args: Wgpu.CallbackArgs(u32)) void {
@@ -94,12 +105,20 @@ pub fn updateProducerCoords(args: Wgpu.CallbackArgs(Producer)) void {
     const buf = args.gctx.lookupResource(args.obj_buf.buf).?;
 
     if (slice) |producers| {
+        Camera.updateMaxX(args.gctx);
         for (producers, 0..) |p, i| {
-            const new_coord = Camera.getWorldPosition(args.gctx, p.absolute_home);
+            const new_coord = Camera.updatePosition(p.home);
             const offset = i * @sizeOf(Producer) + @offsetOf(Producer, "home");
             args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
         }
     }
+
+    args.gctx.queue.writeBuffer(
+        args.gctx.lookupResource(args.stat_buf.buf).?,
+        4 * @sizeOf(u32),
+        u32,
+        &.{ Camera.MAX_X, Camera.MAX_Y },
+    );
 }
 
 pub fn updateConsumerCoords(args: Wgpu.CallbackArgs(Consumer)) void {
@@ -108,7 +127,7 @@ pub fn updateConsumerCoords(args: Wgpu.CallbackArgs(Consumer)) void {
 
     if (slice) |consumers| {
         for (consumers, 0..) |c, i| {
-            const new_coord = Camera.getWorldPosition(args.gctx, c.absolute_home);
+            const new_coord = Camera.updatePosition(c.home);
             var offset = i * @sizeOf(Consumer) + @offsetOf(Consumer, "home");
             args.gctx.queue.writeBuffer(buf, offset, [4]f32, &.{new_coord});
 

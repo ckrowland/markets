@@ -15,7 +15,7 @@ struct VertexOut {
     var x = home[0] + (scale * vertex_position[0]);
     var y = home[1] + (scale * vertex_position[1]);
     output.position_clip = object_to_clip * vec4(x, y, home[2], 1.0);
-    output.color = vec4(1, 1, 1, 0);
+    output.color = vec4(0.7, 0.7, 0.7, 0);
     return output;
 }
 
